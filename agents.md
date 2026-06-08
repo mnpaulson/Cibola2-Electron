@@ -65,3 +65,20 @@ To keep the application lightweight and simple for a small-scale single terminal
 * For taking photos of jewelry items (e.g., in Repair Jobs or Customer details), do not write direct camera streaming or WebRTC logic in the views.
 * Use the reusable dialog component [CameraCapture.vue](file:///c:/dev/Cibola2-Electron/src/components/CameraCapture.vue) which supports webcam permissions, multi-device video input selection (to support external USB macro/inspection scopes), center layout alignment masks, and base64 JPEG export.
 
+---
+
+## 9. Customer Lookup & Two-Pronged Search
+To avoid sending the entire customer list to the client while keeping search spelling-tolerant:
+* **Backend Prefix Search**: `GET /customers?q=...` tokenizes the query and performs prefix & substring queries in SQLite (returning up to 100 candidate records).
+* **Frontend Fuzzy Ranking**: The client uses `fuse.js` to fuzzy filter and rank this candidate list as the operator types.
+* Do not bypass the candidate limit or query the entire directory for interactive lookups.
+
+---
+
+## 10. Global Tab-Navigation History (Back Button)
+The application handles view routing via tab states instead of Vue Router:
+* **Navigation Stack**: Store current and past active tabs in `sessionState.navigationHistory`.
+* **Utility helpers**: Use `navigateTo(tab)` to push a tab and `navigateBack()` to pop the tab.
+* **Global Back Button**: An arrow-left icon in `App.vue`'s app-bar binds to `navigateBack()` and renders only when `sessionState.navigationHistory.length > 1`.
+* **State Passing**: Store entities like `sessionState.selectedCustomerId` when initiating new jobs/credits to prepopulate values on cross-page tab transitions.
+

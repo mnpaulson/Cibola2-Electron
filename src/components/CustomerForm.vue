@@ -1,0 +1,637 @@
+<template>
+  <v-card class="customer-card" elevation="3" :loading="loading">
+    <!-- Card Header -->
+    <v-card-item class="bg-primary text-white py-3">
+      <div class="d-flex justify-space-between align-center">
+        <v-card-title class="font-weight-bold text-subtitle-1">
+          <v-icon start class="mr-2">{{ cardIcon }}</v-icon>
+          {{ cardTitle }}
+        </v-card-title>
+        
+        <!-- Status indicator for note saving -->
+        <span v-if="currentState === 'info' && noteSavingStatus" class="text-caption font-weight-medium">
+          {{ noteSavingStatus }}
+        </span>
+      </div>
+    </v-card-item>
+
+    <v-divider></v-divider>
+
+    <v-card-text class="pa-4">
+      <!-- 1. SEARCH STATE -->
+      <v-fade-transition hide-on-leave>
+        <div v-if="currentState === 'search'">
+          <div class="d-flex align-center gap-2">
+            <v-autocomplete
+              v-model="selectedSearchItem"
+              v-model:search="searchQuery"
+              :loading="loading"
+              :items="formattedCandidates"
+              item-title="displayName"
+              item-value="id"
+              return-object
+              placeholder="Type customer name or phone..."
+              prepend-inner-icon="mdi-account-search"
+              no-filter
+              clearable
+              variant="outlined"
+              density="comfortable"
+              class="flex-grow-1"
+              hide-details
+            >
+              <template v-slot:item="{ props, item }">
+                <v-list-item
+                  v-bind="props"
+                  :title="item.raw.displayName"
+                  :subtitle="item.raw.phone || 'No phone number'"
+                >
+                  <template v-slot:prepend>
+                    <v-avatar color="primary" variant="tonal" size="32">
+                      <v-icon size="16">mdi-account</v-icon>
+                    </v-avatar>
+                  </template>
+                </v-list-item>
+              </template>
+              <template v-slot:no-data>
+                <v-list-item v-if="searchQuery && searchQuery.length >= 2">
+                  <span class="text-medium-emphasis">No customers found. Click the button to add.</span>
+                </v-list-item>
+                <v-list-item v-else>
+                  <span class="text-medium-emphasis">Type at least 2 characters to search...</span>
+                </v-list-item>
+              </template>
+            </v-autocomplete>
+
+            <v-btn
+              color="primary"
+              variant="elevated"
+              icon="mdi-account-plus"
+              class="ml-2"
+              title="Add New Customer"
+              @click="initCreateForm"
+            ></v-btn>
+          </div>
+        </div>
+      </v-fade-transition>
+
+      <!-- 2. INFO / DETAILS STATE -->
+      <v-fade-transition hide-on-leave>
+        <div v-if="currentState === 'info'" class="customer-info-container">
+          <v-row>
+            <v-col cols="12" md="6" class="py-1">
+              <div class="d-flex align-center mb-2">
+                <v-avatar color="primary" variant="tonal" size="48" class="mr-3">
+                  <v-icon size="24">mdi-account</v-icon>
+                </v-avatar>
+                <div>
+                  <h3 class="text-h6 font-weight-bold mb-0">
+                    {{ customer.fname }} {{ customer.lname }}
+                  </h3>
+                  <span class="text-caption text-medium-emphasis">Customer ID: #{{ customer.id }}</span>
+                </div>
+              </div>
+
+              <!-- Contact Info -->
+              <div class="my-3 text-body-2">
+                <div v-if="customer.phone" class="d-flex align-center my-1 text-medium-emphasis">
+                  <v-icon size="16" start class="mr-2">mdi-phone</v-icon>
+                  <span>{{ customer.phone }}</span>
+                </div>
+                <div v-if="customer.email" class="d-flex align-center my-1 text-medium-emphasis">
+                  <v-icon size="16" start class="mr-2">mdi-email</v-icon>
+                  <span class="text-truncate">{{ customer.email }}</span>
+                </div>
+              </div>
+
+              <!-- Address Block -->
+              <div v-if="hasAddress" class="mt-3">
+                <div class="d-flex align-start text-caption text-medium-emphasis">
+                  <v-icon size="16" start class="mr-2 mt-1">mdi-map-marker</v-icon>
+                  <div>
+                    <span v-if="customer.addr_st">{{ customer.addr_st }}<br /></span>
+                    <span v-if="customer.addr_city">{{ customer.addr_city }}, </span>
+                    <span v-if="customer.addr_prov">{{ customer.addr_prov }} </span>
+                    <span v-if="customer.addr_postal">{{ customer.addr_postal }}<br /></span>
+                    <span v-if="customer.addr_country">{{ customer.addr_country }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-caption text-medium-emphasis italic mt-2">
+                <v-icon size="16" start class="mr-2">mdi-map-marker-off</v-icon>
+                No address on file
+              </div>
+            </v-col>
+
+            <!-- Customer Notes -->
+            <v-col cols="12" md="6" v-if="!hideNotes">
+              <v-textarea
+                v-model="customer.note"
+                label="Customer Notes"
+                variant="outlined"
+                rows="4"
+                no-resize
+                density="comfortable"
+                placeholder="Add private customer notes here..."
+                @blur="saveNotesOnly"
+                hide-details
+              ></v-textarea>
+            </v-col>
+          </v-row>
+        </div>
+      </v-fade-transition>
+
+      <!-- 3. FORM / EDIT / CREATE STATE -->
+      <v-fade-transition hide-on-leave>
+        <v-form v-if="currentState === 'form'" ref="formRef" v-model="isFormValid" lazy-validation>
+          <v-row dense>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="customer.fname"
+                label="First Name *"
+                :rules="nameRules"
+                required
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="customer.lname"
+                label="Last Name *"
+                :rules="nameRules"
+                required
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="customer.phone"
+                label="Phone Number"
+                prepend-inner-icon="mdi-phone"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="customer.email"
+                label="E-Mail"
+                prepend-inner-icon="mdi-email"
+                type="email"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            
+            <v-col cols="12">
+              <v-text-field
+                v-model="customer.addr_st"
+                label="Street Address"
+                prepend-inner-icon="mdi-home"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-text-field
+                v-model="customer.addr_city"
+                label="City"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="3">
+              <v-text-field
+                v-model="customer.addr_prov"
+                label="Province/State"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" sm="3">
+              <v-text-field
+                v-model="customer.addr_postal"
+                label="Postal Code"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12">
+              <v-text-field
+                v-model="customer.addr_country"
+                label="Country"
+                variant="outlined"
+                density="compact"
+              ></v-text-field>
+            </v-col>
+
+            <v-col cols="12" v-if="!hideNotes">
+              <v-textarea
+                v-model="customer.note"
+                label="Customer Notes"
+                variant="outlined"
+                rows="2"
+                no-resize
+                density="compact"
+              ></v-textarea>
+            </v-col>
+          </v-row>
+        </v-form>
+      </v-fade-transition>
+    </v-card-text>
+
+    <!-- Card Actions -->
+    <v-divider v-if="currentState !== 'search'"></v-divider>
+    <v-card-actions class="pa-3 bg-light-surface d-flex justify-end gap-2" v-if="currentState !== 'search'">
+      <!-- Actions for Details state -->
+      <template v-if="currentState === 'info'">
+        <v-btn
+          v-if="clearable"
+          color="grey-darken-1"
+          variant="outlined"
+          prepend-icon="mdi-account-switch"
+          size="small"
+          @click="clearSelectedCustomer"
+        >
+          Change
+        </v-btn>
+        <v-btn
+          color="primary"
+          variant="flat"
+          prepend-icon="mdi-pencil"
+          size="small"
+          @click="currentState = 'form'"
+        >
+          Edit Profile
+        </v-btn>
+      </template>
+
+      <!-- Actions for Form state -->
+      <template v-if="currentState === 'form'">
+        <v-btn
+          color="grey-darken-1"
+          variant="outlined"
+          size="small"
+          @click="cancelForm"
+        >
+          Cancel
+        </v-btn>
+        <v-btn
+          color="success"
+          variant="flat"
+          size="small"
+          :disabled="!isFormValid"
+          prepend-icon="mdi-content-save"
+          @click="saveCustomer"
+        >
+          {{ customer.id ? 'Save Changes' : 'Create Customer' }}
+        </v-btn>
+      </template>
+    </v-card-actions>
+  </v-card>
+</template>
+
+<script setup>
+import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { api } from '../utils/api'
+import Fuse from 'fuse.js'
+
+const props = defineProps({
+  modelValue: {
+    type: Number,
+    default: null
+  },
+  hideNotes: {
+    type: Boolean,
+    default: false
+  },
+  clearable: {
+    type: Boolean,
+    default: true
+  },
+  initialState: {
+    type: String,
+    default: 'search' // 'search', 'info', 'form'
+  },
+  prefillQuery: {
+    type: String,
+    default: ''
+  }
+})
+
+const emit = defineEmits(['update:modelValue', 'select', 'newCustomer', 'cancel'])
+
+// State Variables
+const currentState = ref('search') // 'search', 'info', 'form'
+const loading = ref(false)
+const searchQuery = ref('')
+const selectedSearchItem = ref(null)
+const rawCandidates = ref([])
+const searchResults = ref([])
+const isFormValid = ref(true)
+const formRef = ref(null)
+const startingNote = ref('')
+const noteSavingStatus = ref('')
+
+const customer = reactive({
+  id: null,
+  fname: '',
+  lname: '',
+  phone: '',
+  email: '',
+  addr_st: '',
+  addr_city: '',
+  addr_prov: '',
+  addr_postal: '',
+  addr_country: '',
+  note: ''
+})
+
+// Validation Rules
+const nameRules = [
+  v => !!v || 'Name is required',
+  v => (v && v.trim().length > 0) || 'Name cannot be blank'
+]
+
+// Computed Headers
+const cardTitle = computed(() => {
+  if (currentState.value === 'search') return 'Customer Search'
+  if (currentState.value === 'info') return 'Customer Details'
+  return customer.id ? 'Edit Customer Details' : 'Add New Customer'
+})
+
+const cardIcon = computed(() => {
+  if (currentState.value === 'search') return 'mdi-account-search'
+  if (currentState.value === 'info') return 'mdi-account-card-details'
+  return 'mdi-account-plus'
+})
+
+const hasAddress = computed(() => {
+  return (
+    customer.addr_st ||
+    customer.addr_city ||
+    customer.addr_prov ||
+    customer.addr_postal ||
+    customer.addr_country
+  )
+})
+
+// Format candidates list for v-autocomplete dropdown display
+const formattedCandidates = computed(() => {
+  return searchResults.value.map(c => ({
+    ...c,
+    displayName: `${c.fname} ${c.lname} ${c.phone ? ' - ' + c.phone : ''}`
+  }))
+})
+
+// Search watcher with debounced backend fetching + local fuse.js filtering
+let debounceTimeout = null
+watch(searchQuery, (newVal) => {
+  if (debounceTimeout) clearTimeout(debounceTimeout)
+  
+  if (!newVal || newVal.trim().length < 2) {
+    searchResults.value = []
+    return
+  }
+
+  debounceTimeout = setTimeout(() => {
+    fetchCandidates(newVal)
+  }, 350)
+})
+
+// Fetch raw candidates matching the query tokens, then apply fuzzy filter on the client
+async function fetchCandidates(queryText) {
+  loading.value = true
+  try {
+    const data = await api.get(`/customers?q=${encodeURIComponent(queryText)}`)
+    rawCandidates.value = data || []
+    
+    // Perform client-side fuzzy match using Fuse.js
+    if (rawCandidates.value.length > 0) {
+      const fuseInstance = new Fuse(rawCandidates.value, {
+        keys: ['fname', 'lname', 'phone'],
+        threshold: 0.4,
+        distance: 100
+      })
+      const result = fuseInstance.search(queryText)
+      searchResults.value = result.map(r => r.item)
+    } else {
+      searchResults.value = []
+    }
+  } catch (err) {
+    console.error('Failed to search customers:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Watch selection from autocomplete
+watch(selectedSearchItem, (newItem) => {
+  if (newItem && newItem.id) {
+    loadCustomer(newItem.id)
+  }
+})
+
+// Load customer from backend
+async function loadCustomer(id) {
+  if (!id) return
+  loading.value = true
+  try {
+    const data = await api.get(`/customers/${id}`)
+    if (data) {
+      Object.assign(customer, data)
+      startingNote.value = data.note || ''
+      currentState.value = 'info'
+      emit('update:modelValue', data.id)
+      emit('select', data)
+    }
+  } catch (err) {
+    console.error('Failed to load customer:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Watch modelValue change (external synchronization)
+watch(() => props.modelValue, (newVal) => {
+  if (newVal && newVal !== customer.id) {
+    loadCustomer(newVal)
+  } else if (!newVal) {
+    resetState()
+    currentState.value = props.initialState
+  }
+}, { immediate: true })
+
+// Helper to parse query into fname, lname, and phone
+function parseSearchQuery(query) {
+  const result = { fname: '', lname: '', phone: '' }
+  if (!query) return result
+  
+  const cleanQuery = query.trim()
+  
+  // Matches phone numbers with digits, dashes, parentheses, or spaces, minimum 7 digits
+  const phoneMatch = cleanQuery.match(/(\+?\d{1,4}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\b\d{7,12}\b/)
+  
+  let remainingQuery = cleanQuery
+  if (phoneMatch) {
+    result.phone = phoneMatch[0].trim()
+    remainingQuery = cleanQuery.replace(phoneMatch[0], '').trim()
+  }
+  
+  if (remainingQuery) {
+    const nameParts = remainingQuery.split(/\s+/).filter(Boolean)
+    if (nameParts.length > 1) {
+      result.fname = nameParts[0]
+      result.lname = nameParts.slice(1).join(' ')
+    } else if (nameParts.length === 1) {
+      result.fname = nameParts[0]
+    }
+  }
+  
+  return result
+}
+
+// Initialize the "Create New" state with prepopulated names/phone if possible
+function initCreateForm() {
+  resetFormFields()
+  
+  const query = searchQuery.value || props.prefillQuery || ''
+  if (query.trim().length > 0) {
+    const parsed = parseSearchQuery(query)
+    customer.fname = parsed.fname
+    customer.lname = parsed.lname
+    customer.phone = parsed.phone
+  }
+
+  currentState.value = 'form'
+}
+
+// Reset form values
+function resetFormFields() {
+  customer.id = null
+  customer.fname = ''
+  customer.lname = ''
+  customer.phone = ''
+  customer.email = ''
+  customer.addr_st = ''
+  customer.addr_city = ''
+  customer.addr_prov = ''
+  customer.addr_postal = ''
+  customer.addr_country = ''
+  customer.note = ''
+  startingNote.value = ''
+  noteSavingStatus.value = ''
+}
+
+function resetState() {
+  resetFormFields()
+  selectedSearchItem.value = null
+  searchQuery.value = ''
+  searchResults.value = []
+  currentState.value = 'search'
+}
+
+function clearSelectedCustomer() {
+  resetState()
+  emit('update:modelValue', null)
+  emit('select', null)
+}
+
+function cancelForm() {
+  if (customer.id) {
+    currentState.value = 'info'
+  } else {
+    resetState()
+    emit('cancel')
+  }
+}
+
+// Save or Create customer
+async function saveCustomer() {
+  if (!isFormValid.value) return
+  
+  loading.value = true
+  try {
+    let responseData
+    if (customer.id) {
+      // Update
+      responseData = await api.put(`/customers/${customer.id}`, customer)
+    } else {
+      // Create
+      responseData = await api.post('/customers', customer)
+      emit('newCustomer', responseData.id)
+    }
+
+    if (responseData) {
+      Object.assign(customer, responseData)
+      startingNote.value = responseData.note || ''
+      currentState.value = 'info'
+      emit('update:modelValue', responseData.id)
+      emit('select', responseData)
+    }
+  } catch (err) {
+    console.error('Failed to save customer:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Separate Note Auto-Save on Blur
+async function saveNotesOnly() {
+  if (!customer.id || customer.note === startingNote.value) return
+  
+  noteSavingStatus.value = 'Saving...'
+  try {
+    const data = await api.put(`/customers/${customer.id}`, {
+      ...customer,
+      note: customer.note
+    })
+    if (data) {
+      startingNote.value = data.note || ''
+      noteSavingStatus.value = 'Saved!'
+      setTimeout(() => {
+        noteSavingStatus.value = ''
+      }, 2000)
+    }
+  } catch (err) {
+    console.error('Failed to auto-save notes:', err)
+    noteSavingStatus.value = 'Error!'
+  }
+}
+
+onMounted(() => {
+  if (props.modelValue) {
+    loadCustomer(props.modelValue)
+  } else {
+    currentState.value = props.initialState
+    if (props.initialState === 'form' && props.prefillQuery) {
+      const parsed = parseSearchQuery(props.prefillQuery)
+      customer.fname = parsed.fname
+      customer.lname = parsed.lname
+      customer.phone = parsed.phone
+    }
+  }
+})
+</script>
+
+<style scoped>
+.customer-card {
+  border-radius: 12px;
+  border: 1px solid rgba(var(--v-border-color), 0.12);
+  transition: box-shadow 0.3s ease;
+  overflow: hidden;
+}
+
+.bg-light-surface {
+  background-color: rgba(var(--v-theme-surface-variant), 0.05);
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.italic {
+  font-style: italic;
+}
+</style>

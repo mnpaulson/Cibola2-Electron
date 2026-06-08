@@ -19,7 +19,7 @@
           :title="item.title"
           :value="item.value"
           :active="activeTab === item.value"
-          @click="activeTab = item.value"
+          @click="handleTabClick(item.value)"
           active-color="primary"
           class="menu-item-transition"
         ></v-list-item>
@@ -29,6 +29,18 @@
     <!-- App Bar -->
     <v-app-bar app elevation="1" border="none">
       <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
+      
+      <!-- Back button visible when history stack is > 1 -->
+      <v-btn
+        v-if="sessionState.navigationHistory.length > 1"
+        icon="mdi-arrow-left"
+        class="mr-2"
+        color="primary"
+        variant="text"
+        title="Go Back"
+        @click="navigateBack"
+      ></v-btn>
+
       <v-app-bar-title class="font-weight-bold text-gradient">
         {{ currentMenuTitle }}
       </v-app-bar-title>
@@ -78,7 +90,7 @@
               <v-card class="pa-4" elevation="2">
                 <div class="d-flex justify-space-between align-center mb-4">
                   <h3 class="text-h6 font-weight-bold">Recent Repair Jobs</h3>
-                  <v-btn color="primary" variant="flat" size="small" prepend-icon="mdi-plus">
+                  <v-btn color="primary" variant="flat" size="small" prepend-icon="mdi-plus" @click="handleTabClick('jobs')">
                     New Job
                   </v-btn>
                 </div>
@@ -133,6 +145,16 @@
           </v-row>
         </div>
 
+        <!-- Customers Tab -->
+        <div v-else-if="activeTab === 'customers'">
+          <CustomerManager />
+        </div>
+
+        <!-- Repair Jobs Tab -->
+        <div v-else-if="activeTab === 'jobs'">
+          <JobManager />
+        </div>
+
         <!-- Configuration / Settings Tab -->
         <div v-else-if="activeTab === 'config'">
           <Admin />
@@ -168,10 +190,12 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useTheme } from 'vuetify'
 import { settingsState, loadSettings } from './store/settings'
-import { sessionState, startHeartbeat } from './store/session'
+import { sessionState, startHeartbeat, navigateTo, navigateBack } from './store/session'
 import { metadataState, refreshMetadata } from './store/metadata'
 import ConnectionBanner from './components/ConnectionBanner.vue'
 import Admin from './components/Admin.vue'
+import CustomerManager from './components/CustomerManager.vue'
+import JobManager from './components/JobManager.vue'
 
 const theme = useTheme()
 
@@ -212,7 +236,23 @@ const handleManualLoad = async () => {
 }
 
 const drawer = ref(true)
-const activeTab = ref('dashboard')
+const activeTab = computed({
+  get: () => sessionState.activeTab,
+  set: (val) => navigateTo(val)
+})
+
+const handleTabClick = (value) => {
+  if (value === 'jobs') {
+    sessionState.activeJobId = null
+    sessionState.selectedCustomerId = null
+    sessionState.enteredJobEditFromList = false
+  } else if (value === 'credits') {
+    sessionState.activeCreditId = null
+    sessionState.selectedCustomerId = null
+    sessionState.enteredCreditEditFromList = false
+  }
+  activeTab.value = value
+}
 const isDark = ref(true)
 
 const toggleTheme = () => {
