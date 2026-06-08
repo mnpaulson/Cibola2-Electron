@@ -326,6 +326,7 @@ const emit = defineEmits(['update:modelValue', 'select', 'newCustomer', 'cancel'
 const currentState = ref('search') // 'search', 'info', 'form'
 const loading = ref(false)
 const searchQuery = ref('')
+const lastSearchText = ref('')
 const selectedSearchItem = ref(null)
 const rawCandidates = ref([])
 const searchResults = ref([])
@@ -388,6 +389,10 @@ const formattedCandidates = computed(() => {
 // Search watcher with debounced backend fetching + local fuse.js filtering
 let debounceTimeout = null
 watch(searchQuery, (newVal) => {
+  if (newVal && newVal.trim().length > 0) {
+    lastSearchText.value = newVal
+  }
+
   if (debounceTimeout) clearTimeout(debounceTimeout)
   
   if (!newVal || newVal.trim().length < 2) {
@@ -496,7 +501,7 @@ function parseSearchQuery(query) {
 function initCreateForm() {
   resetFormFields()
   
-  const query = searchQuery.value || props.prefillQuery || ''
+  const query = searchQuery.value || lastSearchText.value || props.prefillQuery || ''
   if (query.trim().length > 0) {
     const parsed = parseSearchQuery(query)
     customer.fname = parsed.fname
@@ -528,6 +533,7 @@ function resetState() {
   resetFormFields()
   selectedSearchItem.value = null
   searchQuery.value = ''
+  lastSearchText.value = ''
   searchResults.value = []
   currentState.value = 'search'
 }

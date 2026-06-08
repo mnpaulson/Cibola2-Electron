@@ -104,17 +104,16 @@
                       <th class="text-left font-weight-bold text-caption py-2">Estimate</th>
                       <th class="text-left font-weight-bold text-caption py-2">Created</th>
                       <th class="text-left font-weight-bold text-caption py-2">Due Date</th>
-                      <th class="text-left font-weight-bold text-caption py-2">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-if="loadingHistory" class="text-center">
-                      <td colspan="5" class="py-6">
+                      <td colspan="4" class="py-6">
                         <v-progress-circular indeterminate color="primary"></v-progress-circular>
                       </td>
                     </tr>
                     <tr v-else-if="jobs.length === 0" class="text-center">
-                      <td colspan="5" class="py-6 text-medium-emphasis text-caption italic">
+                      <td colspan="4" class="py-6 text-medium-emphasis text-caption italic">
                         No repair jobs found for this customer.
                       </td>
                     </tr>
@@ -128,18 +127,8 @@
                       <td class="font-weight-bold text-primary">#{{ job.id }}</td>
                       <td>${{ (job.estimate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                       <td class="text-medium-emphasis text-caption">{{ formatDate(job.created_at) }}</td>
-                      <td :class="{ 'text-error font-weight-bold': isUrgent(job) }">
-                        {{ job.due_date || 'No due date' }}
-                      </td>
                       <td>
-                        <v-chip
-                          :color="getJobStatusColor(job.completed_at)"
-                          size="x-small"
-                          variant="flat"
-                          class="font-weight-bold"
-                        >
-                          {{ job.completed_at ? 'Completed' : 'In Progress' }}
-                        </v-chip>
+                        {{ job.due_date || 'No due date' }}
                       </td>
                     </tr>
                   </tbody>
@@ -418,7 +407,16 @@ import { sessionState, navigateTo, setSelectedCustomerId } from '../store/sessio
 import CustomerForm from './CustomerForm.vue'
 
 // Local State
+// Local State
 const selectedId = ref(null)
+
+// Sync with global session state
+watch(() => sessionState.selectedCustomerId, (newVal) => {
+  if (newVal !== selectedId.value) {
+    selectedId.value = newVal
+  }
+}, { immediate: true })
+
 const selectedCustomer = ref(null)
 const activeTab = ref('jobs')
 const loadingHistory = ref(false)
@@ -441,6 +439,9 @@ const confirmLastNameInput = ref('')
 
 // Watch selected Customer ID to load records
 watch(selectedId, (newId) => {
+  if (sessionState.selectedCustomerId !== newId) {
+    sessionState.selectedCustomerId = newId
+  }
   if (newId) {
     fetchAssociatedHistory(newId)
   } else {
@@ -581,7 +582,21 @@ const submitDeleteCustomer = async () => {
 const formatDate = (dateStr) => {
   if (!dateStr) return '—'
   try {
-    const date = new Date(dateStr)
+    const clean = dateStr.trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+      const parts = clean.split('-')
+      const year = parseInt(parts[0], 10)
+      const month = parseInt(parts[1], 10) - 1
+      const day = parseInt(parts[2], 10)
+      const localDate = new Date(year, month, day)
+      return localDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    }
+    let parseableStr = clean
+    if (clean.includes(' ') && !clean.includes('T')) {
+      parseableStr = clean.replace(' ', 'T') + 'Z'
+    }
+    const date = new Date(parseableStr)
+    if (isNaN(date.getTime())) return dateStr
     return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
   } catch {
     return dateStr
@@ -595,13 +610,7 @@ const formatCityProv = (cust) => {
   return parts.length > 0 ? parts.join(', ') : '—'
 }
 
-const getJobStatusColor = (completedAt) => {
-  return completedAt ? 'success' : 'info'
-}
 
-const isUrgent = (job) => {
-  return job.vital_date && !job.completed_at
-}
 
 // Mock nav links until target pages are built
 const goToJob = (jobId) => {

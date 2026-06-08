@@ -81,4 +81,10 @@ The application handles view routing via tab states instead of Vue Router:
 * **Utility helpers**: Use `navigateTo(tab)` to push a tab and `navigateBack()` to pop the tab.
 * **Global Back Button**: An arrow-left icon in `App.vue`'s app-bar binds to `navigateBack()` and renders only when `sessionState.navigationHistory.length > 1`.
 * **State Passing**: Store entities like `sessionState.selectedCustomerId` when initiating new jobs/credits to prepopulate values on cross-page tab transitions.
+---
 
+## 11. Date and Timezone Handling
+To ensure consistent dates across various timezone configurations:
+* **Date-only values**: Fields representing calendar dates (e.g., `due_date`) are stored as `YYYY-MM-DD` strings in the SQLite database. When parsing or displaying these values, format them using local component extraction (e.g., splitting by `-` and constructing a date via `new Date(year, monthIndex, day)`) instead of using raw `new Date('YYYY-MM-DD')` which implicitly parses as UTC and causes off-by-one calendar day offsets in negative timezone offsets.
+* **HTML5 Date Inputs**: Standard `<v-text-field type="date">` inputs strictly expect the value format `YYYY-MM-DD`. Ensure all values loaded into these inputs from the database are normalized to strip time suffixes (e.g., splitting by space or `'T'`).
+* **Timestamp values**: Database created/updated timestamps are saved as UTC string format `YYYY-MM-DD HH:mm:ss`. Normalize them to ISO format (replacing space with `'T'` and appending `'Z'`) before using the Javascript `Date` constructor to guarantee they convert correctly to the client's local timezone.

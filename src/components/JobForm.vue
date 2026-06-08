@@ -15,6 +15,16 @@
     <v-divider></v-divider>
 
     <v-card-text class="pa-4">
+      <!-- Inline Customer Lookup Field -->
+      <div class="mb-4">
+        <CustomerForm
+          v-model="job.customer_id"
+          :clearable="true"
+          :hide-notes="true"
+          @select="handleCustomerSelect"
+        />
+      </div>
+
       <v-form ref="formRef" v-model="isFormValid" lazy-validation>
         <v-row>
           <!-- Left Column inputs -->
@@ -40,15 +50,31 @@
               density="compact"
             ></v-select>
 
-            <v-text-field
-              v-model="job.due_date"
-              type="date"
-              label="Due Date"
-              prepend-inner-icon="mdi-calendar"
-              variant="outlined"
-              density="compact"
-              :class="{ 'urgent-date-input': job.vital_date }"
-            ></v-text-field>
+            <v-menu
+              v-model="dateMenu"
+              :close-on-content-click="false"
+              transition="scale-transition"
+              min-width="auto"
+            >
+              <template v-slot:activator="{ props }">
+                <v-text-field
+                  v-model="dueDateModel"
+                  label="Due Date"
+                  prepend-inner-icon="mdi-calendar"
+                  readonly
+                  v-bind="props"
+                  variant="outlined"
+                  density="compact"
+                  clearable
+                ></v-text-field>
+              </template>
+              <v-date-picker
+                v-model="dueDateValue"
+                no-title
+                color="primary"
+                @update:model-value="dateMenu = false"
+              ></v-date-picker>
+            </v-menu>
 
             <v-text-field
               v-model="job.deposit"
@@ -71,45 +97,7 @@
               density="compact"
             ></v-textarea>
 
-            <div class="d-flex align-center justify-space-between mt-2 flex-wrap bg-light-surface pa-2 rounded-lg border">
-              <v-checkbox
-                v-model="job.appraisal"
-                label="Appraisal Required"
-                color="primary"
-                density="compact"
-                hide-details
-              ></v-checkbox>
 
-              <v-checkbox
-                v-model="job.vital_date"
-                label="Vital Date (Urgent)"
-                color="error"
-                density="compact"
-                hide-details
-              ></v-checkbox>
-
-              <v-checkbox
-                v-model="complete"
-                label="Job Complete"
-                color="success"
-                density="compact"
-                hide-details
-              ></v-checkbox>
-            </div>
-
-            <!-- Complete date shows up only when complete is true -->
-            <v-fade-transition>
-              <div v-if="complete" class="mt-4">
-                <v-text-field
-                  v-model="job.completed_at"
-                  type="date"
-                  label="Completed Date"
-                  prepend-inner-icon="mdi-calendar-check"
-                  variant="outlined"
-                  density="compact"
-                ></v-text-field>
-              </div>
-            </v-fade-transition>
           </v-col>
 
           <!-- Bottom Job Note -->
@@ -302,6 +290,7 @@ import { settingsState } from '../store/settings'
 import { metadataState } from '../store/metadata'
 import { navigateBack } from '../store/session'
 import CameraCapture from './CameraCapture.vue'
+import CustomerForm from './CustomerForm.vue'
 
 const props = defineProps({
   customerId: {
@@ -320,7 +309,6 @@ const emit = defineEmits(['customerId', 'update:jobId', 'update:customerId', 'sa
 const formRef = ref(null)
 const loading = ref(false)
 const isFormValid = ref(true)
-const complete = ref(false)
 const isCameraOpen = ref(false)
 const isLightboxOpen = ref(false)
 const lightboxImage = ref('')
@@ -332,6 +320,40 @@ const deleteImgId = ref(null)
 const isDeleteJobOpen = ref(false)
 
 const customerObj = ref(null)
+const dateMenu = ref(false)
+
+const dueDateModel = computed({
+  get() {
+    return formatDate(job.due_date)
+  },
+  set(val) {
+    if (!val) {
+      job.due_date = ''
+    }
+  }
+})
+
+const dueDateValue = computed({
+  get() {
+    if (!job.due_date) return null
+    const parts = job.due_date.split('-')
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10))
+    }
+    return null
+  },
+  set(val) {
+    if (!val) {
+      job.due_date = ''
+      return
+    }
+    const dateObj = new Date(val)
+    const year = dateObj.getFullYear()
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+    const day = String(dateObj.getDate()).padStart(2, '0')
+    job.due_date = `${year}-${month}-${day}`
+  }
+})
 
 const job = reactive({
   id: null,
@@ -365,12 +387,16 @@ const activeEmployees = computed(() => {
 })
 
 const today = computed(() => {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 })
 
 // Fetch customer when customerId prop updates
 watch(() => props.customerId, async (newId) => {
-  if (newId) {
+  if (newId && newId !== job.customer_id) {
     job.customer_id = newId
     try {
       customerObj.value = await api.get(`/customers/${newId}`)
@@ -378,10 +404,24 @@ watch(() => props.customerId, async (newId) => {
     } catch (err) {
       console.error('Failed to load customer details:', err)
     }
-  } else {
+  } else if (!newId && props.jobId === null) {
     customerObj.value = null
+    job.customer_id = null
   }
 }, { immediate: true })
+
+const handleCustomerSelect = (custObj) => {
+  customerObj.value = custObj
+  if (custObj) {
+    job.customer_id = custObj.id
+    emit('customerId', custObj.id)
+    emit('update:customerId', custObj.id)
+  } else {
+    job.customer_id = null
+    emit('customerId', null)
+    emit('update:customerId', null)
+  }
+}
 
 // Watch jobId to load existing job details
 watch(() => props.jobId, (newId) => {
@@ -391,14 +431,7 @@ watch(() => props.jobId, (newId) => {
   }
 }, { immediate: true })
 
-// Sync completion checkbox with completed_at date
-watch(complete, (isComplete) => {
-  if (isComplete && !job.completed_at) {
-    job.completed_at = today.value
-  } else if (!isComplete) {
-    job.completed_at = ''
-  }
-})
+
 
 // Reset fields
 function resetJobFields() {
@@ -415,7 +448,6 @@ function resetJobFields() {
   job.completed_at = ''
   job.created_at = ''
   job.job_images = []
-  complete.value = false
 }
 
 // Load Job details from API
@@ -433,14 +465,10 @@ async function loadJob(id) {
       job.note = data.note || ''
       job.appraisal = !!data.appraisal
       job.vital_date = !!data.vital_date
-      job.due_date = data.due_date || ''
+      job.due_date = data.due_date ? data.due_date.split(' ')[0].split('T')[0] : ''
       job.completed_at = data.completed_at || ''
       job.created_at = data.created_at || ''
       job.job_images = data.job_images || []
-      
-      if (job.completed_at) {
-        complete.value = true
-      }
     }
   } catch (err) {
     console.error('Failed to load job details:', err)
@@ -608,8 +636,17 @@ async function executeHeadlessPrint() {
 function formatDate(dateStr) {
   if (!dateStr) return ''
   try {
-    const date = new Date(dateStr)
-    // Format to local MMDDYY
+    const clean = dateStr.trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+      const parts = clean.split('-')
+      return `${parts[1]}-${parts[2]}-${parts[0].slice(-2)}`
+    }
+    let parseableStr = clean
+    if (clean.includes(' ') && !clean.includes('T')) {
+      parseableStr = clean.replace(' ', 'T') + 'Z'
+    }
+    const date = new Date(parseableStr)
+    if (isNaN(date.getTime())) return dateStr
     const mm = String(date.getMonth() + 1).padStart(2, '0')
     const dd = String(date.getDate()).padStart(2, '0')
     const yy = String(date.getFullYear()).slice(-2)
@@ -942,7 +979,7 @@ function generatePrintHTML() {
     <!-- Due Dates -->
     <div class="cb-print-element cb-print-due">
       <span>Date: ${createdDateStr}</span><br>
-      <span class="${job.vital_date ? 'cbPrintRed' : ''}">Due: ${dueDateStr}</span>
+      <span class="cbPrintRed">Due: ${dueDateStr}</span>
     </div>
 
     <!-- Top Images section -->

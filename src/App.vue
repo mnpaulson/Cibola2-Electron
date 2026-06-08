@@ -62,84 +62,51 @@
         
         <!-- Dashboard / Overview -->
         <div v-if="activeTab === 'dashboard'">
-          <!-- Stats Grid -->
-          <v-row>
-            <v-col cols="12" sm="6" md="3" v-for="stat in stats" :key="stat.title">
-              <v-card class="stat-card pa-4 mx-auto" elevation="2" hover>
-                <div class="d-flex justify-space-between align-center">
-                  <div>
-                    <span class="text-caption text-medium-emphasis text-uppercase font-weight-bold">{{ stat.title }}</span>
-                    <h2 class="text-h4 font-weight-bold mt-1">{{ stat.value }}</h2>
-                  </div>
-                  <v-avatar :color="stat.color" variant="tonal" size="48">
-                    <v-icon size="24">{{ stat.icon }}</v-icon>
-                  </v-avatar>
-                </div>
-                <div class="mt-3 text-caption">
-                  <span class="text-success font-weight-bold mr-1">{{ stat.trend }}</span>
-                  <span class="text-medium-emphasis">since last week</span>
-                </div>
-              </v-card>
-            </v-col>
-          </v-row>
+          <!-- Welcome Header -->
+          <div class="d-flex flex-column align-center justify-center py-8 text-center">
+            <h1 class="text-h3 font-weight-bold mb-3 text-gradient">Cibola2 Workspace</h1>
+            <p class="text-subtitle-1 text-medium-emphasis max-width-600">
+              Lookup customers, create profiles, or start a new repair job from this minimalist workspace.
+            </p>
+          </div>
 
-          <!-- Main Content Grid -->
-          <v-row class="mt-4">
-            <!-- Repair Jobs Table -->
-            <v-col cols="12" lg="8">
-              <v-card class="pa-4" elevation="2">
-                <div class="d-flex justify-space-between align-center mb-4">
-                  <h3 class="text-h6 font-weight-bold">Recent Repair Jobs</h3>
-                  <v-btn color="primary" variant="flat" size="small" prepend-icon="mdi-plus" @click="handleTabClick('jobs')">
-                    New Job
-                  </v-btn>
-                </div>
-                <v-table hover>
-                  <thead>
-                    <tr>
-                      <th class="text-left font-weight-bold">Job ID</th>
-                      <th class="text-left font-weight-bold">Customer</th>
-                      <th class="text-left font-weight-bold">Item</th>
-                      <th class="text-left font-weight-bold">Status</th>
-                      <th class="text-left font-weight-bold">Estimated Cost</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="job in recentJobs" :key="job.id">
-                      <td>{{ job.id }}</td>
-                      <td>{{ job.customer }}</td>
-                      <td>{{ job.item }}</td>
-                      <td>
-                        <v-chip :color="getStatusColor(job.status)" size="small" variant="flat">
-                           {{ job.status }}
-                        </v-chip>
-                      </td>
-                      <td>${{ job.cost.toFixed(2) }}</td>
-                    </tr>
-                  </tbody>
-                </v-table>
+          <v-row justify="center" class="mt-2">
+            <!-- Customer Search & Create Card -->
+            <v-col cols="12" md="8" lg="6">
+              <v-card elevation="3" class="rounded-lg border mb-4">
+                <v-card-item class="bg-primary text-white py-3">
+                  <v-card-title class="font-weight-bold text-subtitle-1 d-flex align-center">
+                    <v-icon start class="mr-2">mdi-account-search</v-icon>
+                    Customer Search & Registration
+                  </v-card-title>
+                </v-card-item>
+                <v-divider></v-divider>
+                <v-card-text class="pa-4">
+                  <!-- Reuse CustomerForm directly on the dashboard -->
+                  <CustomerForm
+                    initial-state="search"
+                    :clearable="false"
+                    :hide-notes="true"
+                    @select="handleDashboardCustomerSelect"
+                  />
+                </v-card-text>
               </v-card>
-            </v-col>
 
-            <!-- Store credits alert / summary -->
-            <v-col cols="12" lg="4">
-              <v-card class="pa-4" elevation="2">
-                <h3 class="text-h6 font-weight-bold mb-4">Quick Activities</h3>
-                <v-list lines="two">
-                  <v-list-item
-                    v-for="act in activities"
-                    :key="act.id"
-                    :title="act.title"
-                    :subtitle="act.time"
-                    class="activity-item"
-                  >
-                    <template v-slot:prepend>
-                      <v-avatar :color="act.color" variant="tonal" size="40">
-                        <v-icon>{{ act.icon }}</v-icon>
-                      </v-avatar>
-                    </template>
-                  </v-list-item>
-                </v-list>
+              <!-- New Repair Job Quick Action Button -->
+              <v-card elevation="2" class="rounded-lg border pa-4 text-center">
+                <div class="text-subtitle-1 font-weight-bold mb-2 text-medium-emphasis">
+                  Ready to check in a jewelry piece?
+                </div>
+                <v-btn
+                  color="primary"
+                  size="large"
+                  prepend-icon="mdi-wrench-clock"
+                  variant="elevated"
+                  block
+                  @click="startNewJobFromDashboard"
+                >
+                  Start New Repair Job
+                </v-btn>
               </v-card>
             </v-col>
           </v-row>
@@ -196,6 +163,7 @@ import ConnectionBanner from './components/ConnectionBanner.vue'
 import Admin from './components/Admin.vue'
 import CustomerManager from './components/CustomerManager.vue'
 import JobManager from './components/JobManager.vue'
+import CustomerForm from './components/CustomerForm.vue'
 
 const theme = useTheme()
 
@@ -241,6 +209,20 @@ const activeTab = computed({
   set: (val) => navigateTo(val)
 })
 
+const handleDashboardCustomerSelect = (customer) => {
+  if (customer && customer.id) {
+    sessionState.selectedCustomerId = customer.id
+    navigateTo('customers')
+  }
+}
+
+const startNewJobFromDashboard = () => {
+  sessionState.activeJobId = 0
+  sessionState.selectedCustomerId = null
+  sessionState.enteredJobEditFromList = false
+  navigateTo('jobs')
+}
+
 const handleTabClick = (value) => {
   if (value === 'jobs') {
     sessionState.activeJobId = null
@@ -277,34 +259,6 @@ const currentMenuIcon = computed(() => {
   return menuItems.find(item => item.value === activeTab.value)?.icon || 'mdi-help-circle'
 })
 
-const stats = [
-  { title: 'Active Jobs', value: '24', icon: 'mdi-wrench-clock', color: 'info', trend: '+12%' },
-  { title: 'New Customers', value: '142', icon: 'mdi-account-plus', color: 'success', trend: '+8%' },
-  { title: 'Credits Issued', value: '$1,250', icon: 'mdi-wallet', color: 'warning', trend: '-2%' },
-  { title: 'Closed Jobs', value: '98', icon: 'mdi-check-circle', color: 'primary', trend: '+15%' }
-]
-
-const recentJobs = [
-  { id: 'JB-1042', customer: 'Sarah Jenkins', item: 'Diamond Ring resizing', status: 'In Progress', cost: 120.00 },
-  { id: 'JB-1043', customer: 'Michael Chen', item: 'Rolex service', status: 'Pending Approval', cost: 450.00 },
-  { id: 'JB-1044', customer: 'Emma Watson', item: 'Gold Necklace repair', status: 'Completed', cost: 85.00 },
-  { id: 'JB-1045', customer: 'David Smith', item: 'Platinum Band engraving', status: 'In Progress', cost: 150.00 }
-]
-
-const activities = [
-  { id: 1, title: 'Job #1044 marked Completed', time: '10 minutes ago', icon: 'mdi-check-circle', color: 'success' },
-  { id: 2, title: 'New Customer John Doe added', time: '45 minutes ago', icon: 'mdi-account-plus', color: 'info' },
-  { id: 3, title: 'Store credit $50.00 issued to Sarah Jenkins', time: '2 hours ago', icon: 'mdi-wallet', color: 'warning' }
-]
-
-const getStatusColor = (status) => {
-  switch(status) {
-    case 'Completed': return 'success'
-    case 'In Progress': return 'info'
-    case 'Pending Approval': return 'warning'
-    default: return 'medium-emphasis'
-  }
-}
 </script>
 
 <style>
@@ -349,5 +303,9 @@ const getStatusColor = (status) => {
 
 .max-width-500 {
   max-width: 500px;
+}
+
+.max-width-600 {
+  max-width: 600px;
 }
 </style>

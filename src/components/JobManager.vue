@@ -1,21 +1,11 @@
 <template>
   <div>
-    <!-- Workspace Layout: Customer Profile + Job Form (When a job is active or customer selected for new job) -->
+    <!-- Workspace Layout: Job Form (When a job is active or a new job is being created) -->
     <v-row v-if="isWorkspaceActive">
       <v-col cols="12">
-        <!-- Reusable Customer Profile at the top (Info mode, clearable, compact) -->
-        <CustomerForm
-          v-model="sessionState.selectedCustomerId"
-          :clearable="true"
-          :hide-notes="true"
-          @select="handleCustomerSelect"
-        />
-
-        <!-- Job Form Editor below -->
         <JobForm
           v-model:jobId="sessionState.activeJobId"
           v-model:customerId="sessionState.selectedCustomerId"
-          class="mt-4"
           @saved="handleJobSaved"
         />
       </v-col>
@@ -52,7 +42,7 @@
                   variant="flat"
                   prepend-icon="mdi-plus"
                   size="small"
-                  @click="openNewJobCustomerDialog"
+                  @click="startNewJob"
                 >
                   New Job
                 </v-btn>
@@ -72,18 +62,17 @@
                 <th class="font-weight-bold text-subtitle-2 py-3">Assigned Employee</th>
                 <th class="font-weight-bold text-subtitle-2 py-3">Created</th>
                 <th class="font-weight-bold text-subtitle-2 py-3">Due Date</th>
-                <th class="font-weight-bold text-subtitle-2 py-3">Status</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading" class="text-center">
-                <td colspan="7" class="py-12">
+                <td colspan="6" class="py-12">
                   <v-progress-circular indeterminate size="48" color="primary"></v-progress-circular>
                   <div class="mt-3 text-caption text-medium-emphasis">Loading repair jobs...</div>
                 </td>
               </tr>
               <tr v-else-if="filteredJobs.length === 0" class="text-center">
-                <td colspan="7" class="py-12 text-medium-emphasis italic">
+                <td colspan="6" class="py-12 text-medium-emphasis italic">
                   No repair jobs found.
                 </td>
               </tr>
@@ -98,7 +87,7 @@
                   #{{ job.id }}
                 </td>
                 <td class="text-body-2 font-weight-medium">
-                  {{ job.customer ? `${job.customer.fname} ${job.customer.lname}` : 'Unknown Customer' }}
+                  {{ job.customer ? `${job.customer.fname} ${job.customer.lname}` : '—' }}
                 </td>
                 <td class="text-body-2 font-weight-bold text-green-darken-2">
                   ${{ (job.estimate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
@@ -109,18 +98,8 @@
                 <td class="text-caption text-medium-emphasis">
                   {{ formatDate(job.created_at) }}
                 </td>
-                <td :class="['text-caption', { 'text-error font-weight-bold': isUrgent(job) }]">
+                <td class="text-caption">
                   {{ formatDate(job.due_date) || '—' }}
-                </td>
-                <td>
-                  <v-chip
-                    :color="job.completed_at ? 'success' : 'info'"
-                    size="x-small"
-                    variant="flat"
-                    class="font-weight-bold"
-                  >
-                    {{ job.completed_at ? 'Completed' : 'In Progress' }}
-                  </v-chip>
                 </td>
               </tr>
             </tbody>
@@ -157,17 +136,6 @@
         </v-card>
       </v-col>
     </v-row>
-
-    <!-- Dialog to select a Customer before creating a New Job -->
-    <v-dialog v-model="newJobCustomerDialog" max-width="600px">
-      <CustomerForm
-        v-if="newJobCustomerDialog"
-        :clearable="false"
-        initial-state="search"
-        @select="handleNewJobCustomerSelect"
-        @cancel="newJobCustomerDialog = false"
-      />
-    </v-dialog>
   </div>
 </template>
 
@@ -175,28 +143,21 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { api } from '../utils/api'
 import { sessionState } from '../store/session'
-import CustomerForm from './CustomerForm.vue'
 import JobForm from './JobForm.vue'
 
 // Local State
 const jobsList = ref([])
 const loading = ref(false)
 const directorySearch = ref('')
-const newJobCustomerDialog = ref(false)
 
 // Local Pagination
 const currentPage = ref(1)
 const itemsPerPage = 15
 
-// Check if edit workspace is active
+// Check if edit workspace is active (using 0 or non-null values)
 const isWorkspaceActive = computed(() => {
   return sessionState.activeJobId !== null || sessionState.selectedCustomerId !== null
 })
-
-// Load customer select helper
-const handleCustomerSelect = (custObj) => {
-  // Can be used if JobManager needs to update internal cached states
-}
 
 // Fetch all jobs from SQLite DB
 const fetchJobs = async () => {
@@ -260,19 +221,11 @@ const openJobEditor = (job) => {
   sessionState.enteredJobEditFromList = true
 }
 
-// Dialog trigger for new job customer selection
-const openNewJobCustomerDialog = () => {
-  newJobCustomerDialog.value = true
-}
-
-// Handle customer selection for a new job
-const handleNewJobCustomerSelect = (customer) => {
-  if (customer && customer.id) {
-    sessionState.activeJobId = null
-    sessionState.selectedCustomerId = customer.id
-    sessionState.enteredJobEditFromList = true
-    newJobCustomerDialog.value = false
-  }
+// Immediately switch to new job form
+const startNewJob = () => {
+  sessionState.activeJobId = 0
+  sessionState.selectedCustomerId = null
+  sessionState.enteredJobEditFromList = true
 }
 
 // Handle job saved event
@@ -287,19 +240,28 @@ const handleJobSaved = (savedJob) => {
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   try {
-    const date = new Date(dateStr)
+    const clean = dateStr.trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+      const parts = clean.split('-')
+      const year = parseInt(parts[0], 10)
+      const month = parseInt(parts[1], 10) - 1
+      const day = parseInt(parts[2], 10)
+      const localDate = new Date(year, month, day)
+      return localDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    }
+    let parseableStr = clean
+    if (clean.includes(' ') && !clean.includes('T')) {
+      parseableStr = clean.replace(' ', 'T') + 'Z'
+    }
+    const date = new Date(parseableStr)
     if (isNaN(date.getTime())) return dateStr
-    // Format to local date string MMDDYY
     return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
   } catch {
     return dateStr
   }
 }
 
-// Check if job due date is urgent/vital and not completed
-const isUrgent = (job) => {
-  return job.vital_date && !job.completed_at
-}
+
 
 // Load directory on mounting
 onMounted(() => {
