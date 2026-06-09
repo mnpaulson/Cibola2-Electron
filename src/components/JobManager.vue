@@ -107,32 +107,11 @@
 
           <!-- Local Pagination Controls -->
           <v-divider v-if="filteredJobs.length > 0"></v-divider>
-          <div v-if="filteredJobs.length > 0" class="d-flex align-center justify-space-between pa-3 bg-light-surface flex-wrap gap-2">
-            <span class="text-caption text-medium-emphasis">
-              Showing {{ pageStart }} to {{ pageEnd }} of {{ filteredJobs.length }} jobs
-            </span>
-            <div class="d-flex align-center gap-2">
-              <v-btn
-                icon="mdi-chevron-left"
-                variant="outlined"
-                size="x-small"
-                color="primary"
-                :disabled="currentPage === 1"
-                @click="currentPage--"
-              ></v-btn>
-              <span class="text-caption font-weight-bold">
-                Page {{ currentPage }} of {{ totalPages }}
-              </span>
-              <v-btn
-                icon="mdi-chevron-right"
-                variant="outlined"
-                size="x-small"
-                color="primary"
-                :disabled="currentPage === totalPages"
-                @click="currentPage++"
-              ></v-btn>
-            </div>
-          </div>
+          <DirectoryPagination
+            v-model="currentPage"
+            :total-items="filteredJobs.length"
+            :items-per-page="itemsPerPage"
+          />
         </v-card>
       </v-col>
     </v-row>
@@ -142,16 +121,25 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { api } from '../utils/api'
-import { sessionState } from '../store/session'
+import { sessionState, navigateTo } from '../store/session'
+import { formatLocalDate } from '../utils/dates'
 import JobForm from './JobForm.vue'
+import DirectoryPagination from './DirectoryPagination.vue'
 
 // Local State
 const jobsList = ref([])
 const loading = ref(false)
-const directorySearch = ref('')
+// Persisted navigation-friendly states
+const directorySearch = computed({
+  get: () => sessionState.jobSearchQuery,
+  set: (val) => { sessionState.jobSearchQuery = val }
+})
 
-// Local Pagination
-const currentPage = ref(1)
+const currentPage = computed({
+  get: () => sessionState.jobCurrentPage,
+  set: (val) => { sessionState.jobCurrentPage = val }
+})
+
 const itemsPerPage = 15
 
 // Check if edit workspace is active (using 0 or non-null values)
@@ -200,32 +188,16 @@ const paginatedJobs = computed(() => {
   return filteredJobs.value.slice(start, start + itemsPerPage)
 })
 
-const totalPages = computed(() => {
-  return Math.ceil(filteredJobs.value.length / itemsPerPage) || 1
-})
 
-const pageStart = computed(() => {
-  if (filteredJobs.value.length === 0) return 0
-  return (currentPage.value - 1) * itemsPerPage + 1
-})
-
-const pageEnd = computed(() => {
-  const end = currentPage.value * itemsPerPage
-  return end > filteredJobs.value.length ? filteredJobs.value.length : end
-})
 
 // Open specific job for editing
 const openJobEditor = (job) => {
-  sessionState.activeJobId = job.id
-  sessionState.selectedCustomerId = job.customer_id
-  sessionState.enteredJobEditFromList = true
+  navigateTo('jobs', { activeJobId: job.id, selectedCustomerId: job.customer_id })
 }
 
 // Immediately switch to new job form
 const startNewJob = () => {
-  sessionState.activeJobId = 0
-  sessionState.selectedCustomerId = null
-  sessionState.enteredJobEditFromList = true
+  navigateTo('jobs', { activeJobId: 0, selectedCustomerId: null })
 }
 
 // Handle job saved event
@@ -236,30 +208,7 @@ const handleJobSaved = (savedJob) => {
   fetchJobs()
 }
 
-// Date formatter helper
-const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  try {
-    const clean = dateStr.trim()
-    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
-      const parts = clean.split('-')
-      const year = parseInt(parts[0], 10)
-      const month = parseInt(parts[1], 10) - 1
-      const day = parseInt(parts[2], 10)
-      const localDate = new Date(year, month, day)
-      return localDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-    }
-    let parseableStr = clean
-    if (clean.includes(' ') && !clean.includes('T')) {
-      parseableStr = clean.replace(' ', 'T') + 'Z'
-    }
-    const date = new Date(parseableStr)
-    if (isNaN(date.getTime())) return dateStr
-    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-  } catch {
-    return dateStr
-  }
-}
+const formatDate = (dateStr) => formatLocalDate(dateStr, 'long')
 
 
 

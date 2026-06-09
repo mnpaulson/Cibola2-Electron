@@ -1,62 +1,123 @@
-import { reactive } from 'vue'
+import { reactive, watch } from 'vue'
 
 export const sessionState = reactive({
   connectionStatus: 'connecting', // 'connected', 'connecting', 'offline'
   lastCheck: null,
   activeTab: 'dashboard',
-  navigationHistory: ['dashboard'],
+  navigationHistory: [
+    {
+      tab: 'dashboard',
+      params: {
+        selectedCustomerId: null,
+        activeJobId: null,
+        activeCreditId: null,
+        activeSheetId: null
+      }
+    }
+  ],
   selectedCustomerId: null,
   activeJobId: null,
   activeCreditId: null,
   activeSheetId: null,
-  enteredJobEditFromList: false,
-  enteredCreditEditFromList: false
+
+  // Persistent list/directory view states
+  customerSearchQuery: '',
+  customerCurrentPage: 1,
+  customerActiveSubTab: 'jobs',
+  jobSearchQuery: '',
+  jobCurrentPage: 1
 })
 
-export function navigateTo(tab) {
+let isNavigatingHistory = false
+
+export function navigateTo(tab, params = {}) {
   if (!tab) return
-  // Avoid pushing duplicate consecutive tabs in history
-  if (sessionState.navigationHistory[sessionState.navigationHistory.length - 1] !== tab) {
-    sessionState.navigationHistory.push(tab)
+
+  const route = {
+    tab,
+    params: {
+      selectedCustomerId: params.selectedCustomerId !== undefined ? params.selectedCustomerId : null,
+      activeJobId: params.activeJobId !== undefined ? params.activeJobId : null,
+      activeCreditId: params.activeCreditId !== undefined ? params.activeCreditId : null,
+      activeSheetId: params.activeSheetId !== undefined ? params.activeSheetId : null
+    }
   }
-  sessionState.activeTab = tab
-  console.log(`[Navigation] Navigated to tab: ${tab}. History stack:`, sessionState.navigationHistory)
+
+  // Avoid pushing duplicate consecutive routes in history
+  const lastRoute = sessionState.navigationHistory[sessionState.navigationHistory.length - 1]
+  const isDuplicate = lastRoute && 
+                     lastRoute.tab === route.tab && 
+                     lastRoute.params.selectedCustomerId === route.params.selectedCustomerId &&
+                     lastRoute.params.activeJobId === route.params.activeJobId &&
+                     lastRoute.params.activeCreditId === route.params.activeCreditId &&
+                     lastRoute.params.activeSheetId === route.params.activeSheetId
+
+  if (!isDuplicate) {
+    sessionState.navigationHistory.push(route)
+  }
+
+  isNavigatingHistory = true
+  try {
+    sessionState.activeTab = tab
+    sessionState.selectedCustomerId = route.params.selectedCustomerId
+    sessionState.activeJobId = route.params.activeJobId
+    sessionState.activeCreditId = route.params.activeCreditId
+    sessionState.activeSheetId = route.params.activeSheetId
+  } finally {
+    isNavigatingHistory = false
+  }
+
+  console.log(`[Navigation] Navigated to tab: ${tab}. History stack size:`, sessionState.navigationHistory.length)
 }
 
 export function navigateBack() {
-  // If we entered edit mode from a list on the active tab, go back to list view instead of popping tab
-  if (sessionState.activeTab === 'jobs' && sessionState.enteredJobEditFromList) {
-    sessionState.activeJobId = null
-    sessionState.selectedCustomerId = null
-    sessionState.enteredJobEditFromList = false
-    console.log('[Navigation] Returned to jobs list from edit mode')
-    return
-  }
-  if (sessionState.activeTab === 'credits' && sessionState.enteredCreditEditFromList) {
-    sessionState.activeCreditId = null
-    sessionState.selectedCustomerId = null
-    sessionState.enteredCreditEditFromList = false
-    console.log('[Navigation] Returned to credits list from edit mode')
-    return
-  }
-
-  // Normal tab navigation popping
   if (sessionState.navigationHistory.length > 1) {
-    sessionState.navigationHistory.pop() // remove current tab
-    const prevTab = sessionState.navigationHistory[sessionState.navigationHistory.length - 1]
-    sessionState.activeTab = prevTab
-    
-    // Reset edit states upon cross-tab back navigation
-    sessionState.activeJobId = null
-    sessionState.selectedCustomerId = null
-    sessionState.activeCreditId = null
-    sessionState.activeSheetId = null
-    sessionState.enteredJobEditFromList = false
-    sessionState.enteredCreditEditFromList = false
-    
-    console.log(`[Navigation] Navigated back to: ${prevTab}. History stack:`, sessionState.navigationHistory)
+    isNavigatingHistory = true
+    try {
+      sessionState.navigationHistory.pop() // remove current tab
+      const prevRoute = sessionState.navigationHistory[sessionState.navigationHistory.length - 1]
+      
+      sessionState.activeTab = prevRoute.tab
+      sessionState.selectedCustomerId = prevRoute.params.selectedCustomerId
+      sessionState.activeJobId = prevRoute.params.activeJobId
+      sessionState.activeCreditId = prevRoute.params.activeCreditId
+      sessionState.activeSheetId = prevRoute.params.activeSheetId
+      
+      console.log(`[Navigation] Navigated back to:`, prevRoute, `History stack size:`, sessionState.navigationHistory.length)
+    } finally {
+      isNavigatingHistory = false
+    }
   }
 }
+
+// Synchronize state parameter changes into the current history entry
+watch(
+  () => [
+    sessionState.selectedCustomerId,
+    sessionState.activeJobId,
+    sessionState.activeCreditId,
+    sessionState.activeSheetId
+  ],
+  ([custId, jobId, creditId, sheetId]) => {
+    if (isNavigatingHistory) return
+
+    const history = sessionState.navigationHistory
+    if (history.length > 0) {
+      const lastRoute = history[history.length - 1]
+      // Ensure we only update parameters if we are currently looking at the correct active tab
+      if (lastRoute.tab === sessionState.activeTab) {
+        lastRoute.params = {
+          selectedCustomerId: custId,
+          activeJobId: jobId,
+          activeCreditId: creditId,
+          activeSheetId: sheetId
+        }
+        console.log(`[Navigation] Updated parameters of current route to match state changes:`, lastRoute.params)
+      }
+    }
+  },
+  { flush: 'sync' }
+)
 
 export function setSelectedCustomerId(id) {
   sessionState.selectedCustomerId = id

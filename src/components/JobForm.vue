@@ -16,13 +16,18 @@
 
     <v-card-text class="pa-4">
       <!-- Inline Customer Lookup Field -->
-      <div class="mb-4">
-        <CustomerForm
-          v-model="job.customer_id"
-          :clearable="true"
-          :hide-notes="true"
-          @select="handleCustomerSelect"
-        />
+      <div class="mb-4 d-flex align-center gap-2">
+        <div class="flex-grow-1">
+          <CustomerForm
+            v-model="job.customer_id"
+            :clearable="true"
+            :hide-notes="true"
+            :clickable-name="true"
+            @select="handleCustomerSelect"
+            @click-name="navigateTo('customers', { selectedCustomerId: job.customer_id })"
+          />
+        </div>
+
       </div>
 
       <v-form ref="formRef" v-model="isFormValid" lazy-validation>
@@ -116,108 +121,21 @@
       </v-form>
 
       <!-- Attached Jewelry Images Grid -->
-      <div class="mt-4">
-        <div class="text-subtitle-2 font-weight-bold mb-2 d-flex align-center">
-          <v-icon start class="mr-2" color="primary">mdi-camera-image</v-icon>
-          Attached Jewelry Photos ({{ job.job_images.length }})
-        </div>
-
-        <v-row dense v-if="job.job_images.length > 0">
-          <v-col
-            v-for="(img, idx) in job.job_images"
-            :key="idx"
-            cols="12"
-            sm="6"
-            md="4"
-            lg="3"
-          >
-            <v-card class="image-thumbnail-card" border elevation="1">
-              <v-btn
-                icon="mdi-delete"
-                color="error"
-                variant="flat"
-                size="x-small"
-                class="remove-image-btn"
-                @click="confirmRemoveImage(idx)"
-              ></v-btn>
-              
-              <v-img
-                :src="getImageUrl(img.image)"
-                height="150px"
-                cover
-                class="cursor-zoom-in"
-                @click="openLightbox(img.image)"
-              ></v-img>
-
-              <v-card-text class="pa-2 bg-light-surface">
-                <v-textarea
-                  v-model="img.note"
-                  placeholder="Add details about this photo..."
-                  variant="outlined"
-                  density="compact"
-                  rows="2"
-                  no-resize
-                  hide-details
-                  class="text-caption"
-                ></v-textarea>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-        <div v-else class="text-caption text-medium-emphasis italic pa-4 border rounded-lg text-center bg-light-surface">
-          No photos attached. Click the 'Capture' button below to add photos of the jewelry item.
-        </div>
-      </div>
+      <AttachedImages
+        ref="attachedImagesRef"
+        v-model="job.job_images"
+        delete-endpoint="/jobs/images"
+      />
     </v-card-text>
 
-    <!-- Camera dialog integration -->
-    <CameraCapture v-model="isCameraOpen" @capture="handlePhotoCaptured" />
-
-    <!-- Lightbox Modal -->
-    <v-dialog v-model="isLightboxOpen" max-width="80vw" class="lightbox-dialog">
-      <v-card class="bg-black border-none overflow-hidden d-flex justify-center align-center">
-        <v-btn icon="mdi-close" color="white" variant="text" class="lightbox-close-btn" @click="isLightboxOpen = false"></v-btn>
-        <img :src="getImageUrl(lightboxImage)" class="lightbox-image" alt="Lightbox Preview" />
-      </v-card>
-    </v-dialog>
-
-    <!-- Delete Image Modal -->
-    <v-dialog v-model="isDeleteImgOpen" max-width="400px">
-      <v-card class="rounded-lg">
-        <v-card-item class="bg-error text-white py-3">
-          <v-card-title class="text-subtitle-2 font-weight-bold">
-            <v-icon start class="mr-2">mdi-alert</v-icon>
-            Delete Saved Photo
-          </v-card-title>
-        </v-card-item>
-        <v-card-text class="pa-4 text-body-2">
-          Are you sure you want to delete this photo? This will permanently delete the file from the server. This action cannot be undone.
-        </v-card-text>
-        <v-card-actions class="pa-3 bg-light-surface d-flex justify-end gap-2">
-          <v-btn color="grey-darken-1" variant="outlined" size="small" @click="isDeleteImgOpen = false">Cancel</v-btn>
-          <v-btn color="error" variant="flat" size="small" @click="deleteSavedImage">Delete</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <!-- Delete Job Modal -->
-    <v-dialog v-model="isDeleteJobOpen" max-width="400px">
-      <v-card class="rounded-lg">
-        <v-card-item class="bg-error text-white py-3">
-          <v-card-title class="text-subtitle-2 font-weight-bold">
-            <v-icon start class="mr-2">mdi-alert</v-icon>
-            Delete Repair Job
-          </v-card-title>
-        </v-card-item>
-        <v-card-text class="pa-4 text-body-2">
-          Are you sure you want to delete this entire repair job and all its attached images? This action is permanent.
-        </v-card-text>
-        <v-card-actions class="pa-3 bg-light-surface d-flex justify-end gap-2">
-          <v-btn color="grey-darken-1" variant="outlined" size="small" @click="isDeleteJobOpen = false">Cancel</v-btn>
-          <v-btn color="error" variant="flat" size="small" @click="submitDeleteJob">Delete Job</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <DeleteConfirmationDialog
+      v-model="isDeleteJobOpen"
+      title="Delete Repair Job"
+      warning-message="Are you sure you want to delete this entire repair job and all its attached images? This action is permanent."
+      :loading="loading"
+      @confirm="submitDeleteJob"
+    />
 
     <!-- Actions Footer Navigation -->
     <v-divider></v-divider>
@@ -246,14 +164,14 @@
         variant="elevated"
         prepend-icon="mdi-camera"
         size="small"
-        @click="isCameraOpen = true"
+        @click="attachedImagesRef?.openCamera()"
       >
         Capture
       </v-btn>
       <v-btn
         color="info"
         variant="elevated"
-        prepend-icon="mdi-print"
+        prepend-icon="mdi-printer"
         size="small"
         @click="printOnly"
       >
@@ -272,7 +190,7 @@
       <v-btn
         color="primary"
         variant="flat"
-        prepend-icon="mdi-done-all"
+        prepend-icon="mdi-check-all"
         size="small"
         :disabled="!isFormValid"
         @click="saveOrUpdateJob(true, true)"
@@ -288,9 +206,13 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { api } from '../utils/api'
 import { settingsState } from '../store/settings'
 import { metadataState } from '../store/metadata'
-import { navigateBack } from '../store/session'
-import CameraCapture from './CameraCapture.vue'
+import { navigateBack, navigateTo } from '../store/session'
+import { formatLocalDate } from '../utils/dates'
+import AttachedImages from './AttachedImages.vue'
 import CustomerForm from './CustomerForm.vue'
+import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue'
+
+const formatDate = (dateStr) => formatLocalDate(dateStr, 'short')
 
 const props = defineProps({
   customerId: {
@@ -309,13 +231,7 @@ const emit = defineEmits(['customerId', 'update:jobId', 'update:customerId', 'sa
 const formRef = ref(null)
 const loading = ref(false)
 const isFormValid = ref(true)
-const isCameraOpen = ref(false)
-const isLightboxOpen = ref(false)
-const lightboxImage = ref('')
-
-const isDeleteImgOpen = ref(false)
-const deleteImgIndex = ref(null)
-const deleteImgId = ref(null)
+const attachedImagesRef = ref(null)
 
 const isDeleteJobOpen = ref(false)
 
@@ -488,47 +404,7 @@ function getImageUrl(imgStr) {
   return `${base}${path}`
 }
 
-function handlePhotoCaptured(dataUrl) {
-  job.job_images.push({
-    id: null,
-    image: dataUrl,
-    note: ''
-  })
-}
-
-function openLightbox(imgStr) {
-  lightboxImage.value = imgStr
-  isLightboxOpen.value = true
-}
-
-function confirmRemoveImage(index) {
-  const target = job.job_images[index]
-  if (target && target.id !== null && target.id !== undefined) {
-    deleteImgId.value = target.id
-    deleteImgIndex.value = index
-    isDeleteImgOpen.value = true
-  } else {
-    job.job_images.splice(index, 1)
-  }
-}
-
-async function deleteSavedImage() {
-  if (deleteImgId.value === null) return
-  loading.value = true
-  try {
-    const res = await api.delete(`/jobs/images/${deleteImgId.value}`)
-    if (res) {
-      job.job_images.splice(deleteImgIndex.value, 1)
-      isDeleteImgOpen.value = false
-      deleteImgId.value = null
-      deleteImgIndex.value = null
-    }
-  } catch (err) {
-    console.error('Failed to delete job image:', err)
-  } finally {
-    loading.value = false
-  }
-}
+// Note: handlePhotoCaptured, openLightbox, confirmRemoveImage, and deleteSavedImage are now handled in AttachedImages.vue
 
 // Job Create/Update submission
 async function saveOrUpdateJob(print = false, close = false) {
@@ -633,28 +509,7 @@ async function executeHeadlessPrint() {
   }
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return ''
-  try {
-    const clean = dateStr.trim()
-    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
-      const parts = clean.split('-')
-      return `${parts[1]}-${parts[2]}-${parts[0].slice(-2)}`
-    }
-    let parseableStr = clean
-    if (clean.includes(' ') && !clean.includes('T')) {
-      parseableStr = clean.replace(' ', 'T') + 'Z'
-    }
-    const date = new Date(parseableStr)
-    if (isNaN(date.getTime())) return dateStr
-    const mm = String(date.getMonth() + 1).padStart(2, '0')
-    const dd = String(date.getDate()).padStart(2, '0')
-    const yy = String(date.getFullYear()).slice(-2)
-    return `${mm}-${dd}-${yy}`
-  } catch {
-    return dateStr
-  }
-}
+
 
 function generatePrintHTML() {
   const emp = activeEmployees.value.find(e => e.id === job.employee_id)
@@ -1046,49 +901,7 @@ function generatePrintHTML() {
   background-color: rgba(var(--v-theme-surface-variant), 0.05);
 }
 
-.image-thumbnail-card {
-  position: relative;
-  border-radius: 8px;
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
 
-.image-thumbnail-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-}
-
-.remove-image-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 5;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.cursor-zoom-in {
-  cursor: zoom-in;
-}
-
-.lightbox-dialog :deep(.v-overlay__content) {
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-.lightbox-close-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 100;
-  background: rgba(0,0,0,0.4);
-}
-
-.lightbox-image {
-  max-width: 90vw;
-  max-height: 85vh;
-  object-fit: contain;
-  border-radius: 8px;
-}
 
 .urgent-date-input :deep(input) {
   color: rgb(var(--v-theme-error)) !important;

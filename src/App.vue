@@ -71,43 +71,32 @@
           </div>
 
           <v-row justify="center" class="mt-2">
-            <!-- Customer Search & Create Card -->
+            <!-- Customer Search & Create (Simplified / Minimalist Layout) -->
             <v-col cols="12" md="8" lg="6">
-              <v-card elevation="3" class="rounded-lg border mb-4">
-                <v-card-item class="bg-primary text-white py-3">
-                  <v-card-title class="font-weight-bold text-subtitle-1 d-flex align-center">
-                    <v-icon start class="mr-2">mdi-account-search</v-icon>
-                    Customer Search & Registration
-                  </v-card-title>
-                </v-card-item>
-                <v-divider></v-divider>
-                <v-card-text class="pa-4">
-                  <!-- Reuse CustomerForm directly on the dashboard -->
-                  <CustomerForm
-                    initial-state="search"
-                    :clearable="false"
-                    :hide-notes="true"
-                    @select="handleDashboardCustomerSelect"
-                  />
-                </v-card-text>
-              </v-card>
+              <div class="mb-6">
+                <!-- Direct flat customer search component -->
+                <CustomerForm
+                  initial-state="search"
+                  :clearable="false"
+                  :hide-notes="true"
+                  :flat="true"
+                  @select="handleDashboardCustomerSelect"
+                />
+              </div>
 
-              <!-- New Repair Job Quick Action Button -->
-              <v-card elevation="2" class="rounded-lg border pa-4 text-center">
-                <div class="text-subtitle-1 font-weight-bold mb-2 text-medium-emphasis">
-                  Ready to check in a jewelry piece?
-                </div>
+              <!-- New Repair Job Quick Action Button (Minimalist Tonal style) -->
+              <div class="text-center">
                 <v-btn
                   color="primary"
                   size="large"
                   prepend-icon="mdi-wrench-clock"
-                  variant="elevated"
+                  variant="tonal"
                   block
                   @click="startNewJobFromDashboard"
                 >
                   Start New Repair Job
                 </v-btn>
-              </v-card>
+              </div>
             </v-col>
           </v-row>
         </div>
@@ -211,29 +200,17 @@ const activeTab = computed({
 
 const handleDashboardCustomerSelect = (customer) => {
   if (customer && customer.id) {
-    sessionState.selectedCustomerId = customer.id
-    navigateTo('customers')
+    navigateTo('customers', { selectedCustomerId: customer.id })
   }
 }
 
 const startNewJobFromDashboard = () => {
-  sessionState.activeJobId = 0
-  sessionState.selectedCustomerId = null
-  sessionState.enteredJobEditFromList = false
-  navigateTo('jobs')
+  navigateTo('jobs', { activeJobId: 0, selectedCustomerId: null })
 }
 
 const handleTabClick = (value) => {
-  if (value === 'jobs') {
-    sessionState.activeJobId = null
-    sessionState.selectedCustomerId = null
-    sessionState.enteredJobEditFromList = false
-  } else if (value === 'credits') {
-    sessionState.activeCreditId = null
-    sessionState.selectedCustomerId = null
-    sessionState.enteredCreditEditFromList = false
-  }
-  activeTab.value = value
+  // Sidebar clicking navigates to the top-level list of that tab (resets parameters)
+  navigateTo(value)
 }
 const isDark = ref(true)
 

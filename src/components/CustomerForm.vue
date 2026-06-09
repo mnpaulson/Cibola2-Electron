@@ -1,76 +1,65 @@
 <template>
-  <v-card class="customer-card" elevation="3" :loading="loading">
-    <!-- Card Header -->
-    <v-card-item class="bg-primary text-white py-3">
-      <div class="d-flex justify-space-between align-center">
-        <v-card-title class="font-weight-bold text-subtitle-1">
-          <v-icon start class="mr-2">{{ cardIcon }}</v-icon>
-          {{ cardTitle }}
-        </v-card-title>
-        
-        <!-- Status indicator for note saving -->
-        <span v-if="currentState === 'info' && noteSavingStatus" class="text-caption font-weight-medium">
-          {{ noteSavingStatus }}
-        </span>
-      </div>
-    </v-card-item>
-
-    <v-divider></v-divider>
-
-    <v-card-text class="pa-4">
+  <v-card
+    class="customer-card"
+    :class="{ 'flat-customer-card': flat && currentState === 'search' }"
+    :elevation="(flat && currentState === 'search') ? 0 : 3"
+    :variant="(flat && currentState === 'search') ? 'flat' : 'elevated'"
+    :loading="loading"
+  >
+    <v-card-text :class="(flat && currentState === 'search') ? 'pa-0' : 'pa-4'">
       <!-- 1. SEARCH STATE -->
       <v-fade-transition hide-on-leave>
         <div v-if="currentState === 'search'">
-          <div class="d-flex align-center gap-2">
-            <v-autocomplete
-              v-model="selectedSearchItem"
-              v-model:search="searchQuery"
-              :loading="loading"
-              :items="formattedCandidates"
-              item-title="displayName"
-              item-value="id"
-              return-object
-              placeholder="Type customer name or phone..."
-              prepend-inner-icon="mdi-account-search"
-              no-filter
-              clearable
-              variant="outlined"
-              density="comfortable"
-              class="flex-grow-1"
-              hide-details
-            >
-              <template v-slot:item="{ props, item }">
-                <v-list-item
-                  v-bind="props"
-                  :title="item.raw.displayName"
-                  :subtitle="item.raw.phone || 'No phone number'"
-                >
-                  <template v-slot:prepend>
-                    <v-avatar color="primary" variant="tonal" size="32">
-                      <v-icon size="16">mdi-account</v-icon>
-                    </v-avatar>
-                  </template>
-                </v-list-item>
-              </template>
-              <template v-slot:no-data>
-                <v-list-item v-if="searchQuery && searchQuery.length >= 2">
-                  <span class="text-medium-emphasis">No customers found. Click the button to add.</span>
-                </v-list-item>
-                <v-list-item v-else>
-                  <span class="text-medium-emphasis">Type at least 2 characters to search...</span>
-                </v-list-item>
-              </template>
-            </v-autocomplete>
-
-            <v-btn
-              color="primary"
-              variant="elevated"
-              icon="mdi-account-plus"
-              class="ml-2"
-              title="Add New Customer"
-              @click="initCreateForm"
-            ></v-btn>
-          </div>
+          <v-autocomplete
+            v-model="selectedSearchItem"
+            v-model:search="searchQuery"
+            :loading="loading"
+            :items="formattedCandidates"
+            item-title="displayName"
+            item-value="id"
+            return-object
+            placeholder="Type customer name or phone..."
+            prepend-inner-icon="mdi-account-search"
+            menu-icon=""
+            no-filter
+            clearable
+            variant="outlined"
+            density="comfortable"
+            hide-details
+            @keydown.enter.prevent="handleEnterKey"
+          >
+            <template v-slot:append-inner>
+              <v-btn
+                color="primary"
+                icon="mdi-account-plus"
+                variant="text"
+                density="comfortable"
+                title="Add New Customer"
+                @click.stop="initCreateForm"
+              ></v-btn>
+            </template>
+            <template v-slot:item="{ props, item }">
+              <v-list-item
+                v-bind="props"
+                :title="item.raw.displayName"
+                :subtitle="item.raw.phone || 'No phone number'"
+              >
+                <template v-slot:prepend>
+                  <v-avatar color="primary" variant="tonal" size="32">
+                    <v-icon size="16">mdi-account</v-icon>
+                  </v-avatar>
+                </template>
+              </v-list-item>
+            </template>
+            <template v-slot:no-data>
+              <v-list-item v-if="searchQuery && searchQuery.length >= 2">
+                <span class="text-medium-emphasis">No customers found. Press Enter to add.</span>
+              </v-list-item>
+              <v-list-item v-else>
+                <span class="text-medium-emphasis">Type at least 2 characters to search...</span>
+              </v-list-item>
+            </template>
+          </v-autocomplete>
         </div>
       </v-fade-transition>
 
@@ -84,7 +73,11 @@
                   <v-icon size="24">mdi-account</v-icon>
                 </v-avatar>
                 <div>
-                  <h3 class="text-h6 font-weight-bold mb-0">
+                  <h3
+                    class="text-h6 font-weight-bold mb-0"
+                    :class="{ 'clickable-title': clickableName }"
+                    @click="clickableName && $emit('click-name', customer.id)"
+                  >
                     {{ customer.fname }} {{ customer.lname }}
                   </h3>
                   <span class="text-caption text-medium-emphasis">Customer ID: #{{ customer.id }}</span>
@@ -133,7 +126,7 @@
                 density="comfortable"
                 placeholder="Add private customer notes here..."
                 @blur="saveNotesOnly"
-                hide-details
+                :messages="noteSavingStatus ? [noteSavingStatus] : []"
               ></v-textarea>
             </v-col>
           </v-row>
@@ -317,10 +310,18 @@ const props = defineProps({
   prefillQuery: {
     type: String,
     default: ''
+  },
+  flat: {
+    type: Boolean,
+    default: false
+  },
+  clickableName: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'select', 'newCustomer', 'cancel'])
+const emit = defineEmits(['update:modelValue', 'select', 'newCustomer', 'cancel', 'click-name'])
 
 // State Variables
 const currentState = ref('search') // 'search', 'info', 'form'
@@ -355,18 +356,7 @@ const nameRules = [
   v => (v && v.trim().length > 0) || 'Name cannot be blank'
 ]
 
-// Computed Headers
-const cardTitle = computed(() => {
-  if (currentState.value === 'search') return 'Customer Search'
-  if (currentState.value === 'info') return 'Customer Details'
-  return customer.id ? 'Edit Customer Details' : 'Add New Customer'
-})
 
-const cardIcon = computed(() => {
-  if (currentState.value === 'search') return 'mdi-account-search'
-  if (currentState.value === 'info') return 'mdi-account-card-details'
-  return 'mdi-account-plus'
-})
 
 const hasAddress = computed(() => {
   return (
@@ -606,6 +596,14 @@ async function saveNotesOnly() {
   }
 }
 
+const handleEnterKey = () => {
+  if (formattedCandidates.value.length === 0) {
+    initCreateForm()
+  } else {
+    selectedSearchItem.value = formattedCandidates.value[0]
+  }
+}
+
 onMounted(() => {
   if (props.modelValue) {
     loadCustomer(props.modelValue)
@@ -629,6 +627,13 @@ onMounted(() => {
   overflow: hidden;
 }
 
+.flat-customer-card {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
 .bg-light-surface {
   background-color: rgba(var(--v-theme-surface-variant), 0.05);
 }
@@ -639,5 +644,13 @@ onMounted(() => {
 
 .italic {
   font-style: italic;
+}
+
+.clickable-title {
+  cursor: pointer;
+  color: rgb(var(--v-theme-primary));
+}
+.clickable-title:hover {
+  text-decoration: underline;
 }
 </style>

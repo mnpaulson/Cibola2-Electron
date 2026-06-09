@@ -288,10 +288,10 @@
               </tr>
               <tr
                 v-else
-                v-for="cust in filteredDirectory"
+                v-for="cust in paginatedDirectory"
                 :key="cust.id"
                 class="cursor-pointer transition-row hover-shadow"
-                @click="selectedId = cust.id"
+                @click="navigateTo('customers', { selectedCustomerId: cust.id })"
               >
                 <td class="font-weight-bold text-body-2 text-primary py-3">
                   {{ cust.fname }} {{ cust.lname }}
@@ -307,6 +307,13 @@
               </tr>
             </tbody>
           </v-table>
+          
+          <v-divider v-if="filteredDirectory.length > 0"></v-divider>
+          <DirectoryPagination
+            v-model="currentPage"
+            :total-items="filteredDirectory.length"
+            :items-per-page="itemsPerPage"
+          />
         </v-card>
       </v-col>
     </v-row>
@@ -324,79 +331,31 @@
     </v-dialog>
 
     <!-- WARNING DELETE CONFIRMATION MODAL -->
-    <v-dialog v-model="deleteDialog" max-width="500px" persistent>
-      <v-card class="rounded-lg">
-        <v-card-item class="bg-error text-white py-3">
-          <v-card-title class="text-subtitle-1 font-weight-bold">
-            <v-icon start class="mr-2">mdi-alert</v-icon>
-            Warning: Cascading Delete
-          </v-card-title>
-        </v-card-item>
-
-        <v-card-text class="pa-4">
-          <p class="text-body-2 mb-3">
-            You are about to delete customer <strong>{{ customerName }}</strong> (ID: #{{ selectedId }}).
-          </p>
-          
-          <v-alert
-            type="warning"
-            variant="tonal"
-            density="compact"
-            class="text-caption font-weight-medium mb-4"
-          >
-            Deleting this customer will permanently delete all associated items:
-            <ul class="pl-4 mt-1">
-              <li><strong>{{ jobs.length }}</strong> Repair Jobs and their photos</li>
-              <li><strong>{{ credits.length }}</strong> Store Credits</li>
-              <li><strong>{{ customSheets.length }}</strong> Custom Sheets</li>
-            </ul>
-          </v-alert>
-
-          <!-- Safety Checklist -->
-          <v-checkbox
-            v-model="confirmDeleteCheckbox"
-            label="I understand that this action is permanent and cannot be undone."
-            color="error"
-            density="compact"
-            class="text-caption mt-0"
-            hide-details
-          ></v-checkbox>
-
-          <v-text-field
-            v-model="confirmLastNameInput"
-            label="Type customer's Last Name to confirm *"
-            placeholder="Type last name here..."
-            variant="outlined"
-            density="compact"
-            class="mt-4"
-            hide-details
-          ></v-text-field>
-        </v-card-text>
-
-        <v-divider></v-divider>
-
-        <v-card-actions class="pa-3 bg-light-surface d-flex justify-end gap-2">
-          <v-btn
-            color="grey-darken-1"
-            variant="outlined"
-            size="small"
-            @click="closeDeleteDialog"
-          >
-            Cancel
-          </v-btn>
-          <v-btn
-            color="error"
-            variant="flat"
-            size="small"
-            :disabled="!isDeleteEnabled"
-            prepend-icon="mdi-delete-forever"
-            @click="submitDeleteCustomer"
-          >
-            Delete Permanently
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <DeleteConfirmationDialog
+      v-model="deleteDialog"
+      title="Warning: Cascading Delete"
+      :warning-message="`You are about to delete customer <strong>${customerName}</strong> (ID: #${selectedId}).`"
+      :confirm-text-key="selectedCustomer?.lname"
+      confirm-text-placeholder="Type customer's Last Name to confirm *"
+      checkbox-label="I understand that this action is permanent and cannot be undone."
+      :loading="loadingHistory"
+      @confirm="submitDeleteCustomer"
+      @cancel="closeDeleteDialog"
+    >
+      <v-alert
+        type="warning"
+        variant="tonal"
+        density="compact"
+        class="text-caption font-weight-medium mb-4"
+      >
+        Deleting this customer will permanently delete all associated items:
+        <ul class="pl-4 mt-1">
+          <li><strong>{{ jobs.length }}</strong> Repair Jobs and their photos</li>
+          <li><strong>{{ credits.length }}</strong> Store Credits</li>
+          <li><strong>{{ customSheets.length }}</strong> Custom Sheets</li>
+        </ul>
+      </v-alert>
+    </DeleteConfirmationDialog>
   </div>
 </template>
 
@@ -404,7 +363,10 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { api } from '../utils/api'
 import { sessionState, navigateTo, setSelectedCustomerId } from '../store/session'
+import { formatLocalDate, formatCityProv } from '../utils/dates'
 import CustomerForm from './CustomerForm.vue'
+import DirectoryPagination from './DirectoryPagination.vue'
+import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue'
 
 // Local State
 // Local State
@@ -418,7 +380,6 @@ watch(() => sessionState.selectedCustomerId, (newVal) => {
 }, { immediate: true })
 
 const selectedCustomer = ref(null)
-const activeTab = ref('jobs')
 const loadingHistory = ref(false)
 const loadingDirectory = ref(false)
 const createNewDialog = ref(false)
@@ -430,50 +391,36 @@ const customSheets = ref([])
 
 // Directory listings
 const customersDirectory = ref([])
-const directorySearch = ref('')
+
+// Persisted navigation-friendly states
+const activeTab = computed({
+  get: () => sessionState.customerActiveSubTab,
+  set: (val) => { sessionState.customerActiveSubTab = val }
+})
+
+const directorySearch = computed({
+  get: () => sessionState.customerSearchQuery,
+  set: (val) => { sessionState.customerSearchQuery = val }
+})
+
+const currentPage = computed({
+  get: () => sessionState.customerCurrentPage,
+  set: (val) => { sessionState.customerCurrentPage = val }
+})
+
+const itemsPerPage = 15
+
+const paginatedDirectory = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  return filteredDirectory.value.slice(start, start + itemsPerPage)
+})
+
+watch(directorySearch, () => {
+  currentPage.value = 1
+})
 
 // Deletion Dialog variables
 const deleteDialog = ref(false)
-const confirmDeleteCheckbox = ref(false)
-const confirmLastNameInput = ref('')
-
-// Watch selected Customer ID to load records
-watch(selectedId, (newId) => {
-  if (sessionState.selectedCustomerId !== newId) {
-    sessionState.selectedCustomerId = newId
-  }
-  if (newId) {
-    fetchAssociatedHistory(newId)
-  } else {
-    selectedCustomer.value = null
-    fetchDirectory()
-  }
-})
-
-// Customer full name helper
-const customerName = computed(() => {
-  if (selectedCustomer.value) {
-    return `${selectedCustomer.value.fname} ${selectedCustomer.value.lname}`
-  }
-  return ''
-})
-
-// Compute if delete button should be enabled
-const isDeleteEnabled = computed(() => {
-  if (!confirmDeleteCheckbox.value || !selectedCustomer.value) return false
-  const matchName = (selectedCustomer.value.lname || '').trim().toLowerCase()
-  const enteredName = confirmLastNameInput.value.trim().toLowerCase()
-  return matchName === enteredName && enteredName.length > 0
-})
-
-// Handle customer object emitted from sub-component
-const handleCustomerSelect = (custObj) => {
-  selectedCustomer.value = custObj
-}
-
-const handleNewCustomer = (newId) => {
-  selectedId.value = newId
-}
 
 // Fetch all associated jobs, credits, sheets
 const fetchAssociatedHistory = async (customerId) => {
@@ -508,6 +455,40 @@ const fetchDirectory = async () => {
   }
 }
 
+// Watch selected Customer ID to load records
+watch(selectedId, (newId) => {
+  if (sessionState.selectedCustomerId !== newId) {
+    navigateTo('customers', { selectedCustomerId: newId })
+  }
+  if (newId) {
+    fetchAssociatedHistory(newId)
+  } else {
+    selectedCustomer.value = null
+    fetchDirectory()
+  }
+}, { immediate: true })
+
+// Customer full name helper
+const customerName = computed(() => {
+  if (selectedCustomer.value) {
+    return `${selectedCustomer.value.fname} ${selectedCustomer.value.lname}`
+  }
+  return ''
+})
+
+
+
+// Handle customer object emitted from sub-component
+const handleCustomerSelect = (custObj) => {
+  selectedCustomer.value = custObj
+}
+
+const handleNewCustomer = (newId) => {
+  selectedId.value = newId
+}
+
+// History and directory loaders moved above selectedId watcher to prevent temporal dead zone errors
+
 // Filtered directory matching search input
 const filteredDirectory = computed(() => {
   const q = directorySearch.value.trim().toLowerCase()
@@ -533,9 +514,15 @@ const filteredDirectory = computed(() => {
 const createNewRecord = (tabValue) => {
   if (!selectedId.value) return
   
-  // Set shared state customer selection so target page reads it
-  setSelectedCustomerId(selectedId.value)
-  navigateTo(tabValue)
+  if (tabValue === 'jobs') {
+    navigateTo('jobs', { activeJobId: 0, selectedCustomerId: selectedId.value })
+  } else if (tabValue === 'credits') {
+    navigateTo('credits', { activeCreditId: 0, selectedCustomerId: selectedId.value })
+  } else if (tabValue === 'customsheets') {
+    navigateTo('employees', { activeSheetId: 0, selectedCustomerId: selectedId.value })
+  } else {
+    navigateTo(tabValue, { selectedCustomerId: selectedId.value })
+  }
 }
 
 // Open Form state directly to create customer
@@ -552,8 +539,6 @@ const handleNewCustomerSelect = (custObj) => {
 
 // Dialog management
 const openDeleteDialog = () => {
-  confirmDeleteCheckbox.value = false
-  confirmLastNameInput.value = ''
   deleteDialog.value = true
 }
 
@@ -562,8 +547,6 @@ const closeDeleteDialog = () => {
 }
 
 const submitDeleteCustomer = async () => {
-  if (!isDeleteEnabled.value) return
-  
   loadingHistory.value = true
   try {
     const result = await api.delete(`/customers/${selectedId.value}`)
@@ -579,64 +562,28 @@ const submitDeleteCustomer = async () => {
 }
 
 // Helper formats
-const formatDate = (dateStr) => {
-  if (!dateStr) return '—'
-  try {
-    const clean = dateStr.trim()
-    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
-      const parts = clean.split('-')
-      const year = parseInt(parts[0], 10)
-      const month = parseInt(parts[1], 10) - 1
-      const day = parseInt(parts[2], 10)
-      const localDate = new Date(year, month, day)
-      return localDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-    }
-    let parseableStr = clean
-    if (clean.includes(' ') && !clean.includes('T')) {
-      parseableStr = clean.replace(' ', 'T') + 'Z'
-    }
-    const date = new Date(parseableStr)
-    if (isNaN(date.getTime())) return dateStr
-    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-  } catch {
-    return dateStr
-  }
-}
-
-const formatCityProv = (cust) => {
-  const parts = []
-  if (cust.addr_city) parts.push(cust.addr_city)
-  if (cust.addr_prov) parts.push(cust.addr_prov)
-  return parts.length > 0 ? parts.join(', ') : '—'
-}
+const formatDate = (dateStr) => formatLocalDate(dateStr, 'empty-dash')
 
 
 
-// Mock nav links until target pages are built
+// Navigation links to view existing records
 const goToJob = (jobId) => {
   console.log('Navigating to job ID:', jobId)
-  setSelectedCustomerId(selectedId.value)
-  // Store target job ID in session state if needed
-  sessionState.activeJobId = jobId
-  navigateTo('jobs')
+  navigateTo('jobs', { activeJobId: jobId, selectedCustomerId: selectedId.value })
 }
 
 const goToCredit = (creditId) => {
   console.log('Navigating to credit ID:', creditId)
-  setSelectedCustomerId(selectedId.value)
-  sessionState.activeCreditId = creditId
-  navigateTo('credits')
+  navigateTo('credits', { activeCreditId: creditId, selectedCustomerId: selectedId.value })
 }
 
 const goToCustomSheet = (sheetId) => {
   console.log('Navigating to custom sheet ID:', sheetId)
-  setSelectedCustomerId(selectedId.value)
-  sessionState.activeSheetId = sheetId
-  // Navigates to employees or config for now
+  navigateTo('employees', { activeSheetId: sheetId, selectedCustomerId: selectedId.value })
 }
 
 onMounted(() => {
-  fetchDirectory()
+  // Directory loading is handled by the immediate watch on selectedId
 })
 </script>
 
