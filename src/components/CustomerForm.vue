@@ -18,7 +18,7 @@
             item-title="displayName"
             item-value="id"
             return-object
-            placeholder="Type customer name or phone..."
+            placeholder="Customer Search"
             prepend-inner-icon="mdi-account-search"
             menu-icon=""
             no-filter

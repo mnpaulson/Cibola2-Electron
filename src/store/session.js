@@ -25,7 +25,9 @@ export const sessionState = reactive({
   customerCurrentPage: 1,
   customerActiveSubTab: 'jobs',
   jobSearchQuery: '',
-  jobCurrentPage: 1
+  jobCurrentPage: 1,
+  creditSearchQuery: '',
+  creditCurrentPage: 1
 })
 
 let isNavigatingHistory = false

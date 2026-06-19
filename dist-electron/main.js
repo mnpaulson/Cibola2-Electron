@@ -1,16 +1,17 @@
-import { app as s, ipcMain as a, BrowserWindow as u } from "electron";
-import o from "path";
-import { fileURLToPath as I } from "url";
-import l from "fs";
-const m = o.dirname(I(import.meta.url)), d = o.join(s.getPath("userData"), "settings.json");
-function R() {
+import { app, ipcMain, BrowserWindow } from "electron";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
+const __dirname$1 = path.dirname(fileURLToPath(import.meta.url));
+const settingsPath = path.join(app.getPath("userData"), "settings.json");
+function readSettings() {
   try {
-    if (l.existsSync(d)) {
-      const t = l.readFileSync(d, "utf-8");
-      return JSON.parse(t);
+    if (fs.existsSync(settingsPath)) {
+      const data = fs.readFileSync(settingsPath, "utf-8");
+      return JSON.parse(data);
     }
-  } catch (t) {
-    console.error("Failed to read settings:", t);
+  } catch (err) {
+    console.error("Failed to read settings:", err);
   }
   return {
     serverURL: "http://localhost:8000",
@@ -18,81 +19,113 @@ function R() {
     printers: { job: "", credit: "" }
   };
 }
-function y(t) {
+function writeSettings(settings) {
   try {
-    return l.writeFileSync(d, JSON.stringify(t, null, 2), "utf-8"), !0;
-  } catch (e) {
-    return console.error("Failed to write settings:", e), !1;
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+    return true;
+  } catch (err) {
+    console.error("Failed to write settings:", err);
+    return false;
   }
 }
-process.env.APP_ROOT = o.join(m, "..");
-const p = process.env.VITE_DEV_SERVER_URL, h = o.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = p ? o.join(process.env.APP_ROOT, "public") : h;
-let r = null;
-function w() {
-  r = new u({
-    icon: o.join(process.env.VITE_PUBLIC, "favicon.ico"),
+process.env.APP_ROOT = path.join(__dirname$1, "..");
+const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
+const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
+let win = null;
+function createWindow() {
+  win = new BrowserWindow({
+    icon: path.join(process.env.VITE_PUBLIC, "favicon.ico"),
     width: 1280,
     height: 800,
     webPreferences: {
-      preload: o.join(m, "preload.mjs"),
-      nodeIntegration: !1,
-      contextIsolation: !0
+      preload: path.join(__dirname$1, "preload.mjs"),
+      nodeIntegration: false,
+      contextIsolation: true
     }
-  }), r.webContents.on("did-finish-load", () => {
-    r == null || r.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
-  }), p ? (r.loadURL(p), r.webContents.openDevTools()) : r.loadFile(o.join(h, "index.html"));
+  });
+  win.webContents.on("did-finish-load", () => {
+    win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  });
+  if (VITE_DEV_SERVER_URL) {
+    win.loadURL(VITE_DEV_SERVER_URL);
+    win.webContents.openDevTools();
+  } else {
+    win.loadFile(path.join(RENDERER_DIST, "index.html"));
+  }
 }
-a.handle("get-settings", () => R());
-a.handle("save-settings", (t, e) => y(e));
-a.handle("get-printers", async (t) => {
+ipcMain.handle("get-settings", () => {
+  return readSettings();
+});
+ipcMain.handle("save-settings", (event, settings) => {
+  return writeSettings(settings);
+});
+ipcMain.handle("get-printers", async (event) => {
   try {
-    const e = t.sender;
-    if (e) {
+    const wc = event.sender;
+    if (wc) {
       console.log("[IPC get-printers] Invoking wc.getPrintersAsync()...");
-      const i = await e.getPrintersAsync();
-      console.log("[IPC get-printers] Result details:", i);
-      const n = i.map((c) => c.name);
-      return console.log("[IPC get-printers] Mapped printer names:", n), n;
+      const printers = await wc.getPrintersAsync();
+      console.log("[IPC get-printers] Result details:", printers);
+      const names = printers.map((p) => p.name);
+      console.log("[IPC get-printers] Mapped printer names:", names);
+      return names;
     }
-  } catch (e) {
-    console.error("[IPC get-printers] Error occurred:", e);
+  } catch (err) {
+    console.error("[IPC get-printers] Error occurred:", err);
   }
   return [];
 });
-a.handle("print-document", async (t, { printerName: e, htmlContent: i }) => {
+ipcMain.handle("print-document", async (event, { printerName, htmlContent }) => {
   try {
-    console.log(`[IPC print-document] Initializing print for printer: "${e}"`);
-    let n = new u({
-      show: !1,
+    console.log(`[IPC print-document] Initializing print for printer: "${printerName}"`);
+    let printWin = new BrowserWindow({
+      show: false,
       webPreferences: {
-        nodeIntegration: !1,
-        contextIsolation: !0
+        nodeIntegration: false,
+        contextIsolation: true
       }
     });
-    await n.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(i)}`);
-    const c = {
-      silent: !0,
-      printBackground: !0,
+    await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+    const options = {
+      silent: true,
+      printBackground: true,
       margins: { marginType: "none" }
     };
-    return e && (c.deviceName = e), new Promise((g) => {
-      n.webContents.print(c, (P, f) => {
-        n.destroy(), n = null, P ? (console.log(`[IPC print-document] Printed successfully on "${e || "Default Printer"}"`), g({ success: !0 })) : (console.error(`[IPC print-document] Print failed. Error type: ${f}`), g({ success: !1, error: f || "Unknown printing error" }));
+    if (printerName) {
+      options.deviceName = printerName;
+    }
+    return new Promise((resolve) => {
+      printWin.webContents.print(options, (success, errorType) => {
+        printWin.destroy();
+        printWin = null;
+        if (success) {
+          console.log(`[IPC print-document] Printed successfully on "${printerName || "Default Printer"}"`);
+          resolve({ success: true });
+        } else {
+          console.error(`[IPC print-document] Print failed. Error type: ${errorType}`);
+          resolve({ success: false, error: errorType || "Unknown printing error" });
+        }
       });
     });
-  } catch (n) {
-    return console.error("[IPC print-document] Error during printing:", n), { success: !1, error: n.message };
+  } catch (err) {
+    console.error("[IPC print-document] Error during printing:", err);
+    return { success: false, error: err.message };
   }
 });
-s.on("window-all-closed", () => {
-  process.platform !== "darwin" && (s.quit(), r = null);
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+    win = null;
+  }
 });
-s.on("activate", () => {
-  u.getAllWindows().length === 0 && w();
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
 });
-s.whenReady().then(w);
+app.whenReady().then(createWindow);
 export {
-  h as RENDERER_DIST,
-  p as VITE_DEV_SERVER_URL
+  RENDERER_DIST,
+  VITE_DEV_SERVER_URL
 };

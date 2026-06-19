@@ -56,14 +56,15 @@ To keep the application lightweight and simple for a small-scale single terminal
 ---
 
 ## 7. Centralized Calculations
-* Keep mathematical formulas and financial calculations (like gold credit buy-back pricing or custom sheet repair estimates) in [pricing.js](file:///c:/dev/Cibola2-Electron/src/utils/pricing.js).
+* Keep mathematical formulas and financial calculations (like gold credit buy-back pricing or custom sheet estimates) in [pricing.js](file:///c:/dev/Cibola2-Electron/src/utils/pricing.js).
 * Never duplicate estimation or price calculation logic within individual UI page components to prevent mathematical discrepancy.
 
 ---
 
 ## 8. Camera Capture & Jewelry Photography
-* For taking photos of jewelry items (e.g., in Repair Jobs or Customer details), do not write direct camera streaming or WebRTC logic in the views.
+* For taking photos of jewelry items (e.g., in Jobs or Customer details), do not write direct camera streaming or WebRTC logic in the views.
 * Use the reusable dialog component [CameraCapture.vue](file:///c:/dev/Cibola2-Electron/src/components/CameraCapture.vue) which supports webcam permissions, multi-device video input selection (to support external USB macro/inspection scopes), center layout alignment masks, and base64 JPEG export.
+* **Image Quality**: Photos captured from the webcam must be saved at the highest possible quality (using `canvas.toDataURL('image/jpeg', 1.0)`) rather than downscaling/compressing the quality to save space.
 
 ---
 
@@ -158,7 +159,45 @@ When implementing forms that require uploading or photographing jewelry items (s
     checkbox-label="I understand this cannot be undone"
     :loading="loading"
     @confirm="submitDelete"
-  />
   ```
+
+---
+
+## 16. Base64 Asset Embedding in Headless Print Windows
+For static assets (such as `logo.png`) that need to render inside the headless print BrowserWindow:
+* **Avoid Local File Paths**: Do not use local paths (`file://...`) or relative paths (such as `/logo.png`) in the HTML `src` attributes. Because the print layout is loaded via a sandboxed `data:text/html` URL, the Chromium engine blocks local resource loading due to same-origin policies.
+* **Inline Base64 Encoding**: Convert static print assets into base64 Data URLs and export them from dedicated utility modules (such as [logo.js](file:///c:/dev/Cibola2-Electron/src/utils/logo.js)). Import them into form components and embed them directly inside the print HTML string as inline image data.
+
+---
+
+## 17. Reusable Metal Spot Prices Card
+For displaying and updating market metal prices (Gold, Platinum, Silver):
+* **Reusable Component**: Always use [MetalPricesCard.vue](file:///c:/dev/Cibola2-Electron/src/components/MetalPricesCard.vue) rather than duplicating spot price listings or sync trigger buttons.
+* **Display Modes**:
+  * **Large Mode (Default)**: A complete, self-contained dashboard/settings card that displays side-by-side spot prices for Gold/Platinum and an expandable row for Silver. Supports manual editing and auto-syncs every 15 minutes.
+  * **Small Mode (`small` prop)**: A compact layout designed for embedding inside transactional forms (e.g. `CreditForm.vue`). Uses double data bindings (`v-model:gold`, `v-model:platinum`, `v-model:date`), checks for price staleness (>24 hours), and updates parent values reactively when syncs complete.
+* **Sync and Edit protocols**:
+  * Syncing calls the backend `/values/sync` route to pull live spot prices from the market.
+  * Manual editing is done inline, validating for positive decimal inputs.
+  * Both actions trigger `refreshMetadata()` to synchronize the global metadata cache.
+  * On mount in Large Mode, the component automatically checks if the prices are more than 15 minutes old (or missing) and triggers a sync if online. Small mode bypasses this automatic sync to avoid overriding existing saved transaction prices.
+* **Transactional Form Integration**:
+  * Always bind the `:disabled` prop (e.g., `:disabled="disabled"` where `disabled` is true for already saved records) to prevent syncing or editing historical transaction prices.
+  * The transactional form should watch `metadataState.metalPrices` to reactively update default spot prices and dates for *new* records if they haven't been manually edited.
+  * The form must watch the transaction's spot price fields and trigger a recalculation of all line item values and grand totals when the spot prices change (due to sync, manual overrides, or metadata updates).
+* **Offline Handling**: The component monitors `sessionState.connectionStatus` and automatically disables sync and save buttons if the server is offline, displaying a visual alert context warning.
+
+---
+
+## 18. Global Toast Notification System (Unified Snackbar)
+To keep user feedback notifications consistent and avoid cluttering views with duplicate snackbar structures:
+* **Centralized Store**: The application uses a single global `<v-snackbar>` in `App.vue` that binds to the reactive `toastState` and `showToast` helper from [toast.js](file:///c:/dev/Cibola2-Electron/src/store/toast.js).
+* **Usage**:
+  * Import `showToast` from `../store/toast` (or the appropriate relative path to the store).
+  * Call `showToast('Message text', 'success' | 'error' | 'warning' | 'info')` to trigger a non-blocking toast.
+* **No Local Snackbars or Alerts**:
+  * Do not define local `<v-snackbar>` markup or local reactive notification variables in individual form or listing components.
+  * Avoid native `alert()` popups for user validation warnings or API failures. Route them through `showToast` instead.
+
 
 

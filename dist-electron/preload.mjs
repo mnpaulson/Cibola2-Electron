@@ -1,1 +1,17 @@
-"use strict";const n=require("electron");n.contextBridge.exposeInMainWorld("electronAPI",{onMainProcessMessage:e=>{n.ipcRenderer.on("main-process-message",(r,t)=>e(t))},send:(e,r)=>{n.ipcRenderer.send(e,r)},on:(e,r)=>{n.ipcRenderer.on(e,(t,...i)=>r(...i))},getSettings:()=>n.ipcRenderer.invoke("get-settings"),saveSettings:e=>n.ipcRenderer.invoke("save-settings",e),getPrinters:()=>n.ipcRenderer.invoke("get-printers"),printDocument:e=>n.ipcRenderer.invoke("print-document",e)});
+"use strict";
+const electron = require("electron");
+electron.contextBridge.exposeInMainWorld("electronAPI", {
+  onMainProcessMessage: (callback) => {
+    electron.ipcRenderer.on("main-process-message", (_event, value) => callback(value));
+  },
+  send: (channel, data) => {
+    electron.ipcRenderer.send(channel, data);
+  },
+  on: (channel, callback) => {
+    electron.ipcRenderer.on(channel, (event, ...args) => callback(...args));
+  },
+  getSettings: () => electron.ipcRenderer.invoke("get-settings"),
+  saveSettings: (settings) => electron.ipcRenderer.invoke("save-settings", settings),
+  getPrinters: () => electron.ipcRenderer.invoke("get-printers"),
+  printDocument: (payload) => electron.ipcRenderer.invoke("print-document", payload)
+});

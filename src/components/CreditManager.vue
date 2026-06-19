@@ -1,17 +1,17 @@
 <template>
   <div>
-    <!-- Workspace Layout: Job Form (When a job is active or a new job is being created) -->
+    <!-- Workspace Layout: Credit Form (When a credit is active or customer is selected) -->
     <v-row v-if="isWorkspaceActive">
       <v-col cols="12">
-        <JobForm
-          v-model:jobId="sessionState.activeJobId"
+        <CreditForm
+          v-model:creditId="sessionState.activeCreditId"
           v-model:customerId="sessionState.selectedCustomerId"
-          @saved="handleJobSaved"
+          @saved="handleCreditSaved"
         />
       </v-col>
     </v-row>
 
-    <!-- Master Job Directory Listing (Default state when no job/customer selected) -->
+    <!-- Master Gold Credit Directory Listing -->
     <v-row v-else>
       <v-col cols="12">
         <v-card elevation="2" class="directory-card rounded-lg">
@@ -19,13 +19,13 @@
           <v-card-item class="bg-primary text-white py-3">
             <v-row no-gutters align="center" justify="space-between">
               <v-col class="text-h6 font-weight-bold d-flex align-center">
-                <v-icon start class="mr-2">mdi-briefcase-clock</v-icon>
-                Jobs Directory
+                <v-icon start class="mr-2">mdi-currency-usd</v-icon>
+                Gold Credits Directory
               </v-col>
               <v-col cols="12" sm="4" class="mt-2 mt-sm-0">
                 <v-text-field
                   v-model="directorySearch"
-                  placeholder="Filter jobs (ID, customer, employee)..."
+                  placeholder="Filter credits (ID, customer, employee)..."
                   prepend-inner-icon="mdi-magnify"
                   variant="solo"
                   density="compact"
@@ -42,9 +42,9 @@
                   variant="flat"
                   prepend-icon="mdi-plus"
                   size="small"
-                  @click="startNewJob"
+                  @click="startNewCredit"
                 >
-                  New Job
+                  New Credit
                 </v-btn>
               </v-col>
             </v-row>
@@ -56,60 +56,67 @@
           <v-table hover fixed-header class="directory-table">
             <thead>
               <tr>
-                <th class="font-weight-bold text-subtitle-2 py-3">Job ID</th>
+                <th class="font-weight-bold text-subtitle-2 py-3">Credit ID</th>
                 <th class="font-weight-bold text-subtitle-2 py-3">Customer</th>
-                <th class="font-weight-bold text-subtitle-2 py-3">Estimate</th>
+                <th class="font-weight-bold text-subtitle-2 py-3">Payout Value</th>
                 <th class="font-weight-bold text-subtitle-2 py-3">Assigned Employee</th>
                 <th class="font-weight-bold text-subtitle-2 py-3">Created</th>
-                <th class="font-weight-bold text-subtitle-2 py-3">Due Date</th>
+                <th class="font-weight-bold text-subtitle-2 py-3">Used</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading" class="text-center">
                 <td colspan="6" class="py-12">
                   <v-progress-circular indeterminate size="48" color="primary"></v-progress-circular>
-                  <div class="mt-3 text-caption text-medium-emphasis">Loading jobs...</div>
+                  <div class="mt-3 text-caption text-medium-emphasis">Loading gold credits...</div>
                 </td>
               </tr>
-              <tr v-else-if="filteredJobs.length === 0" class="text-center">
+              <tr v-else-if="filteredCredits.length === 0" class="text-center">
                 <td colspan="6" class="py-12 text-medium-emphasis italic">
-                  No jobs found.
+                  No gold credits found.
                 </td>
               </tr>
               <tr
                 v-else
-                v-for="job in paginatedJobs"
-                :key="job.id"
+                v-for="credit in paginatedCredits"
+                :key="credit.id"
                 class="cursor-pointer transition-row hover-shadow"
-                @click="openJobEditor(job)"
+                @click="openCreditEditor(credit)"
               >
                 <td class="font-weight-bold text-body-2 text-primary py-3">
-                  #{{ job.id }}
+                  #{{ credit.id }}
                 </td>
                 <td class="text-body-2 font-weight-medium">
-                  {{ job.customer ? `${job.customer.fname} ${job.customer.lname}` : '—' }}
+                  {{ credit.customer ? `${credit.customer.fname} ${credit.customer.lname}` : '—' }}
                 </td>
-                <td class="text-body-2 font-weight-bold text-green-darken-2">
-                  ${{ (job.estimate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                <td class="text-body-2 font-weight-bold text-success">
+                  ${{ (calculateGrandTotal(credit) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                 </td>
                 <td class="text-body-2">
-                  {{ job.employee ? job.employee.name : 'Unassigned' }}
+                  {{ credit.employee ? credit.employee.name : 'Unassigned' }}
                 </td>
                 <td class="text-caption text-medium-emphasis">
-                  {{ formatDate(job.created_at) }}
+                  {{ formatDate(credit.created_at) }}
                 </td>
-                <td class="text-caption">
-                  {{ formatDate(job.due_date) || '—' }}
+                <td class="text-body-2">
+                  <v-chip
+                    :color="credit.used ? 'warning' : 'success'"
+                    size="small"
+                    variant="tonal"
+                    class="font-weight-bold"
+                  >
+                    {{ credit.used ? 'Used' : 'Active' }}
+                  </v-chip>
                 </td>
               </tr>
             </tbody>
           </v-table>
 
           <!-- Local Pagination Controls -->
-          <v-divider v-if="filteredJobs.length > 0"></v-divider>
+          <v-divider v-if="filteredCredits.length > 0"></v-divider>
           <DirectoryPagination
             v-model="currentPage"
-            :total-items="filteredJobs.length"
+            :total-items="filteredCredits.length"
             :items-per-page="itemsPerPage"
           />
         </v-card>
@@ -123,104 +130,104 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { api } from '../utils/api'
 import { sessionState, navigateTo } from '../store/session'
 import { formatLocalDate } from '../utils/dates'
-import JobForm from './JobForm.vue'
+import CreditForm from './CreditForm.vue'
 import DirectoryPagination from './DirectoryPagination.vue'
 
 // Local State
-const jobsList = ref([])
+const creditsList = ref([])
 const loading = ref(false)
-// Persisted navigation-friendly states
+const itemsPerPage = 15
+
+// Persisted navigation states
 const directorySearch = computed({
-  get: () => sessionState.jobSearchQuery,
-  set: (val) => { sessionState.jobSearchQuery = val }
+  get: () => sessionState.creditSearchQuery,
+  set: (val) => { sessionState.creditSearchQuery = val }
 })
 
 const currentPage = computed({
-  get: () => sessionState.jobCurrentPage,
-  set: (val) => { sessionState.jobCurrentPage = val }
+  get: () => sessionState.creditCurrentPage,
+  set: (val) => { sessionState.creditCurrentPage = val }
 })
 
-const itemsPerPage = 15
-
-// Check if edit workspace is active (using 0 or non-null values)
+// Check if workspace editor is active
 const isWorkspaceActive = computed(() => {
-  return sessionState.activeJobId !== null || sessionState.selectedCustomerId !== null
+  return sessionState.activeCreditId !== null || sessionState.selectedCustomerId !== null
 })
 
-// Fetch all jobs from SQLite DB
-const fetchJobs = async () => {
+// Fetch all credits from backend SQLite DB
+const fetchCredits = async () => {
   loading.value = true
   try {
-    const data = await api.get('/jobs')
-    jobsList.value = data || []
+    const data = await api.get('/goldcredits')
+    creditsList.value = data || []
   } catch (err) {
-    console.error('Failed to load jobs directory:', err)
+    console.error('Failed to load gold credits directory:', err)
   } finally {
     loading.value = false
   }
 }
 
-// Filtered directory
-const filteredJobs = computed(() => {
-  const q = directorySearch.value.trim().toLowerCase()
-  if (!q) return jobsList.value
+// Compute grand total payout from credit items
+const calculateGrandTotal = (credit) => {
+  if (!credit.credit_items) return 0
+  return credit.credit_items.reduce((acc, curr) => acc + (parseFloat(curr.value) || 0), 0)
+}
 
-  return jobsList.value.filter(job => {
-    const idMatch = String(job.id).includes(q)
-    const custFname = job.customer ? (job.customer.fname || '').toLowerCase() : ''
-    const custLname = job.customer ? (job.customer.lname || '').toLowerCase() : ''
+// Filtered list
+const filteredCredits = computed(() => {
+  const q = directorySearch.value.trim().toLowerCase()
+  if (!q) return creditsList.value
+
+  return creditsList.value.filter(credit => {
+    const idMatch = String(credit.id).includes(q)
+    const custFname = credit.customer ? (credit.customer.fname || '').toLowerCase() : ''
+    const custLname = credit.customer ? (credit.customer.lname || '').toLowerCase() : ''
     const custName = `${custFname} ${custLname}`
-    const empName = job.employee ? (job.employee.name || '').toLowerCase() : ''
-    const estString = String(job.estimate || '')
+    const empName = credit.employee ? (credit.employee.name || '').toLowerCase() : ''
+    const typeName = (credit.credit_type || '').toLowerCase()
 
     return (
       idMatch ||
       custName.includes(q) ||
       empName.includes(q) ||
-      estString.includes(q)
+      typeName.includes(q)
     )
   })
 })
 
 // Paginated subset
-const paginatedJobs = computed(() => {
+const paginatedCredits = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage
-  return filteredJobs.value.slice(start, start + itemsPerPage)
+  return filteredCredits.value.slice(start, start + itemsPerPage)
 })
 
-
-
-// Open specific job for editing
-const openJobEditor = (job) => {
-  navigateTo('jobs', { activeJobId: job.id, selectedCustomerId: job.customer_id })
+// Navigation triggers
+const openCreditEditor = (credit) => {
+  navigateTo('credits', { activeCreditId: credit.id, selectedCustomerId: credit.customer_id })
 }
 
-// Immediately switch to new job form
-const startNewJob = () => {
-  navigateTo('jobs', { activeJobId: 0, selectedCustomerId: null })
+const startNewCredit = () => {
+  navigateTo('credits', { activeCreditId: 0, selectedCustomerId: null })
 }
 
-// Handle job saved event
-const handleJobSaved = (savedJob) => {
-  if (savedJob && savedJob.id) {
-    sessionState.activeJobId = savedJob.id
+const handleCreditSaved = (savedCredit) => {
+  if (savedCredit && savedCredit.id) {
+    sessionState.activeCreditId = savedCredit.id
   }
-  fetchJobs()
+  fetchCredits()
 }
 
 const formatDate = (dateStr) => formatLocalDate(dateStr, 'long')
 
-
-
 // Load directory on mounting
 onMounted(() => {
-  fetchJobs()
+  fetchCredits()
 })
 
 // Re-fetch directory when returning to list state
 watch(isWorkspaceActive, (active) => {
   if (!active) {
-    fetchJobs()
+    fetchCredits()
   }
 })
 </script>

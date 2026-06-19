@@ -64,15 +64,14 @@
         <div v-if="activeTab === 'dashboard'">
           <!-- Welcome Header -->
           <div class="d-flex flex-column align-center justify-center py-8 text-center">
-            <h1 class="text-h3 font-weight-bold mb-3 text-gradient">Cibola2 Workspace</h1>
-            <p class="text-subtitle-1 text-medium-emphasis max-width-600">
-              Lookup customers, create profiles, or start a new repair job from this minimalist workspace.
-            </p>
+            <h1 class="text-h3 font-weight-bold mb-3 text-gradient">Cibola 2</h1>
           </div>
 
           <v-row justify="center" class="mt-2">
             <!-- Customer Search & Create (Simplified / Minimalist Layout) -->
             <v-col cols="12" md="8" lg="6">
+              <MetalPricesCard class="mb-6" />
+
               <div class="mb-6">
                 <!-- Direct flat customer search component -->
                 <CustomerForm
@@ -84,17 +83,43 @@
                 />
               </div>
 
-              <!-- New Repair Job Quick Action Button (Minimalist Tonal style) -->
+              <!-- Job Number Search & Quick Create (Right below customer search) -->
+              <div class="mb-6">
+                <v-text-field
+                  v-model="jobNumberInput"
+                  placeholder="Job Number"
+                  prepend-inner-icon="mdi-briefcase-search"
+                  clearable
+                  variant="outlined"
+                  density="comfortable"
+                  hide-details
+                  :loading="isSearchingJob"
+                  @keydown.enter.prevent="handleJobNumberEnter"
+                >
+                  <template v-slot:append-inner>
+                    <v-btn
+                      color="primary"
+                      icon="mdi-plus"
+                      variant="text"
+                      density="comfortable"
+                      title="Start New Job"
+                      @click.stop="startNewJobFromDashboard"
+                    ></v-btn>
+                  </template>
+                </v-text-field>
+              </div>
+
+              <!-- New Job Quick Action Button (Minimalist Tonal style) -->
               <div class="text-center">
                 <v-btn
                   color="primary"
                   size="large"
-                  prepend-icon="mdi-wrench-clock"
+                  prepend-icon="mdi-briefcase-clock"
                   variant="tonal"
                   block
                   @click="startNewJobFromDashboard"
                 >
-                  Start New Repair Job
+                  New Job
                 </v-btn>
               </div>
             </v-col>
@@ -106,7 +131,12 @@
           <CustomerManager />
         </div>
 
-        <!-- Repair Jobs Tab -->
+        <!-- Gold Credits Tab -->
+        <div v-else-if="activeTab === 'credits'">
+          <CreditManager />
+        </div>
+
+        <!-- Jobs Tab -->
         <div v-else-if="activeTab === 'jobs'">
           <JobManager />
         </div>
@@ -139,20 +169,37 @@
 
       </v-container>
     </v-main>
+
+    <!-- Global Snackbar Toasts -->
+    <v-snackbar
+      v-model="toastState.show"
+      :color="toastState.color"
+      :timeout="toastState.timeout"
+      elevation="4"
+    >
+      {{ toastState.text }}
+      <template v-slot:actions>
+        <v-btn variant="text" icon="mdi-close" @click="toastState.show = false"></v-btn>
+      </template>
+    </v-snackbar>
   </v-app>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useTheme } from 'vuetify'
 import { settingsState, loadSettings } from './store/settings'
 import { sessionState, startHeartbeat, navigateTo, navigateBack } from './store/session'
 import { metadataState, refreshMetadata } from './store/metadata'
+import { api } from './utils/api'
 import ConnectionBanner from './components/ConnectionBanner.vue'
 import Admin from './components/Admin.vue'
 import CustomerManager from './components/CustomerManager.vue'
 import JobManager from './components/JobManager.vue'
 import CustomerForm from './components/CustomerForm.vue'
+import MetalPricesCard from './components/MetalPricesCard.vue'
+import CreditManager from './components/CreditManager.vue'
+import { toastState, showToast } from './store/toast'
 
 const theme = useTheme()
 
@@ -198,6 +245,35 @@ const activeTab = computed({
   set: (val) => navigateTo(val)
 })
 
+// Job Number search state & handlers
+const jobNumberInput = ref('')
+const isSearchingJob = ref(false)
+
+const showSnackbar = (text, color = 'success') => {
+  showToast(text, color)
+}
+
+const handleJobNumberEnter = async () => {
+  const id = jobNumberInput.value?.trim()
+  if (!id) return
+
+  isSearchingJob.value = true
+  try {
+    const job = await api.get(`/jobs/${id}`)
+    if (job && job.id) {
+      navigateTo('jobs', { activeJobId: job.id, selectedCustomerId: job.customer_id })
+      jobNumberInput.value = ''
+    } else {
+      showSnackbar(`Job #${id} not found`, 'warning')
+    }
+  } catch (err) {
+    console.error('Failed to open job:', err)
+    showSnackbar(`Job #${id} not found`, 'error')
+  } finally {
+    isSearchingJob.value = false
+  }
+}
+
 const handleDashboardCustomerSelect = (customer) => {
   if (customer && customer.id) {
     navigateTo('customers', { selectedCustomerId: customer.id })
@@ -221,10 +297,10 @@ const toggleTheme = () => {
 
 const menuItems = [
   { title: 'Dashboard', icon: 'mdi-view-dashboard', value: 'dashboard' },
+  { title: 'Gold Credits', icon: 'mdi-currency-usd', value: 'credits' },
+  { title: 'Custom Sheets', icon: 'mdi-clock-outline', value: 'custom' },
+  { title: 'Jobs', icon: 'mdi-briefcase', value: 'jobs' },
   { title: 'Customers', icon: 'mdi-account-group', value: 'customers' },
-  { title: 'Repair Jobs', icon: 'mdi-wrench', value: 'jobs' },
-  { title: 'Employee Sheets', icon: 'mdi-clock-outline', value: 'employees' },
-  { title: 'Store Credits', icon: 'mdi-currency-usd', value: 'credits' },
   { title: 'Configuration', icon: 'mdi-cog', value: 'config' }
 ]
 

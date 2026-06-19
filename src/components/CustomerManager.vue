@@ -44,7 +44,7 @@
                 <v-btn
                   color="primary"
                   variant="elevated"
-                  prepend-icon="mdi-wrench-clock"
+                  prepend-icon="mdi-briefcase-clock"
                   size="small"
                   @click="createNewRecord('jobs')"
                 >
@@ -77,8 +77,8 @@
           <!-- History Tabs -->
           <v-tabs v-model="activeTab" bg-color="surface" align-tabs="start" density="comfortable">
             <v-tab value="jobs" class="text-caption font-weight-bold">
-              <v-icon start>mdi-wrench</v-icon>
-              Repair Jobs ({{ jobs.length }})
+              <v-icon start>mdi-briefcase</v-icon>
+              Jobs ({{ jobs.length }})
             </v-tab>
             <v-tab value="credits" class="text-caption font-weight-bold">
               <v-icon start>mdi-currency-usd</v-icon>
@@ -114,7 +114,7 @@
                     </tr>
                     <tr v-else-if="jobs.length === 0" class="text-center">
                       <td colspan="4" class="py-6 text-medium-emphasis text-caption italic">
-                        No repair jobs found for this customer.
+                        No jobs found for this customer.
                       </td>
                     </tr>
                     <tr
@@ -350,7 +350,7 @@
       >
         Deleting this customer will permanently delete all associated items:
         <ul class="pl-4 mt-1">
-          <li><strong>{{ jobs.length }}</strong> Repair Jobs and their photos</li>
+          <li><strong>{{ jobs.length }}</strong> Jobs and their photos</li>
           <li><strong>{{ credits.length }}</strong> Store Credits</li>
           <li><strong>{{ customSheets.length }}</strong> Custom Sheets</li>
         </ul>

@@ -56,6 +56,17 @@ export function formatLocalDate(dateStr, formatType = 'long') {
       const yy = String(date.getFullYear()).slice(-2)
       return `${mm}-${dd}-${yy}`
     }
+
+    if (formatType === 'datetime') {
+      return date.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    }
     
     return date.toLocaleDateString(undefined, { 
       year: 'numeric', 

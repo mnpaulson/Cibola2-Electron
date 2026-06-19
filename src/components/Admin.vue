@@ -507,57 +507,9 @@
 
             <!-- Metal Prices Cache Sub-tab -->
             <v-window-item value="metal-prices">
-              <v-card variant="outlined" class="border-light">
-                <v-card-text class="pa-0">
-                  <v-table hover class="config-table">
-                    <thead>
-                      <tr>
-                        <th class="font-weight-bold" style="width: 30%">Metal Name</th>
-                        <th class="font-weight-bold" style="width: 40%">
-                          Current Market Value / Gram
-                          <v-tooltip activator="parent" location="bottom">Spot price stored locally and used for calculations</v-tooltip>
-                        </th>
-                        <th class="text-right font-weight-bold" style="width: 30%">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="val in metalPrices" :key="val.id">
-                        <td class="py-2 font-weight-medium">
-                          {{ val.name }}
-                        </td>
-                        <td class="py-2">
-                          <v-text-field
-                            v-model="val.value1"
-                            density="compact"
-                            variant="underlined"
-                            hide-details
-                            type="number"
-                            step="0.01"
-                            prefix="$"
-                          ></v-text-field>
-                        </td>
-                        <td class="text-right py-2">
-                          <v-btn
-                            color="success"
-                            size="small"
-                            variant="outlined"
-                            class="mr-2 text-none font-weight-medium rounded-pill"
-                            @click="saveValue(val)"
-                            :loading="val.saveStatus === 'saving'"
-                          >
-                            <v-icon start v-if="!val.saveStatus">mdi-content-save-outline</v-icon>
-                            <v-icon start v-else-if="val.saveStatus === 'saved'">mdi-check</v-icon>
-                            {{ val.saveStatus === 'saved' ? 'Saved' : 'Save' }}
-                          </v-btn>
-                        </td>
-                      </tr>
-                      <tr v-if="metalPrices.length === 0">
-                        <td colspan="3" class="text-center py-6 text-medium-emphasis">No spot prices found. Check backend seeds.</td>
-                      </tr>
-                    </tbody>
-                  </v-table>
-                </v-card-text>
-              </v-card>
+              <div class="mx-auto" style="max-width: 600px;">
+                <MetalPricesCard />
+              </div>
             </v-window-item>
           </v-window>
         </v-window-item>
@@ -647,18 +599,6 @@
       </v-card>
     </v-dialog>
 
-    <!-- Global Snackbar Toasts -->
-    <v-snackbar
-      v-model="snackbar.show"
-      :color="snackbar.color"
-      :timeout="snackbar.timeout"
-      elevation="4"
-    >
-      {{ snackbar.text }}
-      <template v-slot:actions>
-        <v-btn variant="text" icon="mdi-close" @click="snackbar.show = false"></v-btn>
-      </template>
-    </v-snackbar>
   </div>
 </template>
 
@@ -666,6 +606,8 @@
 import { ref, onMounted, reactive, watch } from 'vue'
 import { api } from '../utils/api'
 import { settingsState, saveSettings, loadSettings } from '../store/settings'
+import { showToast } from '../store/toast'
+import MetalPricesCard from './MetalPricesCard.vue'
 
 // Navigation state
 const activeTab = ref('local')
@@ -702,17 +644,8 @@ const valueDeleteDialog = ref(false)
 const valueToDelete = ref(null)
 
 // Snackbar Toast System
-const snackbar = reactive({
-  show: false,
-  text: '',
-  color: 'success',
-  timeout: 3000
-})
-
 const showSnackbar = (text, color = 'success') => {
-  snackbar.text = text
-  snackbar.color = color
-  snackbar.show = true
+  showToast(text, color)
 }
 
 // ----------------------------------------------------

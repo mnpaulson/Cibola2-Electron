@@ -34,13 +34,13 @@
     <template v-else>
       <v-icon size="48" color="primary" class="mb-2">mdi-cloud-upload-outline</v-icon>
       <span class="text-body-1 font-weight-bold text-center mb-1">
-        Drag & drop jewelry photos here
+        Drag & drop photos here
       </span>
       <span class="text-body-2 text-medium-emphasis text-center mb-2">
         or <span class="text-primary font-weight-medium">click to browse</span> files
       </span>
       <span class="text-caption text-disabled">
-        Supports JPEG, PNG, WEBP
+        Supports JPEG, PNG
       </span>
     </template>
   </v-card>
@@ -48,6 +48,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { showToast } from '../store/toast'
 
 const props = defineProps({
   compact: {
@@ -95,7 +96,7 @@ const onDrop = (e) => {
 const processFiles = (files) => {
   Array.from(files).forEach((file) => {
     if (!file.type.startsWith('image/')) {
-      alert('Only image files are supported.')
+      showToast('Only image files are supported.', 'warning')
       return
     }
     

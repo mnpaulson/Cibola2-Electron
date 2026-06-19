@@ -26,7 +26,7 @@ export function calculateGoldCreditValue(weight, multiplier, markup, spotPrice) 
 }
 
 /**
- * Calculate the estimate cost of a repair job based on configured formulas.
+ * Calculate the estimate cost of a job based on configured formulas.
  * 
  * @param {string} formulaName - Name/type of pricing formula (e.g. 'WeightBased', 'BaseOnly')
  * @param {number|string} basePrice - Base/labor price
@@ -60,4 +60,28 @@ export function calculateRepairJobEstimate(formulaName, basePrice, weight, spotP
       // Just the static/base labor cost
       return Math.round((base + Number.EPSILON) * 100) / 100
   }
+}
+
+/**
+ * Get adjusted markup based on the credit type (credit, split, cash).
+ * Cash is the baseline. Split adds +10% (+0.1). Credit adds +20% (+0.2).
+ * This adjustment only applies to standard gold karats: 8k, 9k, 10k, 12k, 14k, 18k.
+ * 
+ * @param {string} itemName - Name of karat item (e.g. '10k', 'Platinum')
+ * @param {number|string} baseMarkup - Baseline markup percentage (e.g. 0.6)
+ * @param {string} creditType - Selected payout type ('credit', 'split', 'cash')
+ * @returns {number} The adjusted markup percentage
+ */
+export function getAdjustedMarkup(itemName, baseMarkup, creditType) {
+  const parsedBase = parseFloat(baseMarkup) || 0
+  const isAdjustableGold = ['8k', '9k', '10k', '12k', '14k', '18k'].includes(itemName)
+  if (!isAdjustableGold) return parsedBase
+
+  let adjustment = 0
+  if (creditType === 'credit') {
+    adjustment = 0.2
+  } else if (creditType === 'split') {
+    adjustment = 0.1
+  }
+  return Math.round((parsedBase + adjustment) * 100) / 100
 }

@@ -3,8 +3,8 @@
     <!-- Header -->
     <v-card-item class="bg-primary text-white py-3">
       <v-card-title class="font-weight-bold text-subtitle-1 d-flex align-center">
-        <v-icon start class="mr-2">mdi-wrench</v-icon>
-        {{ job.id ? `Edit Job #${job.id}` : 'Create New Repair Job' }}
+        <v-icon start class="mr-2">mdi-briefcase</v-icon>
+        {{ job.id ? `Edit Job #${job.id}` : 'Create New Job' }}
         <v-spacer></v-spacer>
         <span v-if="job.created_at" class="text-caption font-weight-medium">
           Created: {{ formatDate(job.created_at) }}
@@ -95,7 +95,7 @@
           <v-col cols="12" md="6">
             <v-textarea
               v-model="job.est_note"
-              label="Estimate Details (Gold karat, gems, layout info)"
+              label="Estimate Details"
               variant="outlined"
               rows="3"
               no-resize
@@ -131,8 +131,8 @@
     <!-- Delete Job Modal -->
     <DeleteConfirmationDialog
       v-model="isDeleteJobOpen"
-      title="Delete Repair Job"
-      warning-message="Are you sure you want to delete this entire repair job and all its attached images? This action is permanent."
+      title="Delete Job"
+      warning-message="Are you sure you want to delete this entire job and all its attached images? This action is permanent."
       :loading="loading"
       @confirm="submitDeleteJob"
     />
@@ -178,6 +178,15 @@
         Print
       </v-btn>
       <v-btn
+        color="orange-darken-2"
+        variant="tonal"
+        prepend-icon="mdi-file-document-outline"
+        size="small"
+        @click="downloadPrintPreview"
+      >
+        Preview HTML
+      </v-btn>
+      <v-btn
         color="success"
         variant="flat"
         prepend-icon="mdi-content-save-all"
@@ -208,11 +217,36 @@ import { settingsState } from '../store/settings'
 import { metadataState } from '../store/metadata'
 import { navigateBack, navigateTo } from '../store/session'
 import { formatLocalDate } from '../utils/dates'
+import { logoBase64 } from '../utils/logo'
+import { showToast } from '../store/toast'
 import AttachedImages from './AttachedImages.vue'
 import CustomerForm from './CustomerForm.vue'
 import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue'
 
 const formatDate = (dateStr) => formatLocalDate(dateStr, 'short')
+
+function formatPrintDate(dateStr) {
+  if (!dateStr) return ''
+  const clean = dateStr.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+    const parts = clean.split('-')
+    return `${parts[1]}-${parts[2]}-${parts[0]}`
+  }
+  try {
+    let parseableStr = clean
+    if (clean.includes(' ') && !clean.includes('T')) {
+      parseableStr = clean.replace(' ', 'T') + 'Z'
+    }
+    const d = new Date(parseableStr)
+    if (isNaN(d.getTime())) return dateStr
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    return `${mm}-${dd}-${yyyy}`
+  } catch {
+    return dateStr
+  }
+}
 
 const props = defineProps({
   customerId: {
@@ -415,7 +449,7 @@ async function saveOrUpdateJob(print = false, close = false) {
   }
 
   if (!job.customer_id) {
-    alert('Please select a customer first.')
+    showToast('Please select a customer first.', 'warning')
     return
   }
 
@@ -448,7 +482,7 @@ async function saveOrUpdateJob(print = false, close = false) {
     }
   } catch (err) {
     console.error('Failed to save job:', err)
-    alert('Failed to save job: ' + err.message)
+    showToast('Failed to save job: ' + err.message, 'error')
   } finally {
     loading.value = false
   }
@@ -462,6 +496,17 @@ async function printOnly() {
   } else {
     await executeHeadlessPrint()
   }
+}
+
+function downloadPrintPreview() {
+  const htmlContent = generatePrintHTML()
+  const blob = new Blob([htmlContent], { type: 'text/html' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `job-${job.id || 'new'}-print-preview.html`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function discardJob() {
@@ -479,7 +524,7 @@ async function submitDeleteJob() {
     }
   } catch (err) {
     console.error('Failed to delete job:', err)
-    alert('Failed to delete job: ' + err.message)
+    showToast('Failed to delete job: ' + err.message, 'error')
   } finally {
     loading.value = false
   }
@@ -488,7 +533,7 @@ async function submitDeleteJob() {
 // HEADLESS PRINT ENGINE
 async function executeHeadlessPrint() {
   if (!settingsState.printers.job) {
-    alert('Please select a printer for Repair Jobs in Configuration settings.')
+    showToast('Please select a printer for Jobs in Configuration settings.', 'warning')
     return
   }
 
@@ -501,11 +546,11 @@ async function executeHeadlessPrint() {
     })
 
     if (!printResult || !printResult.success) {
-      alert('Printing failed: ' + (printResult?.error || 'Unknown printer queue error'))
+      showToast('Printing failed: ' + (printResult?.error || 'Unknown printer queue error'), 'error')
     }
   } catch (err) {
     console.error('IPC Print error:', err)
-    alert('IPC Connection failed: ' + err.message)
+    showToast('IPC Connection failed: ' + err.message, 'error')
   }
 }
 
@@ -517,8 +562,9 @@ function generatePrintHTML() {
   const estVal = parseFloat(String(job.estimate).replace(/,/g, '')) || 0
   const depVal = parseFloat(String(job.deposit).replace(/,/g, '')) || 0
   
-  const createdDateStr = formatDate(job.created_at || new Date().toISOString())
-  const dueDateStr = job.due_date ? formatDate(job.due_date) : ''
+  const createdDateStr = formatPrintDate(job.created_at || new Date().toISOString())
+  const dueDateStr = job.due_date ? formatPrintDate(job.due_date) : ''
+  const todayDateStr = formatPrintDate(today.value)
 
   // Process images
   let imagesHTML = ''
@@ -539,14 +585,37 @@ function generatePrintHTML() {
     `
   })
 
-  // Full server path for logo
-  const logoUrl = getImageUrl('/logo.png')
-
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <style>
+    * {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    @font-face {
+      font-family: 'Material Icons';
+      font-style: normal;
+      font-weight: 400;
+      src: local('Material Icons'), local('MaterialIcons-Regular'), url(https://fonts.gstatic.com/s/materialicons/v41/flUhRq6tzZclQEJ-Vdg-IuiaDsNcIhQ8tQ.woff2) format('woff2');
+    }
+    .material-icons {
+      font-family: 'Material Icons';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 24px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
     body {
       height: 11in;
       width: 8.5in;
@@ -556,6 +625,9 @@ function generatePrintHTML() {
       overflow: hidden;
       background: white;
       color: black;
+    }
+    @page {
+      margin: 0mm;
     }
     .cb-print {
       position: absolute !important;        
@@ -576,23 +648,18 @@ function generatePrintHTML() {
     .cb-print-blanks {
       height: 0.45in;
       width: 3.95in;
-      position: absolute;
-      top: 0;
       left: 0;
     }
     .cb-print-top-box {
       display: inline-block;
       height: 100%;
       box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
-      border: 1px solid #ddd;
     }
     .cb-print-top-text {
       position: relative;
       bottom: -0.275in;
       font-size: 0.75em;
       color: grey;
-      text-align: center;
-      display: block;
     }
     .cb-print-top-flags {
       width: 1.34in;
@@ -605,7 +672,6 @@ function generatePrintHTML() {
       left: 1.38in;
       top: 0.05in;
       font-size: 1.4em;
-      font-weight: bold;
     }
     .cb-print-top-gold-credit {
       width: 0.75in;
@@ -622,7 +688,6 @@ function generatePrintHTML() {
       padding-left: 30px;
       box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
       overflow: hidden;
-      border: 1px solid #ddd;
     }
     .cb-print-customer-icon {
       left: 0px;
@@ -633,8 +698,7 @@ function generatePrintHTML() {
       height: 0.99in;
       width: 3.95in;        
       padding: 5px;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
-      border: 1px solid #ddd;
+      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
     }
     .cb-print-job-num {
       top: 1.4in;
@@ -644,9 +708,7 @@ function generatePrintHTML() {
       font-size: 1.75em;
       line-height: 2.25em;
       text-align: center;
-      font-weight: bold;
       box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
-      border: 1px solid #ddd;
     }
     .cb-employee {
       top: 0.5in;
@@ -658,7 +720,6 @@ function generatePrintHTML() {
       line-height: 1.5em;
       font-size: 1.5em;
       text-align: center;
-      border: 1px solid #ddd;
     }
     .cb-print-estimate {
       height: 1in;
@@ -668,7 +729,6 @@ function generatePrintHTML() {
       box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
       padding: 3px;
       line-height: 1.1em;
-      border: 1px solid #ddd;
     }
     .cb-print-est-amt {
       font-size: 1.2em;
@@ -686,103 +746,109 @@ function generatePrintHTML() {
       width: 1.35in;
       height: 0.55in;
       box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
-      font-size: 0.95em;
-      padding: 3px;
-      border: 1px solid #ddd;
+      font-size: 1.25em;
+    }
+    .cb-print-jobicon {
+      padding-right: 5px;
+    }
+    .cb-print-dates {
+      padding-left: 0.3in;
     }
     .cbPrintRed {
-      color: red !important;
-      font-weight: bold;
+      color: red !important;        
     }
-    .cb-print-images{
+    .cb-print-images {
       top: 0in;
-      left: 4.05in;
-      width: 3.95in;
+      left: 0;
+      width: 100%;
       height: 6in;
+      column-count: 2;
+      column-fill: auto;
+      column-gap: 0.1in;
     }
     .cb-print-image-spacer {
       height: 3in;
+      position: static !important;
     }
     .cb-print-image-cont {
+      position: static !important;
       height: 0.99in;
-      margin-bottom: 0.05in;
+      margin-bottom: 0.01in;
       width: 100%;
-      border: 1px solid #eee;
+      padding: 1px;
     }
-    .cb-print-image{
+    .cb-print-image {
+      position: static !important;
       float: left;
       height: 100%;
-      width: 1.3in;
-      object-fit: cover;
+      border-top-left-radius: 3%;
+      border-bottom-left-radius: 3%;
+      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
     }
     .cb-print-image-note {
+      position: static !important;
       height: 0.97in;
+      max-height: 0.97in;
+      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
       overflow: hidden;
       padding-left: 5px;
+      padding-right: 5px;
       padding-top: 3px;
       line-height: 1.1em;
-      font-size: 0.8em;
     }
     .cb-print-logo {
-      position: absolute;
       width: 3.4in;
       top: 6.2in;
       left: 0.25in;
     }
     .cb-print-customer-name {
-      position: absolute;
       top: 7.4in;
       font-weight: bold;
-      left: 0.25in;
+      margin-left: 0.25in;
     }
     .cb-print-cus-images {
-      position: absolute;
       top: 7.6in;
-      left: 0.25in;
-      width: 3.5in;
+      left: 0;
+      width: 100%;
       height: 3in;
+      column-count: 2;
+      column-fill: auto;
+      column-gap: 0.1in;
+      text-align: center;
+      line-height: 0em;
     }
     .cb-print-cus-img-cont {
-      height: 1.4in;
-      width: 1.6in;
-      margin: 2px;
+      position: static !important;
+      height: 1.49in;
+      padding: 1px;
       display: inline-block;
-      border: 1px solid #ccc;
     }
     .cb-print-cust-img {
+      position: static !important;
       height: 100%;
-      width: 100%;
-      object-fit: cover;
+      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
     }
     .cb-print-cus-job-info {
-      position: absolute;
       left: 4.05in;
       width: 2.45in;
       height: 1.3in;
       top: 6.25in;
-      padding: 5px;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
-      border: 1px solid #ddd;
-      font-size: 0.9em;
+      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
     }
     .cb-print-cus-estimate {
-      position: absolute;
       top: 6.25in;
       width: 1.45in;
       height: 1.3in;
       box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
       left: 6.55in;       
-      padding: 5px;
-      border: 1px solid #ddd;
     }
     .cb-print-cus-warning {
-      position: absolute;
       top: 10in;
-      font-size: 1.1em;
+      font-size: 1.25em;
       left: 4.25in;
       font-weight: bold;
+      -webkit-text-stroke: 1px white;
       text-align: center;
-      width: 3.8in;
     }
   </style>
 </head>
@@ -790,7 +856,7 @@ function generatePrintHTML() {
   <div class="cb-print">
     <!-- Blanks Box -->
     <div class="cb-print-element cb-print-blanks">
-      <div class="cb-print-top-box cb-print-top-flags"><span class="cb-print-top-text">EMR NA Check</span></div>
+      <div class="cb-print-top-box cb-print-top-flags"><span class="cb-print-top-text">EMR NA LM Check</span></div>
       <div class="cb-print-top-box cb-print-top-deposit"><span class="cb-print-top-text">Deposit</span></div>
       <div class="cb-print-top-box cb-print-top-gold-credit"><span class="cb-print-top-text">Gold Credit</span></div>
       <div class="cb-print-top-box cb-print-total"><span class="cb-print-top-text">Total</span></div>
@@ -803,9 +869,9 @@ function generatePrintHTML() {
 
     <!-- Customer info -->
     <div class="cb-print-element cb-print-customer-info">
-      <span class="cb-print-nowrap">Name: ${customerObj.value?.fname || ''} ${customerObj.value?.lname || ''}</span><br>
-      <span class="cb-print-nowrap">Phone: ${customerObj.value?.phone || ''}</span><br>
-      <span class="cb-print-nowrap">Email: ${customerObj.value?.email || ''}</span>
+      <span class="material-icons cb-print-element cb-print-customer-icon">person</span><span class="cb-print-element cb-print-nowrap">${customerObj.value?.fname || ''} ${customerObj.value?.lname || ''}</span><br>
+      <span class="material-icons cb-print-element cb-print-customer-icon">phone</span><span class="cb-print-element cb-print-nowrap">${customerObj.value?.phone || ''}</span> <br>
+      <span class="material-icons cb-print-element cb-print-customer-icon">email</span><span class="cb-print-element cb-print-nowrap">${customerObj.value?.email || ''}</span>
     </div>
 
     <!-- Job Notes -->
@@ -826,25 +892,27 @@ function generatePrintHTML() {
     <!-- Estimate Details -->
     <div class="cb-print-element cb-print-estimate">
       <div class="cb-print-est-amt">
-        ${estVal > 0 ? `Est: $${estVal.toLocaleString(undefined, {minimumFractionDigits: 2})}` : ''}
+        ${estVal > 0 ? `Est: $${estVal.toLocaleString(undefined, {minimumFractionDigits: 2})} + GST` : ''}
       </div>
       <div class="cb-print-est-note">${job.est_note || ''}</div>
     </div>
 
     <!-- Due Dates -->
     <div class="cb-print-element cb-print-due">
-      <span>Date: ${createdDateStr}</span><br>
-      <span class="cbPrintRed">Due: ${dueDateStr}</span>
+      <span class="material-icons cb-print-element cb-print-jobicon">today</span>
+      <span class="cb-print-element cb-print-dates">${createdDateStr}</span><br />
+      <span class="material-icons cb-print-element cb-print-jobicon">event_available</span>
+      <span class="cb-print-element cb-print-dates ${job.vital_date ? 'cbPrintRed' : ''}">${dueDateStr}</span>
     </div>
 
     <!-- Top Images section -->
     <div class="cb-print-element cb-print-images">
-      <div class="cb-print-image-spacer"></div>
+      <div class="cb-print-element cb-print-image-spacer"></div>
       ${imagesHTML}
     </div>
 
     <!-- Bottom Customer Section Logo -->
-    <img class="cb-print-logo cb-print-element" src="${logoUrl}" alt="">
+    <img class="cb-print-logo cb-print-element" src="${logoBase64}" alt="">
 
     <!-- Bottom Customer Name -->
     <div class="cb-print-element cb-print-customer-name">
@@ -858,7 +926,7 @@ function generatePrintHTML() {
 
     <!-- Bottom Store Contact info -->
     <div class="cb-print-element cb-print-cus-job-info">
-      Date: ${today.value}<br>
+      Date: ${todayDateStr}<br>
       Employee: ${empName}<br>
       Phone: 403-320-0846<br>
       E-mail: info@thegoldworks.com<br>
@@ -867,7 +935,7 @@ function generatePrintHTML() {
     <!-- Bottom Customer Estimate -->
     <div class="cb-print-element cb-print-cus-estimate">
       <div class="cb-print-est-amt">
-        ${estVal > 0 ? `Estimate: $${estVal.toLocaleString(undefined, {minimumFractionDigits: 2})}` : ''}
+        ${estVal > 0 ? `Estimate: $${estVal.toLocaleString(undefined, {minimumFractionDigits: 2})} + GST` : ''}
       </div>
       <div class="cb-print-est-note">${job.est_note || ''}</div>
     </div>

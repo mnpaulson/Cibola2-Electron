@@ -55,12 +55,6 @@
             <span class="text-subtitle-2 text-white font-weight-medium">Initializing camera stream...</span>
           </div>
 
-          <!-- Alignment overlay for jewelry -->
-          <div v-if="isStreaming" class="camera-alignment-overlay">
-            <div class="target-crosshair"></div>
-            <div class="target-circle"></div>
-            <span class="alignment-tip">Center jewelry item in target area</span>
-          </div>
         </div>
       </v-card-text>
 
@@ -209,7 +203,7 @@ const captureImage = () => {
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+    const dataUrl = canvas.toDataURL('image/jpeg', 1.0)
     emit('capture', dataUrl)
     close()
   }
