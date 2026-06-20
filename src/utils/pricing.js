@@ -26,40 +26,17 @@ export function calculateGoldCreditValue(weight, multiplier, markup, spotPrice) 
 }
 
 /**
- * Calculate the estimate cost of a job based on configured formulas.
+ * Calculate the unit price per gram for a gold credit item.
+ * Formula: value / weight
  * 
- * @param {string} formulaName - Name/type of pricing formula (e.g. 'WeightBased', 'BaseOnly')
- * @param {number|string} basePrice - Base/labor price
- * @param {number|string} weight - Weight of metal added/used in grams
- * @param {number|string} spotPrice - Current spot price per gram of metal type
- * @returns {number} Total estimate price
+ * @param {number|string} value - Calculated item value
+ * @param {number|string} weight - Weight in grams
+ * @returns {number} The rounded unit price per gram
  */
-export function calculateRepairJobEstimate(formulaName, basePrice, weight, spotPrice) {
-  const base = parseFloat(basePrice) || 0
+export function calculateGoldCreditUnitPrice(value, weight) {
+  const val = parseFloat(value) || 0
   const w = parseFloat(weight) || 0
-  const spot = parseFloat(spotPrice) || 0
-
-  const normalizedFormula = (formulaName || '').toLowerCase().trim()
-
-  switch (normalizedFormula) {
-    case 'weight':
-    case 'weightbased':
-    case 'metal':
-      // Base labor cost + weight * spot price
-      const metalCost = w * spot
-      return Math.round((base + metalCost + Number.EPSILON) * 100) / 100
-
-    case 'doublemetal':
-      // Base labor cost + weight * spot price * 2 (standard markup for added materials)
-      const doubleMetalCost = w * spot * 2
-      return Math.round((base + doubleMetalCost + Number.EPSILON) * 100) / 100
-
-    case 'base':
-    case 'baseonly':
-    default:
-      // Just the static/base labor cost
-      return Math.round((base + Number.EPSILON) * 100) / 100
-  }
+  return w > 0 ? Math.round((val / w) * 100) / 100 : 0
 }
 
 /**
@@ -84,4 +61,38 @@ export function getAdjustedMarkup(itemName, baseMarkup, creditType) {
     adjustment = 0.1
   }
   return Math.round((parsedBase + adjustment) * 100) / 100
+}
+
+/**
+ * Calculate the unit price (Price Per) for a custom sheet item.
+ * Formula: basePrice * priceModifier * markup
+ * 
+ * @param {number|string} basePrice - Base price (metal spot or base rate)
+ * @param {number|string} priceModifier - Purity multiplier or modifier
+ * @param {number|string} markup - Markup multiplier factor
+ * @returns {number} The calculated unit price
+ */
+export function calculateCustomSheetPricePer(basePrice, priceModifier, markup) {
+  const base = parseFloat(basePrice) || 0
+  const modifier = parseFloat(priceModifier) || 0
+  const markupInput = parseFloat(markup)
+  const mark = isNaN(markupInput) || markupInput <= 0 ? 1 : markupInput
+
+  return base * modifier * mark
+}
+
+/**
+ * Calculate the total cost for a custom sheet item.
+ * Formula: amt * PricePer
+ * 
+ * @param {number|string} amt - Amount or weight
+ * @param {number|string} basePrice - Base price
+ * @param {number|string} priceModifier - Purity multiplier or modifier
+ * @param {number|string} markup - Markup multiplier factor
+ * @returns {number} The rounded total cost
+ */
+export function calculateCustomSheetItemTotal(amt, basePrice, priceModifier, markup) {
+  const a = parseFloat(amt) || 0
+  const pricePer = calculateCustomSheetPricePer(basePrice, priceModifier, markup)
+  return Math.round(a * pricePer * 100) / 100
 }

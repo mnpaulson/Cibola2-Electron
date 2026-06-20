@@ -64,6 +64,8 @@ To keep the application lightweight and simple for a small-scale single terminal
 ## 8. Camera Capture & Jewelry Photography
 * For taking photos of jewelry items (e.g., in Jobs or Customer details), do not write direct camera streaming or WebRTC logic in the views.
 * Use the reusable dialog component [CameraCapture.vue](file:///c:/dev/Cibola2-Electron/src/components/CameraCapture.vue) which supports webcam permissions, multi-device video input selection (to support external USB macro/inspection scopes), center layout alignment masks, and base64 JPEG export.
+* **Default Camera**: The operator can configure a default camera in the System Settings (Local Settings tab). `CameraCapture.vue` will automatically load and prioritize this camera device upon launch. When selected on the settings screen, the system runs a brief capture probe to automatically populate and suggest the device's physical maximum resolution values.
+* **Resolution Auto-detection**: The camera stream automatically starts by requesting constraints closest to the camera's maximum resolution (up to 4K / 4096x2160) for optimal capture quality. The active resolution is detected and displayed dynamically in the capture window header.
 * **Image Quality**: Photos captured from the webcam must be saved at the highest possible quality (using `canvas.toDataURL('image/jpeg', 1.0)`) rather than downscaling/compressing the quality to save space.
 
 ---
@@ -179,7 +181,7 @@ For displaying and updating market metal prices (Gold, Platinum, Silver):
 * **Sync and Edit protocols**:
   * Syncing calls the backend `/values/sync` route to pull live spot prices from the market.
   * Manual editing is done inline, validating for positive decimal inputs.
-  * Both actions trigger `refreshMetadata()` to synchronize the global metadata cache.
+  * Both actions trigger `refreshMetadata()` to synchronize the global metadata cache. Upon a successful update or sync, the last updated timestamp text flashes green as feedback instead of showing a success toast (error cases still display toast notifications).
   * On mount in Large Mode, the component automatically checks if the prices are more than 15 minutes old (or missing) and triggers a sync if online. Small mode bypasses this automatic sync to avoid overriding existing saved transaction prices.
 * **Transactional Form Integration**:
   * Always bind the `:disabled` prop (e.g., `:disabled="disabled"` where `disabled` is true for already saved records) to prevent syncing or editing historical transaction prices.
@@ -198,6 +200,76 @@ To keep user feedback notifications consistent and avoid cluttering views with d
 * **No Local Snackbars or Alerts**:
   * Do not define local `<v-snackbar>` markup or local reactive notification variables in individual form or listing components.
   * Avoid native `alert()` popups for user validation warnings or API failures. Route them through `showToast` instead.
+
+---
+
+## 19. Reusable Custom Sheets Page Guidelines
+* **Routing Identifier**: The custom sheets tab is registered under `'custom'`. All customer-linked shortcuts should call `navigateTo('custom', { activeSheetId: id, selectedCustomerId: customerId })`.
+* **Centralized Estimate Calculations**: Line item price calculations must call `calculateRepairJobEstimate(formulaName, basePrice, weight, spotPrice)` from [pricing.js](file:///c:/dev/Cibola2-Electron/src/utils/pricing.js).
+* **Estimate Values Pricing Schema**: The database stores estimate items (`est_values`) using pricing columns: `basePrice` (metal spot price or base labor/stone rate), `priceModifier` (karat purity multiplier or 1.0 for non-metal), and `markup` (multiplier factor). The client calculates the final unit price per item (Price Per) as: `basePrice * priceModifier * markup`. The `discount` field is unused on the frontend and set to `0`. The legacy `pricePer` field is deprecated and not supported by the backend.
+* **Metal Spot Prices Integration**: Integrate `MetalPricesCard` in `small` mode. To preserve historical pricing, do not watch local spot prices to automatically trigger calculations on existing items. Instead, expose an explicit update button (`Update Estimates to Newest Spot Prices`) that updates local spot variables from cached metadata and calls `recalculateItem()` on all metal price items, resetting any manual overrides. Inform the operator that the displayed spot prices are historical creation values.
+* **Payload Sanitation**: Always strip client-side temporary identifiers (like `clientId-X` strings) from estimate IDs and estimate values before posting/putting payloads to SQLite.
+* **Custom Sheet Image Attachments**: Custom design sheets support attaching design jewelry photos or drawings. Use `<AttachedImages>` component inside the custom sheet form, binding to `sheet.custom_images` with `delete-endpoint="/customsheets/images"`. Trigger camera captures via `attachedImagesRef.value.openCamera()`.
+* **Custom Sheet Printing**: Printing custom sheet estimates uses a dedicated Custom Sheet Printer configured in local settings (`settingsState.printers.custom`), falling back to a headless window layout with base64 embedded assets. If the custom sheet has attached images, they will render in a grid layout (`.images-grid`) at the bottom of the printed page.
+
+---
+
+## 20. Directory Column Sorting Guidelines
+For manager directories (Jobs, Credits, Custom Sheets, Customers):
+* **Default Sort**: Always default to sorting by record creation date descending (`created_at` descending, i.e., `sortBy = 'created_at'`, `sortDesc = true`) to surface the newest records first.
+* **Sortable Columns**: Enable sorting by clicking headers for **Customer Name** (and **Record Created Date** or **Last Active** / **Name**).
+* **Hover Interaction**: Apply the `.sortable-header` class to enable interactive cursor-pointer styles and background highlights on hover. Show the sorting chevron indicator (`mdi-chevron-down` or `mdi-chevron-up`) only when the corresponding column is active.
+* **Pagination Reset**: Always reset the directory's active page back to 1 (`currentPage.value = 1`) when toggling or switching sorting columns.
+
+---
+
+## 21. Custom Values Configuration (Admin.vue)
+Custom configurations are stored in the global `values` database table and categorized using `type_id` values:
+* `type_id = 1`: Gold Credits
+* `type_id = 2`: Metal Spot Prices
+* `type_id = 3`: Custom Sheet values (displays Name, Category combobox, Base Price, Metal Type, Markup, and Default Quantity; Formula and Order columns are hidden).
+* `type_id = 4`: Custom Sheet Categories (displays Category Name and display Order, and provides up/down arrow buttons to easily reorder categories and automatically update order values on the backend).
+
+* **Performance Optimization (No Tab Animations)**: To avoid interface lag and maintain fast view switching when loading values tables, all sliding and opacity transition animations on `<v-window-item>` elements are disabled. Always include `:transition="false"` and `:reverse-transition="false"` props on configuration windows, and do not introduce custom CSS transitions that slow down DOM updates.
+
+Always trigger `await refreshMetadata()` in the store after any values updates, creates, or deletions to synchronize the UI's reactive cache.
+
+---
+
+## 22. Collapsible Navigation Sidebar (Rail Mode)
+* **Collapse Mechanism**: The navigation sidebar behaves as a collapsible rail. Instead of fully hiding the sidebar, it shrinks to show only the navigation icons and allow for direct navigation.
+* **State Control**: The sidebar's state is managed using the reactive reference `isRail` in `App.vue`, which is bound to the `v-model:rail` property of the `v-navigation-drawer`. The drawer has the `permanent` prop so that it is never fully hidden.
+* **Toggle Buttons**:
+  1. A chevron toggle button is located at the bottom of the navigation drawer (defined in the `append` slot of `v-navigation-drawer`).
+  2. The app-bar menu icon (`v-app-bar-nav-icon`) also toggles the `isRail` state.
+* **Layout Adjustments**:
+  * The top logo list item uses a dynamic class `:class="isRail ? 'px-2 py-4' : 'pa-4'"` to align the avatar nicely in both expanded and collapsed (rail) states.
+
+---
+
+## 23. Reusable Form Bottom Actions Layout
+For transactional form pages (JobForm, CreditForm, CustomSheetForm):
+* **Bottom Bar Navigation Component**: Do not implement individual, scroll-bound bottom card action buttons (Discard, Save, Print, Delete, Capture). Instead, always use the reusable `<FormBottomNavigation>` component.
+* **Component Usage**:
+  ```html
+  <FormBottomNavigation
+    :show-delete="!!job.id"
+    :show-preview="true"
+    :save-label="job.id ? 'Update Job' : 'Save Job'"
+    :disable-save="!isFormValid"
+    :show-print-close="true"
+    :disable-print-close="!isFormValid"
+    @discard="discardJob"
+    @delete="isDeleteJobOpen = true"
+    @capture="attachedImagesRef?.openCamera()"
+    @print="printOnly"
+    @preview="downloadPrintPreview"
+    @save="saveOrUpdateJob(false, false)"
+    @save-print-close="saveOrUpdateJob(true, true)"
+  />
+  ```
+* **Combined Discard / Delete**: The Discard and Delete actions are combined into a single action slot at the far right. It displays a grey 'Discard' button if the record is unsaved (`show-delete` is false) and a red 'Delete' button if the record is saved (`show-delete` is true).
+* **Form Padding**: When using the fixed bottom navigation layout, add the `pb-20` class (adds 80px bottom padding) to the wrapping `<v-card>` element to prevent the bottom actions bar from covering form fields or image gallery sections.
 
 
 

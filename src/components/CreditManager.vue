@@ -57,10 +57,30 @@
             <thead>
               <tr>
                 <th class="font-weight-bold text-subtitle-2 py-3">Credit ID</th>
-                <th class="font-weight-bold text-subtitle-2 py-3">Customer</th>
+                <th
+                  class="font-weight-bold text-subtitle-2 py-3 sortable-header"
+                  @click="toggleSort('customer_name')"
+                >
+                  <div class="d-flex align-center">
+                    Customer
+                    <v-icon size="small" class="ml-1" v-if="sortBy === 'customer_name'">
+                      {{ sortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                    </v-icon>
+                  </div>
+                </th>
                 <th class="font-weight-bold text-subtitle-2 py-3">Payout Value</th>
                 <th class="font-weight-bold text-subtitle-2 py-3">Assigned Employee</th>
-                <th class="font-weight-bold text-subtitle-2 py-3">Created</th>
+                <th
+                  class="font-weight-bold text-subtitle-2 py-3 sortable-header"
+                  @click="toggleSort('created_at')"
+                >
+                  <div class="d-flex align-center">
+                    Created
+                    <v-icon size="small" class="ml-1" v-if="sortBy === 'created_at'">
+                      {{ sortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                    </v-icon>
+                  </div>
+                </th>
                 <th class="font-weight-bold text-subtitle-2 py-3">Used</th>
               </tr>
             </thead>
@@ -195,10 +215,41 @@ const filteredCredits = computed(() => {
   })
 })
 
+// Sorting state
+const sortBy = ref('created_at')
+const sortDesc = ref(true)
+
+const toggleSort = (field) => {
+  if (sortBy.value === field) {
+    sortDesc.value = !sortDesc.value
+  } else {
+    sortBy.value = field
+    sortDesc.value = field === 'created_at' ? true : false
+  }
+  currentPage.value = 1
+}
+
+const sortedCredits = computed(() => {
+  const list = [...filteredCredits.value]
+  return list.sort((a, b) => {
+    let comparison = 0
+    if (sortBy.value === 'customer_name') {
+      const nameA = a.customer ? `${a.customer.fname} ${a.customer.lname}`.trim().toLowerCase() : ''
+      const nameB = b.customer ? `${b.customer.fname} ${b.customer.lname}`.trim().toLowerCase() : ''
+      comparison = nameA.localeCompare(nameB)
+    } else if (sortBy.value === 'created_at') {
+      const dateA = a.created_at || ''
+      const dateB = b.created_at || ''
+      comparison = dateA.localeCompare(dateB)
+    }
+    return sortDesc.value ? -comparison : comparison
+  })
+})
+
 // Paginated subset
 const paginatedCredits = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage
-  return filteredCredits.value.slice(start, start + itemsPerPage)
+  return sortedCredits.value.slice(start, start + itemsPerPage)
 })
 
 // Navigation triggers
@@ -281,5 +332,15 @@ watch(isWorkspaceActive, (active) => {
 
 .bg-light-surface {
   background-color: rgba(var(--v-theme-surface-variant), 0.05);
+}
+
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.sortable-header:hover {
+  background-color: rgba(var(--v-theme-primary), 0.08) !important;
 }
 </style>

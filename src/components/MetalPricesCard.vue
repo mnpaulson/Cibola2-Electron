@@ -65,7 +65,14 @@
       </v-col>
     </v-row>
     <div class="d-flex align-center justify-space-between mt-3 flex-wrap">
-      <span class="text-caption text-medium-emphasis" :class="{ 'text-error font-weight-bold': !disabled && priceAgeWarn }">
+      <span
+        class="text-caption update-text"
+        :class="{
+          'text-error font-weight-bold': !disabled && priceAgeWarn,
+          'flash-active': isFlashing
+        }"
+        @animationend="isFlashing = false"
+      >
         <template v-if="disabled">
           Prices as of: {{ formatLocalDate(date, 'datetime') || 'Never' }}
         </template>
@@ -166,7 +173,11 @@
 
       <!-- Footer Actions & Info -->
       <div class="d-flex align-center justify-space-between mt-4">
-        <div class="text-caption text-medium-emphasis">
+        <div
+          class="text-caption update-text"
+          :class="{ 'flash-active': isFlashing }"
+          @animationend="isFlashing = false"
+        >
           Updated: {{ lastUpdatedText }}
         </div>
 
@@ -342,7 +353,7 @@ const saveSmallPrices = async () => {
 
     await Promise.all(updates)
     await refreshMetadata()
-    showToast('Global spot prices updated successfully', 'success')
+    triggerFlashEffect()
     isManuallyEdited.value = false
     
     emit('update:gold', g)
@@ -375,6 +386,14 @@ const isEditing = ref(false)
 const isSaving = ref(false)
 const isSyncing = ref(false)
 const isSilverExpanded = ref(false)
+const isFlashing = ref(false)
+
+function triggerFlashEffect() {
+  isFlashing.value = false
+  setTimeout(() => {
+    isFlashing.value = true
+  }, 50)
+}
 
 const localPrices = reactive({
   gold: '',
@@ -514,7 +533,7 @@ const savePrices = async () => {
 
     await Promise.all(updates)
     await refreshMetadata()
-    showToast('Prices updated successfully', 'success')
+    triggerFlashEffect()
     isEditing.value = false
   } catch (err) {
     console.error('Failed to update metal prices:', err)
@@ -534,7 +553,7 @@ const syncPrices = async () => {
   try {
     await api.post('/values/sync')
     await refreshMetadata()
-    showToast('Successfully synced spot prices with market', 'success')
+    triggerFlashEffect()
     isManuallyEdited.value = false
     
     if (props.small) {
@@ -646,5 +665,28 @@ onMounted(async () => {
 }
 .bg-light-surface {
   background-color: rgba(var(--v-theme-surface-variant), 0.05);
+}
+
+.update-text {
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+@keyframes flash-success {
+  0% {
+    color: #4caf50;
+    text-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+  }
+  50% {
+    color: #4caf50;
+    text-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+  }
+  100% {
+    color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+    text-shadow: none;
+  }
+}
+
+.flash-active {
+  animation: flash-success 2s ease-out;
 }
 </style>

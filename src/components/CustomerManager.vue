@@ -267,11 +267,31 @@
           <v-table hover fixed-header class="directory-table">
             <thead>
               <tr>
-                <th class="font-weight-bold text-subtitle-2 py-3">Name</th>
+                <th
+                  class="font-weight-bold text-subtitle-2 py-3 sortable-header"
+                  @click="toggleSort('customer_name')"
+                >
+                  <div class="d-flex align-center">
+                    Name
+                    <v-icon size="small" class="ml-1" v-if="sortBy === 'customer_name'">
+                      {{ sortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                    </v-icon>
+                  </div>
+                </th>
                 <th class="font-weight-bold text-subtitle-2 py-3">Phone</th>
                 <th class="font-weight-bold text-subtitle-2 py-3">Email</th>
                 <th class="font-weight-bold text-subtitle-2 py-3">Location</th>
-                <th class="font-weight-bold text-subtitle-2 py-3">Last Active</th>
+                <th
+                  class="font-weight-bold text-subtitle-2 py-3 sortable-header"
+                  @click="toggleSort('updated_at')"
+                >
+                  <div class="d-flex align-center">
+                    Last Active
+                    <v-icon size="small" class="ml-1" v-if="sortBy === 'updated_at' || sortBy === 'created_at'">
+                      {{ sortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                    </v-icon>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -410,9 +430,44 @@ const currentPage = computed({
 
 const itemsPerPage = 15
 
+// Sorting state
+const sortBy = ref('created_at')
+const sortDesc = ref(true)
+
+const toggleSort = (field) => {
+  if (sortBy.value === field) {
+    sortDesc.value = !sortDesc.value
+  } else {
+    sortBy.value = field
+    sortDesc.value = field === 'created_at' || field === 'updated_at' ? true : false
+  }
+  currentPage.value = 1
+}
+
+const sortedDirectory = computed(() => {
+  const list = [...filteredDirectory.value]
+  return list.sort((a, b) => {
+    let comparison = 0
+    if (sortBy.value === 'customer_name') {
+      const nameA = `${a.fname} ${a.lname}`.trim().toLowerCase()
+      const nameB = `${b.fname} ${b.lname}`.trim().toLowerCase()
+      comparison = nameA.localeCompare(nameB)
+    } else if (sortBy.value === 'created_at') {
+      const dateA = a.created_at || ''
+      const dateB = b.created_at || ''
+      comparison = dateA.localeCompare(dateB)
+    } else if (sortBy.value === 'updated_at') {
+      const dateA = a.updated_at || ''
+      const dateB = b.updated_at || ''
+      comparison = dateA.localeCompare(dateB)
+    }
+    return sortDesc.value ? -comparison : comparison
+  })
+})
+
 const paginatedDirectory = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage
-  return filteredDirectory.value.slice(start, start + itemsPerPage)
+  return sortedDirectory.value.slice(start, start + itemsPerPage)
 })
 
 watch(directorySearch, () => {
@@ -519,7 +574,7 @@ const createNewRecord = (tabValue) => {
   } else if (tabValue === 'credits') {
     navigateTo('credits', { activeCreditId: 0, selectedCustomerId: selectedId.value })
   } else if (tabValue === 'customsheets') {
-    navigateTo('employees', { activeSheetId: 0, selectedCustomerId: selectedId.value })
+    navigateTo('custom', { activeSheetId: 0, selectedCustomerId: selectedId.value })
   } else {
     navigateTo(tabValue, { selectedCustomerId: selectedId.value })
   }
@@ -579,7 +634,7 @@ const goToCredit = (creditId) => {
 
 const goToCustomSheet = (sheetId) => {
   console.log('Navigating to custom sheet ID:', sheetId)
-  navigateTo('employees', { activeSheetId: sheetId, selectedCustomerId: selectedId.value })
+  navigateTo('custom', { activeSheetId: sheetId, selectedCustomerId: selectedId.value })
 }
 
 onMounted(() => {
@@ -641,5 +696,15 @@ onMounted(() => {
 
 .bg-light-surface {
   background-color: rgba(var(--v-theme-surface-variant), 0.05);
+}
+
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.sortable-header:hover {
+  background-color: rgba(var(--v-theme-primary), 0.08) !important;
 }
 </style>

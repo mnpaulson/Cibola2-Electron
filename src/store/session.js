@@ -27,7 +27,9 @@ export const sessionState = reactive({
   jobSearchQuery: '',
   jobCurrentPage: 1,
   creditSearchQuery: '',
-  creditCurrentPage: 1
+  creditCurrentPage: 1,
+  sheetSearchQuery: '',
+  sheetCurrentPage: 1
 })
 
 let isNavigatingHistory = false
@@ -150,7 +152,7 @@ export function startHeartbeat(serverURL) {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 3000) // 3s timeout
       
-      const response = await fetch(`${url}/employees`, {
+      const response = await fetch(`${url}/health`, {
         method: 'GET',
         signal: controller.signal
       })

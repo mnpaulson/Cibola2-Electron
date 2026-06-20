@@ -34,8 +34,8 @@
             class="camera-select-dropdown"
             @update:model-value="initStream"
           ></v-select>
-          <div class="text-caption text-medium-emphasis">
-            Resolution: {{ settingsState.camera.width }} x {{ settingsState.camera.height }}
+          <div class="text-caption text-medium-emphasis" v-if="isStreaming">
+            Resolution: {{ currentWidth }} x {{ currentHeight }}
           </div>
         </div>
 
@@ -103,6 +103,8 @@ const errorMsg = ref('')
 const selectedDeviceId = ref('')
 const videoDevices = ref([])
 const showFlash = ref(false)
+const currentWidth = ref(0)
+const currentHeight = ref(0)
 
 let localStream = null
 
@@ -131,9 +133,11 @@ const getDevices = async () => {
     
     videoDevices.value = video
 
-    // Default to first camera if not set
+    // Default to configured default camera if available, otherwise first camera
     if (video.length > 0 && !selectedDeviceId.value) {
-      selectedDeviceId.value = video[0].deviceId
+      const defaultId = settingsState.camera.defaultDeviceId
+      const hasDefault = video.some(d => d.deviceId === defaultId)
+      selectedDeviceId.value = hasDefault ? defaultId : video[0].deviceId
     }
   } catch (err) {
     console.error('Failed to list video devices:', err)
@@ -158,8 +162,14 @@ const initStream = async () => {
     return
   }
 
-  const width = parseInt(settingsState.camera.width) || 1280
-  const height = parseInt(settingsState.camera.height) || 1024
+  let width = 4096
+  let height = 2160
+
+  // Respect saved settings if the selected device is the default camera (since it holds the user's preference/adjustment)
+  if (selectedDeviceId.value && selectedDeviceId.value === settingsState.camera.defaultDeviceId) {
+    width = parseInt(settingsState.camera.width) || 4096
+    height = parseInt(settingsState.camera.height) || 2160
+  }
 
   const constraints = {
     audio: false,
@@ -176,6 +186,14 @@ const initStream = async () => {
     if (videoRef.value) {
       videoRef.value.srcObject = stream
       isStreaming.value = true
+
+      // Get actual stream settings to display the resolution
+      const track = stream.getVideoTracks()[0]
+      if (track) {
+        const settings = track.getSettings()
+        currentWidth.value = settings.width || 0
+        currentHeight.value = settings.height || 0
+      }
     }
   } catch (err) {
     console.error('getUserMedia failed:', err)
@@ -197,8 +215,8 @@ const captureImage = () => {
   // Capture canvas logic
   const video = videoRef.value
   const canvas = document.createElement('canvas')
-  canvas.width = video.videoWidth || parseInt(settingsState.camera.width) || 1280
-  canvas.height = video.videoHeight || parseInt(settingsState.camera.height) || 1024
+  canvas.width = video.videoWidth || currentWidth.value || 1280
+  canvas.height = video.videoHeight || currentHeight.value || 1024
 
   const ctx = canvas.getContext('2d')
   if (ctx) {

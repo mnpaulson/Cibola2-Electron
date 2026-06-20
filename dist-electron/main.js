@@ -16,7 +16,7 @@ function readSettings() {
   return {
     serverURL: "http://localhost:8000",
     camera: { width: "1280", height: "1024" },
-    printers: { job: "", credit: "" }
+    printers: { job: "", credit: "", custom: "" }
   };
 }
 function writeSettings(settings) {

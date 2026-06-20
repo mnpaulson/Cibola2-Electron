@@ -1,12 +1,18 @@
 <template>
   <v-app>
     <!-- Navigation Drawer -->
-    <v-navigation-drawer v-model="drawer" app border="none" elevation="2">
+    <v-navigation-drawer
+      v-model="drawer"
+      v-model:rail="isRail"
+      permanent
+      app
+      border="none"
+      elevation="2"
+    >
       <v-list-item
         prepend-avatar="https://cdn.vuetifyjs.com/images/logos/vuetify-logo-dark.png"
-        title="Cibola2 Admin"
-        subtitle="Jewelry Repair & Sales"
-        class="pa-4"
+        title="Cibola2"
+        :class="isRail ? 'px-2 py-4' : 'pa-4'"
       ></v-list-item>
 
       <v-divider></v-divider>
@@ -20,15 +26,26 @@
           :value="item.value"
           :active="activeTab === item.value"
           @click="handleTabClick(item.value)"
-          active-color="primary"
+          color="primary"
           class="menu-item-transition"
         ></v-list-item>
       </v-list>
+
+      <template v-slot:append>
+        <v-divider></v-divider>
+        <v-list density="compact" nav>
+          <v-list-item
+            :prepend-icon="isRail ? 'mdi-chevron-double-right' : 'mdi-chevron-double-left'"
+            title="Collapse"
+            @click="isRail = !isRail"
+            class="menu-item-transition"
+          ></v-list-item>
+        </v-list>
+      </template>
     </v-navigation-drawer>
 
     <!-- App Bar -->
     <v-app-bar app elevation="1" border="none">
-      <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
       
       <!-- Back button visible when history stack is > 1 -->
       <v-btn
@@ -141,6 +158,11 @@
           <JobManager />
         </div>
 
+        <!-- Custom Sheets Tab -->
+        <div v-else-if="activeTab === 'custom'">
+          <CustomSheetManager />
+        </div>
+
         <!-- Configuration / Settings Tab -->
         <div v-else-if="activeTab === 'config'">
           <Admin />
@@ -199,6 +221,7 @@ import JobManager from './components/JobManager.vue'
 import CustomerForm from './components/CustomerForm.vue'
 import MetalPricesCard from './components/MetalPricesCard.vue'
 import CreditManager from './components/CreditManager.vue'
+import CustomSheetManager from './components/CustomSheetManager.vue'
 import { toastState, showToast } from './store/toast'
 
 const theme = useTheme()
@@ -240,6 +263,7 @@ const handleManualLoad = async () => {
 }
 
 const drawer = ref(true)
+const isRail = ref(false)
 const activeTab = computed({
   get: () => sessionState.activeTab,
   set: (val) => navigateTo(val)

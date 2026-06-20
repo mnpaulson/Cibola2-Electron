@@ -36,7 +36,7 @@
       <v-window v-model="activeTab" class="pa-6">
         
         <!-- Local Settings Tab -->
-        <v-window-item value="local">
+        <v-window-item value="local" :transition="false" :reverse-transition="false">
           <v-row>
             <v-col cols="12" md="6" class="mx-auto">
               <v-card variant="outlined" class="border-light pa-4">
@@ -57,6 +57,22 @@
                     hint="The address of the cibola2 backend service"
                     persistent-hint
                   ></v-text-field>
+
+                  <v-select
+                    v-model="localSettings.defaultDeviceId"
+                    :items="videoDevices"
+                    item-title="label"
+                    item-value="deviceId"
+                    label="Default Camera"
+                    prepend-inner-icon="mdi-webcam"
+                    variant="outlined"
+                    density="comfortable"
+                    class="mb-3"
+                    clearable
+                    hint="Choose the default camera device for jewelry photography"
+                    persistent-hint
+                    @update:model-value="onDefaultCameraChanged"
+                  ></v-select>
 
                   <v-row class="mt-2">
                     <v-col cols="6">
@@ -159,6 +175,36 @@
                       </v-btn>
                     </v-col>
                   </v-row>
+
+                  <v-row class="align-start mb-2">
+                    <v-col cols="9">
+                      <v-combobox
+                        label="Custom Sheet Printer"
+                        v-model="localSettings.customPrinter"
+                        :items="printerNames"
+                        prepend-inner-icon="mdi-file-document-edit-outline"
+                        variant="outlined"
+                        density="comfortable"
+                        clearable
+                        hint="Select a printer or type the name manually"
+                        persistent-hint
+                        no-data-text="No system printers detected. Type to enter manually."
+                      ></v-combobox>
+                    </v-col>
+                    <v-col cols="3" class="pt-1">
+                      <v-btn
+                        block
+                        variant="tonal"
+                        color="secondary"
+                        height="48"
+                        prepend-icon="mdi-printer-eye"
+                        @click="handlePrintTestPage(localSettings.customPrinter, 'Custom Sheet')"
+                        :disabled="!localSettings.customPrinter"
+                      >
+                        Test
+                      </v-btn>
+                    </v-col>
+                  </v-row>
                 </v-card-text>
               </v-card>
 
@@ -180,7 +226,7 @@
         </v-window-item>
 
         <!-- Employees Tab -->
-        <v-window-item value="employees">
+        <v-window-item value="employees" :transition="false" :reverse-transition="false">
           <v-row>
             <!-- Left Panel: Add/Edit Form -->
             <v-col cols="12" md="4">
@@ -310,22 +356,22 @@
         </v-window-item>
 
         <!-- Custom Values Tab -->
-        <v-window-item value="values">
+        <v-window-item value="values" :transition="false" :reverse-transition="false">
           <v-tabs v-model="valuesSubTab" color="secondary" density="comfortable" class="mb-4">
             <v-tab value="custom-sheet" class="text-none">Custom Sheets</v-tab>
+            <v-tab value="custom-sheet-categories" class="text-none">Custom Sheet Categories</v-tab>
             <v-tab value="gold-credit" class="text-none">Gold Credits</v-tab>
-            <v-tab value="metal-prices" class="text-none">Metal Spot Prices</v-tab>
           </v-tabs>
 
           <v-window v-model="valuesSubTab">
             <!-- Custom Sheets Config Sub-tab -->
-            <v-window-item value="custom-sheet">
+            <v-window-item value="custom-sheet" :transition="false" :reverse-transition="false">
               <v-card variant="outlined" class="border-light">
                 <v-card-text class="pa-0">
                   <v-table hover class="config-table">
                     <thead>
                       <tr>
-                        <th class="font-weight-bold" style="width: 20%">Name</th>
+                        <th class="font-weight-bold" style="width: 18%">Name</th>
                         <th class="font-weight-bold" style="width: 15%">
                           Category
                           <v-tooltip activator="parent" location="bottom">Category headers group estimate parameters (Use 'Extra' for dynamic buttons)</v-tooltip>
@@ -338,21 +384,30 @@
                           Metal Type
                           <v-tooltip activator="parent" location="bottom">Set to 'Gold' or 'Plat' to bound calculations to cached metal rates</v-tooltip>
                         </th>
-                        <th class="font-weight-bold" style="width: 12%">
-                          Formula
-                          <v-tooltip activator="parent" location="bottom">Name of pricing function to utilize</v-tooltip>
+                        <th class="font-weight-bold" style="width: 10%">
+                          Markup
+                          <v-tooltip activator="parent" location="bottom">The markup factor applied to calculations</v-tooltip>
                         </th>
-                        <th class="font-weight-bold" style="width: 8%">Order</th>
+                        <th class="font-weight-bold" style="width: 12%">
+                          Default Quantity
+                          <v-tooltip activator="parent" location="bottom">The default item quantity for estimates</v-tooltip>
+                        </th>
                         <th class="text-right font-weight-bold" style="width: 21%">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="val in customSheets" :key="val.id || Math.random()">
+                      <tr v-for="val in customSheets" :key="val.tempId">
                         <td class="py-1">
                           <v-text-field v-model="val.name" density="compact" variant="underlined" hide-details></v-text-field>
                         </td>
                         <td class="py-1">
-                          <v-text-field v-model="val.value1" density="compact" variant="underlined" hide-details></v-text-field>
+                          <v-combobox
+                            v-model="val.value1"
+                            :items="categoryNames"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                          ></v-combobox>
                         </td>
                         <td class="py-1">
                           <v-text-field v-model="val.value2" density="compact" variant="underlined" hide-details></v-text-field>
@@ -361,10 +416,10 @@
                           <v-text-field v-model="val.value3" density="compact" variant="underlined" hide-details placeholder="e.g. Gold"></v-text-field>
                         </td>
                         <td class="py-1">
-                          <v-text-field v-model="val.value4" density="compact" variant="underlined" hide-details></v-text-field>
+                          <v-text-field v-model="val.markup" density="compact" variant="underlined" hide-details></v-text-field>
                         </td>
                         <td class="py-1">
-                          <v-text-field v-model="val.order" density="compact" variant="underlined" hide-details type="number"></v-text-field>
+                          <v-text-field v-model="val.default" density="compact" variant="underlined" hide-details></v-text-field>
                         </td>
                         <td class="text-right py-1">
                           <v-btn
@@ -415,8 +470,111 @@
               </v-btn>
             </v-window-item>
 
+            <!-- Custom Sheet Categories Config Sub-tab -->
+            <v-window-item value="custom-sheet-categories" :transition="false" :reverse-transition="false">
+              <v-card variant="outlined" class="border-light">
+                <v-card-text class="pa-0">
+                  <v-table hover class="config-table">
+                    <thead>
+                      <tr>
+                        <th class="font-weight-bold" style="width: 50%">Category Name</th>
+                        <th class="font-weight-bold" style="width: 20%">
+                          Order
+                          <v-tooltip activator="parent" location="bottom">Set display ordering index of custom sheet categories</v-tooltip>
+                        </th>
+                        <th class="text-right font-weight-bold" style="width: 30%">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(val, index) in customSheetCategories" :key="val.tempId">
+                        <td class="py-1">
+                          <v-text-field v-model="val.name" density="compact" variant="underlined" hide-details></v-text-field>
+                        </td>
+                        <td class="py-1">
+                          <div class="d-flex align-center" style="gap: 8px;">
+                            <v-text-field
+                              v-model="val.order"
+                              density="compact"
+                              variant="underlined"
+                              hide-details
+                              type="number"
+                              style="max-width: 60px;"
+                            ></v-text-field>
+                            <div class="d-flex flex-column align-center justify-center">
+                              <v-btn
+                                icon="mdi-chevron-up"
+                                variant="text"
+                                size="x-small"
+                                density="compact"
+                                :disabled="index === 0"
+                                @click="moveCategory(index, 'up')"
+                                class="ma-0 pa-0"
+                                style="font-size: 14px; height: 16px; width: 16px;"
+                              ></v-btn>
+                              <v-btn
+                                icon="mdi-chevron-down"
+                                variant="text"
+                                size="x-small"
+                                density="compact"
+                                :disabled="index === customSheetCategories.length - 1"
+                                @click="moveCategory(index, 'down')"
+                                class="ma-0 pa-0"
+                                style="font-size: 14px; height: 16px; width: 16px;"
+                              ></v-btn>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="text-right py-1">
+                          <v-btn
+                            :color="val.active === 1 ? 'primary' : 'medium-emphasis'"
+                            size="small"
+                            variant="tonal"
+                            class="mr-1 text-none font-weight-medium rounded-pill"
+                            @click="val.active = val.active === 1 ? 0 : 1"
+                          >
+                            {{ val.active === 1 ? 'Active' : 'Inactive' }}
+                          </v-btn>
+                          <v-btn
+                            color="success"
+                            size="small"
+                            variant="outlined"
+                            class="mr-1 text-none font-weight-medium rounded-pill"
+                            @click="saveValue(val)"
+                            :loading="val.saveStatus === 'saving'"
+                          >
+                            <v-icon start v-if="!val.saveStatus">mdi-content-save-outline</v-icon>
+                            <v-icon start v-else-if="val.saveStatus === 'saved'">mdi-check</v-icon>
+                            {{ val.saveStatus === 'saved' ? 'Saved' : 'Save' }}
+                          </v-btn>
+                          <v-btn
+                            icon="mdi-trash-can-outline"
+                            color="error"
+                            variant="text"
+                            density="comfortable"
+                            @click="confirmDeleteValue(val)"
+                          ></v-btn>
+                        </td>
+                      </tr>
+                      <tr v-if="customSheetCategories.length === 0">
+                        <td colspan="3" class="text-center py-6 text-medium-emphasis">No custom sheet categories configured.</td>
+                      </tr>
+                    </tbody>
+                  </v-table>
+                </v-card-text>
+              </v-card>
+              <v-btn
+                variant="outlined"
+                color="primary"
+                class="mt-4 text-none font-weight-medium"
+                prepend-icon="mdi-plus"
+                @click="newValue(4)"
+              >
+                New Category
+              </v-btn>
+            </v-window-item>
+
             <!-- Gold Credits Config Sub-tab -->
-            <v-window-item value="gold-credit">
+            <v-window-item value="gold-credit" :transition="false" :reverse-transition="false">
               <v-card variant="outlined" class="border-light">
                 <v-card-text class="pa-0">
                   <v-table hover class="config-table">
@@ -440,7 +598,7 @@
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="val in goldCredits" :key="val.id || Math.random()">
+                      <tr v-for="val in goldCredits" :key="val.tempId">
                         <td class="py-1">
                           <v-text-field v-model="val.name" density="compact" variant="underlined" hide-details></v-text-field>
                         </td>
@@ -505,12 +663,7 @@
               </v-btn>
             </v-window-item>
 
-            <!-- Metal Prices Cache Sub-tab -->
-            <v-window-item value="metal-prices">
-              <div class="mx-auto" style="max-width: 600px;">
-                <MetalPricesCard />
-              </div>
-            </v-window-item>
+
           </v-window>
         </v-window-item>
 
@@ -603,11 +756,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive, watch } from 'vue'
+import { ref, onMounted, reactive, watch, computed } from 'vue'
 import { api } from '../utils/api'
 import { settingsState, saveSettings, loadSettings } from '../store/settings'
 import { showToast } from '../store/toast'
-import MetalPricesCard from './MetalPricesCard.vue'
+import { refreshMetadata } from '../store/metadata'
+
 
 // Navigation state
 const activeTab = ref('local')
@@ -618,10 +772,13 @@ const localSettings = reactive({
   serverURL: '',
   cameraWidth: '',
   cameraHeight: '',
+  defaultDeviceId: '',
   jobPrinter: '',
-  creditPrinter: ''
+  creditPrinter: '',
+  customPrinter: ''
 })
 const printerNames = ref([])
+const videoDevices = ref([])
 const isSavingSettings = ref(false)
 
 // Employees State
@@ -638,10 +795,14 @@ const employeeToDelete = ref(null)
 // Custom Values State
 const valuesList = ref([])
 const customSheets = ref([])
+const customSheetCategories = ref([])
 const goldCredits = ref([])
-const metalPrices = ref([])
 const valueDeleteDialog = ref(false)
 const valueToDelete = ref(null)
+
+const categoryNames = computed(() => {
+  return customSheetCategories.value.map(c => c.name).filter(Boolean)
+})
 
 // Snackbar Toast System
 const showSnackbar = (text, color = 'success') => {
@@ -655,8 +816,61 @@ const initLocalSettings = () => {
   localSettings.serverURL = settingsState.serverURL
   localSettings.cameraWidth = settingsState.camera.width
   localSettings.cameraHeight = settingsState.camera.height
+  localSettings.defaultDeviceId = settingsState.camera.defaultDeviceId || ''
   localSettings.jobPrinter = settingsState.printers.job
   localSettings.creditPrinter = settingsState.printers.credit
+  localSettings.customPrinter = settingsState.printers.custom
+}
+
+const fetchVideoDevices = async () => {
+  try {
+    // Request permission first to get labels
+    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
+    tempStream.getTracks().forEach(track => track.stop())
+  } catch (err) {
+    console.warn('Failed to access camera permission for settings page list:', err)
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    videoDevices.value = devices
+      .filter(device => device.kind === 'videoinput')
+      .map((device, index) => ({
+        deviceId: device.deviceId,
+        label: device.label || `Camera ${index + 1}`
+      }))
+  } catch (err) {
+    console.error('Failed to list video devices in settings:', err)
+  }
+}
+
+const onDefaultCameraChanged = async (deviceId) => {
+  if (!deviceId) return
+  
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        deviceId: { exact: deviceId },
+        width: { ideal: 4096 },
+        height: { ideal: 2160 }
+      }
+    })
+    
+    const track = stream.getVideoTracks()[0]
+    if (track) {
+      const settings = track.getSettings()
+      if (settings.width) {
+        localSettings.cameraWidth = String(settings.width)
+      }
+      if (settings.height) {
+        localSettings.cameraHeight = String(settings.height)
+      }
+    }
+    
+    stream.getTracks().forEach(t => t.stop())
+  } catch (err) {
+    console.error('Failed to autodetect camera resolution on settings select:', err)
+  }
 }
 
 const fetchPrinters = async (showToast = false) => {
@@ -781,11 +995,13 @@ const handleSaveSettings = async () => {
       serverURL: localSettings.serverURL,
       camera: {
         width: localSettings.cameraWidth,
-        height: localSettings.cameraHeight
+        height: localSettings.cameraHeight,
+        defaultDeviceId: localSettings.defaultDeviceId
       },
       printers: {
         job: localSettings.jobPrinter,
-        credit: localSettings.creditPrinter
+        credit: localSettings.creditPrinter,
+        custom: localSettings.customPrinter
       }
     })
     showSnackbar('Local settings cached successfully', 'success')
@@ -896,13 +1112,14 @@ const getValues = async () => {
     const data = await api.get('/values')
     valuesList.value = (data || []).map(v => ({
       ...v,
+      tempId: `val-${v.id}`,
       saveStatus: null
     }))
     
     // Categorize custom values
     customSheets.value = valuesList.value.filter(v => v.type_id === 3)
     goldCredits.value = valuesList.value.filter(v => v.type_id === 1)
-    metalPrices.value = valuesList.value.filter(v => v.type_id === 2)
+    customSheetCategories.value = valuesList.value.filter(v => v.type_id === 4)
   } catch (err) {
     console.error('Failed to load values configuration:', err)
   }
@@ -911,6 +1128,7 @@ const getValues = async () => {
 const newValue = (typeId) => {
   const newItem = {
     id: null,
+    tempId: `new-${Date.now()}-${Math.random()}`,
     type_id: typeId,
     name: '',
     value1: '',
@@ -918,6 +1136,8 @@ const newValue = (typeId) => {
     value3: typeId === 1 ? 'Gold' : '', // Default to Gold metal type for credits
     value4: '',
     order: '',
+    markup: '',
+    default: '',
     active: 1,
     saveStatus: null
   }
@@ -926,6 +1146,8 @@ const newValue = (typeId) => {
     goldCredits.value.push(newItem)
   } else if (typeId === 3) {
     customSheets.value.push(newItem)
+  } else if (typeId === 4) {
+    customSheetCategories.value.push(newItem)
   }
 }
 
@@ -944,6 +1166,8 @@ const saveValue = async (value) => {
       value3: value.value3 !== null && value.value3 !== undefined ? String(value.value3).trim() : null,
       value4: value.value4 !== null && value.value4 !== undefined ? String(value.value4).trim() : null,
       order: value.order !== null && value.order !== undefined ? String(value.order).trim() : null,
+      markup: value.markup !== null && value.markup !== undefined ? String(value.markup).trim() : null,
+      default: value.default !== null && value.default !== undefined ? String(value.default).trim() : null,
       active: value.active === 0 || value.active === false ? 0 : 1
     }
 
@@ -960,6 +1184,9 @@ const saveValue = async (value) => {
     setTimeout(() => {
       value.saveStatus = null
     }, 2000)
+
+    // Sync metadata store cache
+    await refreshMetadata()
 
     // Reload all config values to ensure ordering
     await getValues()
@@ -984,6 +1211,8 @@ const handleDeleteValue = async () => {
       goldCredits.value = goldCredits.value.filter(v => v !== val)
     } else if (val.type_id === 3) {
       customSheets.value = customSheets.value.filter(v => v !== val)
+    } else if (val.type_id === 4) {
+      customSheetCategories.value = customSheetCategories.value.filter(v => v !== val)
     }
     valueDeleteDialog.value = false
     valueToDelete.value = null
@@ -993,6 +1222,10 @@ const handleDeleteValue = async () => {
   try {
     await api.delete(`/values/${val.id}`)
     showSnackbar('Item removed successfully', 'success')
+    
+    // Sync metadata store cache
+    await refreshMetadata()
+    
     await getValues()
   } catch (err) {
     showSnackbar('Failed to delete item: ' + err.message, 'error')
@@ -1001,6 +1234,56 @@ const handleDeleteValue = async () => {
     valueToDelete.value = null
   }
 }
+
+const moveCategory = async (index, direction) => {
+  const targetIndex = direction === 'up' ? index - 1 : index + 1
+  const list = customSheetCategories.value
+  if (targetIndex < 0 || targetIndex >= list.length) return
+  
+  const currentItem = list[index]
+  const targetItem = list[targetIndex]
+  
+  // Swap their positions in the array
+  list[index] = targetItem
+  list[targetIndex] = currentItem
+  
+  // Re-assign sequential order numbers
+  list.forEach((item, idx) => {
+    item.order = idx + 1
+  })
+  
+  // Update the reactive ref array reference to trigger Vue's reactivity
+  customSheetCategories.value = [...list]
+  
+  // Save the changes to backend for items that have an id
+  try {
+    const itemsToSave = [currentItem, targetItem].filter(item => item.id)
+    for (const item of itemsToSave) {
+      const payload = {
+        name: item.name.trim(),
+        value1: item.value1 !== null && item.value1 !== undefined ? String(item.value1).trim() : null,
+        value2: item.value2 !== null && item.value2 !== undefined ? String(item.value2).trim() : null,
+        value3: item.value3 !== null && item.value3 !== undefined ? String(item.value3).trim() : null,
+        value4: item.value4 !== null && item.value4 !== undefined ? String(item.value4).trim() : null,
+        order: String(item.order),
+        markup: item.markup !== null && item.markup !== undefined ? String(item.markup).trim() : null,
+        default: item.default !== null && item.default !== undefined ? String(item.default).trim() : null,
+        active: item.active === 0 || item.active === false ? 0 : 1
+      }
+      await api.put(`/values/${item.id}`, payload)
+    }
+    
+    // Sync metadata store cache
+    await refreshMetadata()
+    // Reload all config values to ensure correct UI ordering
+    await getValues()
+    
+    showSnackbar('Category order updated successfully', 'success')
+  } catch (err) {
+    showSnackbar('Failed to save category order: ' + err.message, 'error')
+  }
+}
+
 
 // ----------------------------------------------------
 // Initialization
@@ -1013,11 +1296,18 @@ onMounted(async () => {
   
   initLocalSettings()
   await fetchPrinters()
-  
-  // Try loading database configs
-  await getEmployees()
-  await getValues()
+  await fetchVideoDevices()
 })
+
+// Watch active tab to load data lazily (e.g. only get employee data when rendering the employee list)
+watch(activeTab, (newTab) => {
+  if (newTab === 'employees') {
+    getEmployees()
+  } else if (newTab === 'values') {
+    getValues()
+  }
+}, { immediate: true })
+
 
 // Watch settings state to sync local variables if changed elsewhere
 watch(() => settingsState.isLoaded, (loaded) => {
@@ -1087,7 +1377,5 @@ watch(() => settingsState.isLoaded, (loaded) => {
   font-size: 0.9rem !important;
 }
 
-.v-window-item {
-  transition: opacity 0.3s ease;
-}
+/* Custom v-window-item transitions disabled for performance */
 </style>

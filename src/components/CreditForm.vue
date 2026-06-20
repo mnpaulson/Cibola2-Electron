@@ -1,5 +1,5 @@
 <template>
-  <v-card class="credit-card" elevation="3" :loading="loading">
+  <v-card class="credit-card pb-20" elevation="3" :loading="loading">
     <!-- Header -->
     <v-card-item class="bg-primary text-white py-3">
       <v-card-title class="font-weight-bold text-subtitle-1 d-flex align-center">
@@ -253,80 +253,23 @@
     />
 
     <!-- Actions Footer Navigation -->
-    <v-divider></v-divider>
-    <v-card-actions class="pa-3 bg-light-surface d-flex flex-wrap justify-end gap-2">
-      <v-btn
-        color="grey-darken-2"
-        variant="outlined"
-        prepend-icon="mdi-arrow-left"
-        size="small"
-        @click="discardCredit"
-      >
-        Discard
-      </v-btn>
-      <v-btn
-        v-if="credit.id"
-        color="error"
-        variant="outlined"
-        prepend-icon="mdi-delete"
-        size="small"
-        @click="isDeleteOpen = true"
-      >
-        Delete
-      </v-btn>
-      <v-btn
-        color="secondary"
-        variant="elevated"
-        prepend-icon="mdi-camera"
-        size="small"
-        :disabled="disabled"
-        @click="attachedImagesRef?.openCamera()"
-      >
-        Capture
-      </v-btn>
-      <v-btn
-        color="info"
-        variant="elevated"
-        prepend-icon="mdi-printer"
-        size="small"
-        :disabled="!credit.id"
-        @click="printOnly"
-      >
-        Print
-      </v-btn>
-      <v-btn
-        v-if="!credit.id"
-        color="success"
-        variant="flat"
-        prepend-icon="mdi-content-save-all"
-        size="small"
-        :disabled="!isFormValid"
-        @click="saveOrUpdateCredit(false, false)"
-      >
-        Save Credit
-      </v-btn>
-      <v-btn
-        v-else
-        color="success"
-        variant="flat"
-        prepend-icon="mdi-content-save"
-        size="small"
-        @click="saveOrUpdateCredit(false, false)"
-      >
-        Update Notes
-      </v-btn>
-      <v-btn
-        v-if="!credit.id"
-        color="primary"
-        variant="flat"
-        prepend-icon="mdi-check-all"
-        size="small"
-        :disabled="!isFormValid"
-        @click="saveOrUpdateCredit(true, true)"
-      >
-        Print & Close
-      </v-btn>
-    </v-card-actions>
+    <FormBottomNavigation
+      :show-delete="!!credit.id"
+      :show-preview="false"
+      :save-label="!credit.id ? 'Save Credit' : 'Update Notes'"
+      :save-icon="!credit.id ? 'mdi-content-save-all' : 'mdi-content-save'"
+      :disable-save="!credit.id ? !isFormValid : false"
+      :show-print-close="!credit.id"
+      :disable-print-close="!isFormValid"
+      :disable-capture="disabled"
+      :disable-print="!credit.id"
+      @discard="discardCredit"
+      @delete="isDeleteOpen = true"
+      @capture="attachedImagesRef?.openCamera()"
+      @print="printOnly"
+      @save="saveOrUpdateCredit(false, false)"
+      @save-print-close="saveOrUpdateCredit(true, true)"
+    />
   </v-card>
 </template>
 
@@ -339,11 +282,12 @@ import { navigateBack, navigateTo } from '../store/session'
 import { formatLocalDate } from '../utils/dates'
 import { logoBase64 } from '../utils/logo'
 import { showToast } from '../store/toast'
-import { calculateGoldCreditValue, getAdjustedMarkup } from '../utils/pricing'
+import { calculateGoldCreditValue, getAdjustedMarkup, calculateGoldCreditUnitPrice } from '../utils/pricing'
 import AttachedImages from './AttachedImages.vue'
 import CustomerForm from './CustomerForm.vue'
 import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue'
 import MetalPricesCard from './MetalPricesCard.vue'
+import FormBottomNavigation from './FormBottomNavigation.vue'
 
 // Props & Emits
 const props = defineProps({
@@ -494,7 +438,7 @@ async function loadCredit(id) {
           markup: element.markup,
           multiplier: element.multiplier,
           weight: element.weight,
-          unitPrice: element.weight > 0 ? Math.round((element.value / element.weight) * 100) / 100 : 0,
+          unitPrice: calculateGoldCreditUnitPrice(element.value, element.weight),
           value: element.value
         }
       })
@@ -650,7 +594,7 @@ function recalculateItem(item) {
   }
   
   item.value = calculateGoldCreditValue(w, item.multiplier, item.markup, spot)
-  item.unitPrice = w > 0 ? Math.round((item.value / w) * 100) / 100 : 0
+  item.unitPrice = calculateGoldCreditUnitPrice(item.value, w)
   
   recalculateTotal()
 }

@@ -1,5 +1,5 @@
 <template>
-  <v-card class="job-card" elevation="3" :loading="loading">
+  <v-card class="job-card pb-20" elevation="3" :loading="loading">
     <!-- Header -->
     <v-card-item class="bg-primary text-white py-3">
       <v-card-title class="font-weight-bold text-subtitle-1 d-flex align-center">
@@ -121,11 +121,15 @@
       </v-form>
 
       <!-- Attached Jewelry Images Grid -->
-      <AttachedImages
-        ref="attachedImagesRef"
-        v-model="job.job_images"
-        delete-endpoint="/jobs/images"
-      />
+      <v-row class="mt-4">
+        <v-col cols="12">
+          <AttachedImages
+            ref="attachedImagesRef"
+            v-model="job.job_images"
+            delete-endpoint="/jobs/images"
+          />
+        </v-col>
+      </v-row>
     </v-card-text>
 
     <!-- Delete Job Modal -->
@@ -138,75 +142,21 @@
     />
 
     <!-- Actions Footer Navigation -->
-    <v-divider></v-divider>
-    <v-card-actions class="pa-3 bg-light-surface d-flex flex-wrap justify-end gap-2">
-      <v-btn
-        color="grey-darken-2"
-        variant="outlined"
-        prepend-icon="mdi-arrow-left"
-        size="small"
-        @click="discardJob"
-      >
-        Discard
-      </v-btn>
-      <v-btn
-        v-if="job.id"
-        color="error"
-        variant="outlined"
-        prepend-icon="mdi-delete"
-        size="small"
-        @click="isDeleteJobOpen = true"
-      >
-        Delete
-      </v-btn>
-      <v-btn
-        color="secondary"
-        variant="elevated"
-        prepend-icon="mdi-camera"
-        size="small"
-        @click="attachedImagesRef?.openCamera()"
-      >
-        Capture
-      </v-btn>
-      <v-btn
-        color="info"
-        variant="elevated"
-        prepend-icon="mdi-printer"
-        size="small"
-        @click="printOnly"
-      >
-        Print
-      </v-btn>
-      <v-btn
-        color="orange-darken-2"
-        variant="tonal"
-        prepend-icon="mdi-file-document-outline"
-        size="small"
-        @click="downloadPrintPreview"
-      >
-        Preview HTML
-      </v-btn>
-      <v-btn
-        color="success"
-        variant="flat"
-        prepend-icon="mdi-content-save-all"
-        size="small"
-        :disabled="!isFormValid"
-        @click="saveOrUpdateJob(false, false)"
-      >
-        {{ job.id ? 'Update Job' : 'Save Job' }}
-      </v-btn>
-      <v-btn
-        color="primary"
-        variant="flat"
-        prepend-icon="mdi-check-all"
-        size="small"
-        :disabled="!isFormValid"
-        @click="saveOrUpdateJob(true, true)"
-      >
-        Print & Close
-      </v-btn>
-    </v-card-actions>
+    <FormBottomNavigation
+      :show-delete="!!job.id"
+      :show-preview="true"
+      :save-label="job.id ? 'Update Job' : 'Save Job'"
+      :disable-save="!isFormValid"
+      :show-print-close="true"
+      :disable-print-close="!isFormValid"
+      @discard="discardJob"
+      @delete="isDeleteJobOpen = true"
+      @capture="attachedImagesRef?.openCamera()"
+      @print="printOnly"
+      @preview="downloadPrintPreview"
+      @save="saveOrUpdateJob(false, false)"
+      @save-print-close="saveOrUpdateJob(true, true)"
+    />
   </v-card>
 </template>
 
@@ -222,6 +172,7 @@ import { showToast } from '../store/toast'
 import AttachedImages from './AttachedImages.vue'
 import CustomerForm from './CustomerForm.vue'
 import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue'
+import FormBottomNavigation from './FormBottomNavigation.vue'
 
 const formatDate = (dateStr) => formatLocalDate(dateStr, 'short')
 

@@ -4,11 +4,13 @@ export const settingsState = reactive({
   serverURL: 'http://localhost:8000',
   camera: {
     width: '1280',
-    height: '1024'
+    height: '1024',
+    defaultDeviceId: ''
   },
   printers: {
     job: '',
-    credit: ''
+    credit: '',
+    custom: ''
   },
   isLoaded: false
 })
@@ -22,10 +24,12 @@ export async function loadSettings() {
         if (settings.camera) {
           if (settings.camera.width) settingsState.camera.width = settings.camera.width
           if (settings.camera.height) settingsState.camera.height = settings.camera.height
+          if (settings.camera.defaultDeviceId) settingsState.camera.defaultDeviceId = settings.camera.defaultDeviceId
         }
         if (settings.printers) {
           if (settings.printers.job) settingsState.printers.job = settings.printers.job
           if (settings.printers.credit) settingsState.printers.credit = settings.printers.credit
+          if (settings.printers.custom) settingsState.printers.custom = settings.printers.custom
         }
       }
     } catch (err) {
@@ -40,10 +44,12 @@ export async function saveSettings(newSettings) {
   if (newSettings.camera) {
     if (newSettings.camera.width) settingsState.camera.width = newSettings.camera.width
     if (newSettings.camera.height) settingsState.camera.height = newSettings.camera.height
+    settingsState.camera.defaultDeviceId = newSettings.camera.defaultDeviceId || ''
   }
   if (newSettings.printers) {
     settingsState.printers.job = newSettings.printers.job || ''
     settingsState.printers.credit = newSettings.printers.credit || ''
+    settingsState.printers.custom = newSettings.printers.custom || ''
   }
 
   if (window.electronAPI && window.electronAPI.saveSettings) {
@@ -52,11 +58,13 @@ export async function saveSettings(newSettings) {
         serverURL: settingsState.serverURL,
         camera: {
           width: settingsState.camera.width,
-          height: settingsState.camera.height
+          height: settingsState.camera.height,
+          defaultDeviceId: settingsState.camera.defaultDeviceId
         },
         printers: {
           job: settingsState.printers.job,
-          credit: settingsState.printers.credit
+          credit: settingsState.printers.credit,
+          custom: settingsState.printers.custom
         }
       })
     } catch (err) {
@@ -65,3 +73,4 @@ export async function saveSettings(newSettings) {
     }
   }
 }
+
