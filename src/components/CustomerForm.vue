@@ -41,11 +41,16 @@
             <template v-slot:item="{ props, item }">
               <v-list-item
                 v-bind="props"
-                :title="item.raw.displayName"
-                :subtitle="item.raw.phone || 'No phone number'"
               >
+                <template v-slot:title>
+                  <span v-html="highlightText(`${item.raw.fname} ${item.raw.lname}`, searchQuery)"></span>
+                </template>
+                <template v-slot:subtitle>
+                  <span v-if="item.raw.phone" v-html="highlightText(item.raw.phone, searchQuery)"></span>
+                  <span v-else class="text-medium-emphasis">No phone number</span>
+                </template>
                 <template v-slot:prepend>
-                  <v-avatar color="primary" variant="tonal" size="32">
+                  <v-avatar color="primary" variant="tonal" size="32" class="mr-2">
                     <v-icon size="16">mdi-account</v-icon>
                   </v-avatar>
                 </template>
@@ -330,7 +335,6 @@ const searchQuery = ref('')
 const lastSearchText = ref('')
 const selectedSearchItem = ref(null)
 const rawCandidates = ref([])
-const searchResults = ref([])
 const isFormValid = ref(true)
 const formRef = ref(null)
 const startingNote = ref('')
@@ -368,15 +372,111 @@ const hasAddress = computed(() => {
   )
 })
 
+// Perform client-side fuzzy match and ranking instantly as the user types
+const filteredCandidates = computed(() => {
+  const query = searchQuery.value || ''
+  if (!query || query.trim().length < 2) {
+    return []
+  }
+
+  const queryWords = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+
+  const candidatesWithFullName = rawCandidates.value.map(c => ({
+    ...c,
+    fullName: `${c.fname || ''} ${c.lname || ''}`.trim()
+  }))
+
+  const fuseInstance = new Fuse(candidatesWithFullName, {
+    keys: [
+      { name: 'fullName', weight: 0.8 },
+      { name: 'fname', weight: 0.1 },
+      { name: 'lname', weight: 0.1 },
+      { name: 'phone', weight: 0.2 }
+    ],
+    threshold: 0.4,
+    distance: 100,
+    includeScore: true,
+    ignoreLocation: true
+  })
+
+  const result = fuseInstance.search(query)
+
+  const scoreCandidate = (c, words) => {
+    const fname = (c.fname || '').toLowerCase()
+    const lname = (c.lname || '').toLowerCase()
+    const fullName = `${fname} ${lname}`
+    const phone = (c.phone || '').toLowerCase()
+    
+    let score = 0
+    let matchedWordsCount = 0
+
+    for (const word of words) {
+      let wordScore = 0
+      let matched = false
+      
+      if (fname === word || lname === word) {
+        wordScore += 10
+        matched = true
+      } else if (fname.startsWith(word) || lname.startsWith(word)) {
+        wordScore += 5
+        matched = true
+      } else if (fullName.includes(word)) {
+        wordScore += 2
+        matched = true
+      } else if (phone.includes(word)) {
+        wordScore += 1
+        matched = true
+      }
+      
+      if (matched) {
+        matchedWordsCount++
+        score += wordScore
+      }
+    }
+    
+    score += matchedWordsCount * 100
+    return score
+  }
+
+  const sorted = [...result].sort((a, b) => {
+    const scoreA = scoreCandidate(a.item, queryWords)
+    const scoreB = scoreCandidate(b.item, queryWords)
+    
+    if (scoreB !== scoreA) {
+      return scoreB - scoreA
+    }
+    return (a.score || 0) - (b.score || 0)
+  })
+
+  return sorted.map(r => r.item)
+})
+
 // Format candidates list for v-autocomplete dropdown display
 const formattedCandidates = computed(() => {
-  return searchResults.value.map(c => ({
+  return filteredCandidates.value.map(c => ({
     ...c,
     displayName: `${c.fname} ${c.lname} ${c.phone ? ' - ' + c.phone : ''}`
   }))
 })
 
-// Search watcher with debounced backend fetching + local fuse.js filtering
+// Highlight matched substring helper for autocomplete template
+const highlightText = (text, query) => {
+  if (!text) return ''
+  if (!query) return text
+
+  const tokens = query.trim().split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return text
+
+  // Sort tokens by length descending to prevent shorter matches inside the regex from overriding longer ones
+  tokens.sort((a, b) => b.length - a.length)
+
+  const escapedTokens = tokens.map(token => token.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'))
+  const regex = new RegExp(`(${escapedTokens.join('|')})`, 'gi')
+
+  return text.replace(regex, '<span style="background-color: rgba(var(--v-theme-primary), 0.18); color: rgb(var(--v-theme-primary)); font-weight: 600; padding: 0 2px; border-radius: 2px;">$1</span>')
+}
+
+// Search watcher with debounced backend fetching + local instant filtering
 let debounceTimeout = null
 watch(searchQuery, (newVal) => {
   if (newVal && newVal.trim().length > 0) {
@@ -386,7 +486,7 @@ watch(searchQuery, (newVal) => {
   if (debounceTimeout) clearTimeout(debounceTimeout)
   
   if (!newVal || newVal.trim().length < 2) {
-    searchResults.value = []
+    rawCandidates.value = []
     return
   }
 
@@ -395,25 +495,12 @@ watch(searchQuery, (newVal) => {
   }, 350)
 })
 
-// Fetch raw candidates matching the query tokens, then apply fuzzy filter on the client
+// Fetch raw candidates matching the query tokens
 async function fetchCandidates(queryText) {
   loading.value = true
   try {
     const data = await api.get(`/customers?q=${encodeURIComponent(queryText)}`)
     rawCandidates.value = data || []
-    
-    // Perform client-side fuzzy match using Fuse.js
-    if (rawCandidates.value.length > 0) {
-      const fuseInstance = new Fuse(rawCandidates.value, {
-        keys: ['fname', 'lname', 'phone'],
-        threshold: 0.4,
-        distance: 100
-      })
-      const result = fuseInstance.search(queryText)
-      searchResults.value = result.map(r => r.item)
-    } else {
-      searchResults.value = []
-    }
   } catch (err) {
     console.error('Failed to search customers:', err)
   } finally {
@@ -524,7 +611,7 @@ function resetState() {
   selectedSearchItem.value = null
   searchQuery.value = ''
   lastSearchText.value = ''
-  searchResults.value = []
+  rawCandidates.value = []
   currentState.value = 'search'
 }
 

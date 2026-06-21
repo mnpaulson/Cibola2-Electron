@@ -289,9 +289,19 @@
             <v-col cols="12" md="8">
               <v-card variant="outlined" class="border-light">
                 <v-card-title class="px-4 py-3 text-subtitle-1 font-weight-bold d-flex justify-space-between align-center border-b">
-                  <span>Store Directory</span>
+                  <div class="d-flex align-center">
+                    <span>Store Directory</span>
+                    <v-checkbox
+                      v-model="hideInactiveEmployees"
+                      label="Hide Inactive"
+                      hide-details
+                      density="compact"
+                      color="primary"
+                      class="ml-4"
+                    ></v-checkbox>
+                  </div>
                   <v-chip size="small" color="primary" variant="tonal" class="font-weight-bold">
-                    {{ employees.length }} Employees
+                    {{ filteredEmployees.length }} Employees
                   </v-chip>
                 </v-card-title>
 
@@ -304,7 +314,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="emp in employees" :key="emp.id" class="employee-row">
+                    <tr v-for="emp in filteredEmployees" :key="emp.id" class="employee-row">
                       <td class="font-weight-medium">
                         {{ emp.name }}
                         <v-chip v-if="emp.id === 1" size="x-small" color="warning" class="ml-2 font-weight-bold" variant="flat">
@@ -312,16 +322,18 @@
                         </v-chip>
                       </td>
                       <td class="text-center">
-                        <v-chip
-                          :color="emp.active ? 'success' : 'grey'"
-                          size="small"
-                          variant="tonal"
-                          class="font-weight-bold cursor-pointer"
-                          @click="emp.id !== 1 && toggleEmployeeActive(emp)"
-                          :disabled="emp.id === 1"
-                        >
-                          {{ emp.active ? 'Active' : 'Inactive' }}
-                        </v-chip>
+                        <div class="d-flex justify-center">
+                          <v-switch
+                            :model-value="emp.active === 1"
+                            @update:model-value="toggleEmployeeActive(emp)"
+                            color="success"
+                            density="compact"
+                            hide-details
+                            inset
+                            :loading="emp.loadingActive"
+                            :disabled="emp.id === 1 || emp.loadingActive"
+                          ></v-switch>
+                        </div>
                       </td>
                       <td class="text-right">
                         <v-btn
@@ -334,18 +346,21 @@
                           :disabled="emp.id === 1"
                         ></v-btn>
                         <v-btn
-                          icon="mdi-trash-can-outline"
-                          variant="text"
                           color="error"
-                          density="comfortable"
+                          variant="outlined"
+                          size="small"
+                          class="text-none font-weight-medium rounded-pill"
+                          prepend-icon="mdi-trash-can-outline"
                           @click="confirmDeleteEmployee(emp)"
                           :disabled="emp.id === 1"
-                        ></v-btn>
+                        >
+                          Delete
+                        </v-btn>
                       </td>
                     </tr>
-                    <tr v-if="employees.length === 0">
+                    <tr v-if="filteredEmployees.length === 0">
                       <td colspan="3" class="text-center py-6 text-medium-emphasis">
-                        No employees found. Check connection parameters.
+                        {{ employees.length === 0 ? 'No employees found. Check connection parameters.' : 'No active employees found matching the filter.' }}
                       </td>
                     </tr>
                   </tbody>
@@ -366,39 +381,56 @@
           <v-window v-model="valuesSubTab">
             <!-- Custom Sheets Config Sub-tab -->
             <v-window-item value="custom-sheet" :transition="false" :reverse-transition="false">
+              <div class="d-flex align-center justify-end mb-3">
+                <v-checkbox
+                  v-model="hideInactiveCustomSheets"
+                  label="Hide Inactive"
+                  hide-details
+                  density="compact"
+                  color="primary"
+                ></v-checkbox>
+              </div>
               <v-card variant="outlined" class="border-light">
                 <v-card-text class="pa-0">
                   <v-table hover class="config-table">
                     <thead>
                       <tr>
-                        <th class="font-weight-bold" style="width: 18%">Name</th>
-                        <th class="font-weight-bold" style="width: 15%">
+                        <th class="font-weight-bold" style="width: 17%">Name</th>
+                        <th class="font-weight-bold" style="width: 14%">
                           Category
                           <v-tooltip activator="parent" location="bottom">Category headers group estimate parameters (Use 'Extra' for dynamic buttons)</v-tooltip>
                         </th>
-                        <th class="font-weight-bold" style="width: 12%">
+                        <th class="font-weight-bold" style="width: 10%">
                           Base Price
                           <v-tooltip activator="parent" location="bottom">Static price fallback if no metal calculations are used</v-tooltip>
                         </th>
-                        <th class="font-weight-bold" style="width: 12%">
+                        <th class="font-weight-bold" style="width: 15%">
                           Metal Type
                           <v-tooltip activator="parent" location="bottom">Set to 'Gold' or 'Plat' to bound calculations to cached metal rates</v-tooltip>
                         </th>
-                        <th class="font-weight-bold" style="width: 10%">
+                        <th class="font-weight-bold" style="width: 9%">
                           Markup
                           <v-tooltip activator="parent" location="bottom">The markup factor applied to calculations</v-tooltip>
                         </th>
-                        <th class="font-weight-bold" style="width: 12%">
+                        <th class="font-weight-bold" style="width: 9%">
                           Default Quantity
                           <v-tooltip activator="parent" location="bottom">The default item quantity for estimates</v-tooltip>
                         </th>
-                        <th class="text-right font-weight-bold" style="width: 21%">Actions</th>
+                        <th class="font-weight-bold text-center" style="width: 10%">Active</th>
+                        <th class="text-right font-weight-bold" style="width: 16%">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="val in customSheets" :key="val.tempId">
+                      <tr v-for="val in filteredCustomSheets" :key="val.tempId">
                         <td class="py-1">
-                          <v-text-field v-model="val.name" density="compact" variant="underlined" hide-details></v-text-field>
+                          <v-text-field
+                            v-model="val.name"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                            @input="markPending(val)"
+                            @blur="saveIfPending(val)"
+                          ></v-text-field>
                         </td>
                         <td class="py-1">
                           <v-combobox
@@ -407,53 +439,98 @@
                             density="compact"
                             variant="underlined"
                             hide-details
+                            @input="markPending(val)"
+                            @update:model-value="onComboboxChange(val)"
                           ></v-combobox>
                         </td>
                         <td class="py-1">
-                          <v-text-field v-model="val.value2" density="compact" variant="underlined" hide-details></v-text-field>
+                          <v-text-field
+                            v-model="val.value2"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                            @input="markPending(val)"
+                            @blur="saveIfPending(val)"
+                          ></v-text-field>
                         </td>
                         <td class="py-1">
-                          <v-text-field v-model="val.value3" density="compact" variant="underlined" hide-details placeholder="e.g. Gold"></v-text-field>
+                          <v-select
+                            v-model="val.value3"
+                            :items="['Gold', 'Plat', 'Silver']"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                            clearable
+                            placeholder="Select"
+                            @update:model-value="onComboboxChange(val)"
+                          ></v-select>
                         </td>
                         <td class="py-1">
-                          <v-text-field v-model="val.markup" density="compact" variant="underlined" hide-details></v-text-field>
+                          <v-text-field
+                            v-model="val.markup"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                            @input="markPending(val)"
+                            @blur="saveIfPending(val)"
+                          ></v-text-field>
                         </td>
                         <td class="py-1">
-                          <v-text-field v-model="val.default" density="compact" variant="underlined" hide-details></v-text-field>
+                          <v-text-field
+                            v-model="val.default"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                            @input="markPending(val)"
+                            @blur="saveIfPending(val)"
+                          ></v-text-field>
+                        </td>
+                        <td class="py-1">
+                          <div class="d-flex justify-center">
+                            <v-switch
+                              :model-value="val.active === 1"
+                              @update:model-value="toggleValueActive(val)"
+                              color="success"
+                              density="compact"
+                              hide-details
+                              inset
+                              :loading="val.saveStatus === 'saving'"
+                              :disabled="val.saveStatus === 'saving'"
+                            ></v-switch>
+                          </div>
                         </td>
                         <td class="text-right py-1">
-                          <v-btn
-                            :color="val.active === 1 ? 'primary' : 'medium-emphasis'"
-                            size="small"
-                            variant="tonal"
-                            class="mr-1 text-none font-weight-medium rounded-pill"
-                            @click="val.active = val.active === 1 ? 0 : 1"
-                          >
-                            {{ val.active === 1 ? 'Active' : 'Inactive' }}
-                          </v-btn>
-                          <v-btn
-                            color="success"
-                            size="small"
-                            variant="outlined"
-                            class="mr-1 text-none font-weight-medium rounded-pill"
-                            @click="saveValue(val)"
-                            :loading="val.saveStatus === 'saving'"
-                          >
-                            <v-icon start v-if="!val.saveStatus">mdi-content-save-outline</v-icon>
-                            <v-icon start v-else-if="val.saveStatus === 'saved'">mdi-check</v-icon>
-                            {{ val.saveStatus === 'saved' ? 'Saved' : 'Save' }}
-                          </v-btn>
-                          <v-btn
-                            icon="mdi-trash-can-outline"
-                            color="error"
-                            variant="text"
-                            density="comfortable"
-                            @click="confirmDeleteValue(val)"
-                          ></v-btn>
+                          <div class="d-inline-flex align-center justify-end">
+                            <v-tooltip location="bottom">
+                              <template v-slot:activator="{ props }">
+                                <v-icon
+                                  v-bind="props"
+                                  :color="getStatusColor(val.saveStatus)"
+                                  class="mr-3"
+                                  size="small"
+                                >
+                                  {{ getStatusIcon(val.saveStatus) }}
+                                </v-icon>
+                              </template>
+                              <span>{{ getStatusTooltip(val.saveStatus) }}</span>
+                            </v-tooltip>
+                            <v-btn
+                              color="error"
+                              variant="outlined"
+                              size="small"
+                              class="text-none font-weight-medium rounded-pill"
+                              prepend-icon="mdi-trash-can-outline"
+                              @click="confirmDeleteValue(val)"
+                            >
+                              Delete
+                            </v-btn>
+                          </div>
                         </td>
                       </tr>
-                      <tr v-if="customSheets.length === 0">
-                        <td colspan="7" class="text-center py-6 text-medium-emphasis">No custom sheet items configured.</td>
+                      <tr v-if="filteredCustomSheets.length === 0">
+                        <td colspan="8" class="text-center py-6 text-medium-emphasis">
+                          {{ customSheets.length === 0 ? 'No custom sheet items configured.' : 'No active custom sheet items found matching the filter.' }}
+                        </td>
                       </tr>
                     </tbody>
                   </v-table>
@@ -472,23 +549,40 @@
 
             <!-- Custom Sheet Categories Config Sub-tab -->
             <v-window-item value="custom-sheet-categories" :transition="false" :reverse-transition="false">
+              <div class="d-flex align-center justify-end mb-3">
+                <v-checkbox
+                  v-model="hideInactiveCategories"
+                  label="Hide Inactive"
+                  hide-details
+                  density="compact"
+                  color="primary"
+                ></v-checkbox>
+              </div>
               <v-card variant="outlined" class="border-light">
                 <v-card-text class="pa-0">
                   <v-table hover class="config-table">
                     <thead>
                       <tr>
-                        <th class="font-weight-bold" style="width: 50%">Category Name</th>
+                        <th class="font-weight-bold" style="width: 45%">Category Name</th>
                         <th class="font-weight-bold" style="width: 20%">
                           Order
                           <v-tooltip activator="parent" location="bottom">Set display ordering index of custom sheet categories</v-tooltip>
                         </th>
-                        <th class="text-right font-weight-bold" style="width: 30%">Actions</th>
+                        <th class="font-weight-bold text-center" style="width: 15%">Active</th>
+                        <th class="text-right font-weight-bold" style="width: 20%">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="(val, index) in customSheetCategories" :key="val.tempId">
+                      <tr v-for="(val, index) in filteredCustomSheetCategories" :key="val.tempId">
                         <td class="py-1">
-                          <v-text-field v-model="val.name" density="compact" variant="underlined" hide-details></v-text-field>
+                          <v-text-field
+                            v-model="val.name"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                            @input="markPending(val)"
+                            @blur="saveIfPending(val)"
+                          ></v-text-field>
                         </td>
                         <td class="py-1">
                           <div class="d-flex align-center" style="gap: 8px;">
@@ -499,6 +593,8 @@
                               hide-details
                               type="number"
                               style="max-width: 60px;"
+                              @input="markPending(val)"
+                              @blur="saveIfPending(val)"
                             ></v-text-field>
                             <div class="d-flex flex-column align-center justify-center">
                               <v-btn
@@ -507,7 +603,7 @@
                                 size="x-small"
                                 density="compact"
                                 :disabled="index === 0"
-                                @click="moveCategory(index, 'up')"
+                                @click="moveCategory(val, 'up')"
                                 class="ma-0 pa-0"
                                 style="font-size: 14px; height: 16px; width: 16px;"
                               ></v-btn>
@@ -516,47 +612,60 @@
                                 variant="text"
                                 size="x-small"
                                 density="compact"
-                                :disabled="index === customSheetCategories.length - 1"
-                                @click="moveCategory(index, 'down')"
+                                :disabled="index === filteredCustomSheetCategories.length - 1"
+                                @click="moveCategory(val, 'down')"
                                 class="ma-0 pa-0"
                                 style="font-size: 14px; height: 16px; width: 16px;"
                               ></v-btn>
                             </div>
                           </div>
                         </td>
+                        <td class="py-1">
+                          <div class="d-flex justify-center">
+                            <v-switch
+                              :model-value="val.active === 1"
+                              @update:model-value="toggleValueActive(val)"
+                              color="success"
+                              density="compact"
+                              hide-details
+                              inset
+                              :loading="val.saveStatus === 'saving'"
+                              :disabled="val.saveStatus === 'saving'"
+                            ></v-switch>
+                          </div>
+                        </td>
                         <td class="text-right py-1">
-                          <v-btn
-                            :color="val.active === 1 ? 'primary' : 'medium-emphasis'"
-                            size="small"
-                            variant="tonal"
-                            class="mr-1 text-none font-weight-medium rounded-pill"
-                            @click="val.active = val.active === 1 ? 0 : 1"
-                          >
-                            {{ val.active === 1 ? 'Active' : 'Inactive' }}
-                          </v-btn>
-                          <v-btn
-                            color="success"
-                            size="small"
-                            variant="outlined"
-                            class="mr-1 text-none font-weight-medium rounded-pill"
-                            @click="saveValue(val)"
-                            :loading="val.saveStatus === 'saving'"
-                          >
-                            <v-icon start v-if="!val.saveStatus">mdi-content-save-outline</v-icon>
-                            <v-icon start v-else-if="val.saveStatus === 'saved'">mdi-check</v-icon>
-                            {{ val.saveStatus === 'saved' ? 'Saved' : 'Save' }}
-                          </v-btn>
-                          <v-btn
-                            icon="mdi-trash-can-outline"
-                            color="error"
-                            variant="text"
-                            density="comfortable"
-                            @click="confirmDeleteValue(val)"
-                          ></v-btn>
+                          <div class="d-inline-flex align-center justify-end">
+                            <v-tooltip location="bottom">
+                              <template v-slot:activator="{ props }">
+                                <v-icon
+                                  v-bind="props"
+                                  :color="getStatusColor(val.saveStatus)"
+                                  class="mr-3"
+                                  size="small"
+                                >
+                                  {{ getStatusIcon(val.saveStatus) }}
+                                </v-icon>
+                              </template>
+                              <span>{{ getStatusTooltip(val.saveStatus) }}</span>
+                            </v-tooltip>
+                            <v-btn
+                              color="error"
+                              variant="outlined"
+                              size="small"
+                              class="text-none font-weight-medium rounded-pill"
+                              prepend-icon="mdi-trash-can-outline"
+                              @click="confirmDeleteValue(val)"
+                            >
+                              Delete
+                            </v-btn>
+                          </div>
                         </td>
                       </tr>
-                      <tr v-if="customSheetCategories.length === 0">
-                        <td colspan="3" class="text-center py-6 text-medium-emphasis">No custom sheet categories configured.</td>
+                      <tr v-if="filteredCustomSheetCategories.length === 0">
+                        <td colspan="4" class="text-center py-6 text-medium-emphasis">
+                          {{ customSheetCategories.length === 0 ? 'No custom sheet categories configured.' : 'No active custom sheet categories found matching the filter.' }}
+                        </td>
                       </tr>
                     </tbody>
                   </v-table>
@@ -580,73 +689,126 @@
                   <v-table hover class="config-table">
                     <thead>
                       <tr>
-                        <th class="font-weight-bold" style="width: 25%">Name</th>
+                        <th class="font-weight-bold" style="width: 22%">Name</th>
                         <th class="font-weight-bold" style="width: 18%">
                           Metal Price Multiplier
                           <v-tooltip activator="parent" location="bottom">Multiplied by the spot rate (e.g. 14k = 0.585)</v-tooltip>
                         </th>
-                        <th class="font-weight-bold" style="width: 15%">
+                        <th class="font-weight-bold" style="width: 12%">
                           Markup
                           <v-tooltip activator="parent" location="bottom">Value factor multiplied to metal price and weight</v-tooltip>
                         </th>
-                        <th class="font-weight-bold" style="width: 15%">
+                        <th class="font-weight-bold" style="width: 12%">
                           Metal Type
                           <v-tooltip activator="parent" location="bottom">Assigns 'Gold' or 'Platinum' spot prices to evaluate item value</v-tooltip>
                         </th>
                         <th class="font-weight-bold" style="width: 8%">Order</th>
-                        <th class="text-right font-weight-bold" style="width: 19%">Actions</th>
+                        <th class="font-weight-bold text-center" style="width: 10%">Active</th>
+                        <th class="text-right font-weight-bold" style="width: 18%">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-for="val in goldCredits" :key="val.tempId">
                         <td class="py-1">
-                          <v-text-field v-model="val.name" density="compact" variant="underlined" hide-details></v-text-field>
+                          <v-text-field
+                            v-model="val.name"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                            @input="markPending(val)"
+                            @blur="saveIfPending(val)"
+                          ></v-text-field>
                         </td>
                         <td class="py-1">
-                          <v-text-field v-model="val.value1" density="compact" variant="underlined" hide-details type="number" step="0.001"></v-text-field>
+                          <v-text-field
+                            v-model="val.value1"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                            type="number"
+                            step="0.001"
+                            @input="markPending(val)"
+                            @blur="saveIfPending(val)"
+                          ></v-text-field>
                         </td>
                         <td class="py-1">
-                          <v-text-field v-model="val.value2" density="compact" variant="underlined" hide-details type="number" step="0.01"></v-text-field>
+                          <v-text-field
+                            v-model="val.value2"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                            type="number"
+                            step="0.01"
+                            @input="markPending(val)"
+                            @blur="saveIfPending(val)"
+                          ></v-text-field>
                         </td>
                         <td class="py-1">
-                          <v-text-field v-model="val.value3" density="compact" variant="underlined" hide-details placeholder="Gold or Platinum"></v-text-field>
+                          <v-text-field
+                            v-model="val.value3"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                            placeholder="Gold or Platinum"
+                            @input="markPending(val)"
+                            @blur="saveIfPending(val)"
+                          ></v-text-field>
                         </td>
                         <td class="py-1">
-                          <v-text-field v-model="val.order" density="compact" variant="underlined" hide-details type="number"></v-text-field>
+                          <v-text-field
+                            v-model="val.order"
+                            density="compact"
+                            variant="underlined"
+                            hide-details
+                            type="number"
+                            @input="markPending(val)"
+                            @blur="saveIfPending(val)"
+                          ></v-text-field>
+                        </td>
+                        <td class="py-1">
+                          <div class="d-flex justify-center">
+                            <v-switch
+                              :model-value="val.active === 1"
+                              @update:model-value="toggleValueActive(val)"
+                              color="success"
+                              density="compact"
+                              hide-details
+                              inset
+                              :loading="val.saveStatus === 'saving'"
+                              :disabled="val.saveStatus === 'saving'"
+                            ></v-switch>
+                          </div>
                         </td>
                         <td class="text-right py-1">
-                          <v-btn
-                            :color="val.active === 1 ? 'primary' : 'medium-emphasis'"
-                            size="small"
-                            variant="tonal"
-                            class="mr-1 text-none font-weight-medium rounded-pill"
-                            @click="val.active = val.active === 1 ? 0 : 1"
-                          >
-                            {{ val.active === 1 ? 'Active' : 'Inactive' }}
-                          </v-btn>
-                          <v-btn
-                            color="success"
-                            size="small"
-                            variant="outlined"
-                            class="mr-1 text-none font-weight-medium rounded-pill"
-                            @click="saveValue(val)"
-                            :loading="val.saveStatus === 'saving'"
-                          >
-                            <v-icon start v-if="!val.saveStatus">mdi-content-save-outline</v-icon>
-                            <v-icon start v-else-if="val.saveStatus === 'saved'">mdi-check</v-icon>
-                            {{ val.saveStatus === 'saved' ? 'Saved' : 'Save' }}
-                          </v-btn>
-                          <v-btn
-                            icon="mdi-trash-can-outline"
-                            color="error"
-                            variant="text"
-                            density="comfortable"
-                            @click="confirmDeleteValue(val)"
-                          ></v-btn>
+                          <div class="d-inline-flex align-center justify-end">
+                            <v-tooltip location="bottom">
+                              <template v-slot:activator="{ props }">
+                                <v-icon
+                                  v-bind="props"
+                                  :color="getStatusColor(val.saveStatus)"
+                                  class="mr-3"
+                                  size="small"
+                                >
+                                  {{ getStatusIcon(val.saveStatus) }}
+                                </v-icon>
+                              </template>
+                              <span>{{ getStatusTooltip(val.saveStatus) }}</span>
+                            </v-tooltip>
+                            <v-btn
+                              color="error"
+                              variant="outlined"
+                              size="small"
+                              class="text-none font-weight-medium rounded-pill"
+                              prepend-icon="mdi-trash-can-outline"
+                              @click="confirmDeleteValue(val)"
+                            >
+                              Delete
+                            </v-btn>
+                          </div>
                         </td>
                       </tr>
                       <tr v-if="goldCredits.length === 0">
-                        <td colspan="6" class="text-center py-6 text-medium-emphasis">No gold credit items configured.</td>
+                        <td colspan="7" class="text-center py-6 text-medium-emphasis">No gold credit items configured.</td>
                       </tr>
                     </tbody>
                   </v-table>
@@ -791,6 +953,14 @@ const currentEmployee = reactive({
 const isSavingEmployee = ref(false)
 const employeeDeleteDialog = ref(false)
 const employeeToDelete = ref(null)
+const hideInactiveEmployees = ref(true)
+
+const filteredEmployees = computed(() => {
+  if (hideInactiveEmployees.value) {
+    return employees.value.filter(emp => emp.active === 1 || emp.justDeactivated)
+  }
+  return employees.value
+})
 
 // Custom Values State
 const valuesList = ref([])
@@ -799,6 +969,22 @@ const customSheetCategories = ref([])
 const goldCredits = ref([])
 const valueDeleteDialog = ref(false)
 const valueToDelete = ref(null)
+const hideInactiveCustomSheets = ref(true)
+const hideInactiveCategories = ref(true)
+
+const filteredCustomSheets = computed(() => {
+  if (hideInactiveCustomSheets.value) {
+    return customSheets.value.filter(val => val.active === 1 || !val.id || val.justDeactivated)
+  }
+  return customSheets.value
+})
+
+const filteredCustomSheetCategories = computed(() => {
+  if (hideInactiveCategories.value) {
+    return customSheetCategories.value.filter(val => val.active === 1 || !val.id || val.justDeactivated)
+  }
+  return customSheetCategories.value
+})
 
 const categoryNames = computed(() => {
   return customSheetCategories.value.map(c => c.name).filter(Boolean)
@@ -1017,8 +1203,19 @@ const handleSaveSettings = async () => {
 // ----------------------------------------------------
 const getEmployees = async () => {
   try {
+    const deactivatedStates = {}
+    employees.value.forEach(emp => {
+      if (emp.id) {
+        deactivatedStates[emp.id] = emp.justDeactivated
+      }
+    })
+
     const data = await api.get('/employees')
-    employees.value = data || []
+    employees.value = (data || []).map(emp => ({
+      ...emp,
+      loadingActive: false,
+      justDeactivated: deactivatedStates[emp.id] || false
+    }))
   } catch (err) {
     console.error('Failed to load employees:', err)
   }
@@ -1055,6 +1252,8 @@ const handleSaveEmployee = async () => {
 }
 
 const toggleEmployeeActive = async (emp) => {
+  if (emp.loadingActive) return
+  emp.loadingActive = true
   try {
     const newActive = emp.active === 1 ? 0 : 1
     await api.put(`/employees/${emp.id}`, {
@@ -1062,9 +1261,16 @@ const toggleEmployeeActive = async (emp) => {
       active: newActive
     })
     emp.active = newActive
+    if (newActive === 0) {
+      emp.justDeactivated = true
+    } else {
+      emp.justDeactivated = false
+    }
     showSnackbar(`Employee ${newActive ? 'activated' : 'deactivated'}`, 'success')
   } catch (err) {
     showSnackbar('Failed to toggle status: ' + err.message, 'error')
+  } finally {
+    emp.loadingActive = false
   }
 }
 
@@ -1109,19 +1315,118 @@ const handleDeleteEmployee = async () => {
 // ----------------------------------------------------
 const getValues = async () => {
   try {
+    const currentStatuses = {}
+    const deactivatedStates = {}
+    valuesList.value.forEach(v => {
+      const key = v.id || v.tempId
+      if (key) {
+        currentStatuses[key] = v.saveStatus
+        deactivatedStates[key] = v.justDeactivated
+      }
+    })
+
+    // Keep track of unsaved local items
+    const unsavedSheets = customSheets.value.filter(v => !v.id)
+    const unsavedCategories = customSheetCategories.value.filter(v => !v.id)
+    const unsavedCredits = goldCredits.value.filter(v => !v.id)
+
     const data = await api.get('/values')
-    valuesList.value = (data || []).map(v => ({
-      ...v,
-      tempId: `val-${v.id}`,
-      saveStatus: null
-    }))
+    valuesList.value = (data || []).map(v => {
+      const tempId = `val-${v.id}`
+      return {
+        ...v,
+        tempId,
+        saveStatus: currentStatuses[v.id] || null,
+        justDeactivated: deactivatedStates[v.id] || false
+      }
+    })
     
     // Categorize custom values
-    customSheets.value = valuesList.value.filter(v => v.type_id === 3)
-    goldCredits.value = valuesList.value.filter(v => v.type_id === 1)
-    customSheetCategories.value = valuesList.value.filter(v => v.type_id === 4)
+    customSheets.value = [
+      ...valuesList.value.filter(v => v.type_id === 3),
+      ...unsavedSheets
+    ]
+    goldCredits.value = [
+      ...valuesList.value.filter(v => v.type_id === 1),
+      ...unsavedCredits
+    ]
+    
+    const dbCategories = valuesList.value.filter(v => v.type_id === 4)
+    customSheetCategories.value = [
+      ...dbCategories.sort((a, b) => {
+        const orderA = a.order !== null && a.order !== undefined && a.order !== '' ? Number(a.order) : -999
+        const orderB = b.order !== null && b.order !== undefined && b.order !== '' ? Number(b.order) : -999
+        return orderB - orderA
+      }),
+      ...unsavedCategories
+    ]
   } catch (err) {
     console.error('Failed to load values configuration:', err)
+  }
+}
+
+const toggleValueActive = async (val) => {
+  const newActive = val.active === 1 ? 0 : 1
+  val.active = newActive
+  if (newActive === 0) {
+    val.justDeactivated = true
+  } else {
+    val.justDeactivated = false
+  }
+  
+  if (val.id) {
+    await saveValue(val)
+  }
+}
+
+const markPending = (val) => {
+  if (val.saveStatus !== 'saving') {
+    val.saveStatus = 'pending'
+  }
+}
+
+const saveIfPending = async (val) => {
+  if (val.saveStatus === 'pending') {
+    if (!val.name || !val.name.trim()) {
+      val.saveStatus = null
+      return
+    }
+    await saveValue(val)
+  }
+}
+
+const onComboboxChange = async (val) => {
+  markPending(val)
+  await saveIfPending(val)
+}
+
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'pending': return 'warning'
+    case 'saving': return 'info'
+    case 'saved': return 'success'
+    case 'error': return 'error'
+    default: return 'medium-emphasis'
+  }
+}
+
+const getStatusIcon = (status) => {
+  switch (status) {
+    case 'pending': return 'mdi-cloud-upload-outline'
+    case 'saving': return 'mdi-cloud-sync-outline'
+    case 'saved': return 'mdi-check-circle-outline'
+    case 'error': return 'mdi-alert-circle-outline'
+    default: return 'mdi-cloud-check-outline'
+  }
+}
+
+const getStatusTooltip = (status) => {
+  switch (status) {
+    case 'pending': return 'Changes pending (press Tab or click outside to save)'
+    case 'saving': return 'Saving changes to database...'
+    case 'saved': return 'All changes saved'
+    case 'error': return 'Failed to save changes'
+    default: return 'Saved'
   }
 }
 
@@ -1134,7 +1439,6 @@ const newValue = (typeId) => {
     value1: '',
     value2: '',
     value3: typeId === 1 ? 'Gold' : '', // Default to Gold metal type for credits
-    value4: '',
     order: '',
     markup: '',
     default: '',
@@ -1164,7 +1468,6 @@ const saveValue = async (value) => {
       value1: value.value1 !== null && value.value1 !== undefined ? String(value.value1).trim() : null,
       value2: value.value2 !== null && value.value2 !== undefined ? String(value.value2).trim() : null,
       value3: value.value3 !== null && value.value3 !== undefined ? String(value.value3).trim() : null,
-      value4: value.value4 !== null && value.value4 !== undefined ? String(value.value4).trim() : null,
       order: value.order !== null && value.order !== undefined ? String(value.order).trim() : null,
       markup: value.markup !== null && value.markup !== undefined ? String(value.markup).trim() : null,
       default: value.default !== null && value.default !== undefined ? String(value.default).trim() : null,
@@ -1182,8 +1485,13 @@ const saveValue = async (value) => {
     }
 
     setTimeout(() => {
-      value.saveStatus = null
-    }, 2000)
+      const item = valuesList.value.find(v => v.id === value.id)
+      if (item) {
+        item.saveStatus = null
+      } else {
+        value.saveStatus = null
+      }
+    }, 3000)
 
     // Sync metadata store cache
     await refreshMetadata()
@@ -1235,42 +1543,49 @@ const handleDeleteValue = async () => {
   }
 }
 
-const moveCategory = async (index, direction) => {
-  const targetIndex = direction === 'up' ? index - 1 : index + 1
-  const list = customSheetCategories.value
-  if (targetIndex < 0 || targetIndex >= list.length) return
+const moveCategory = async (item, direction) => {
+  const filteredList = filteredCustomSheetCategories.value
+  const filteredIndex = filteredList.indexOf(item)
+  if (filteredIndex === -1) return
   
-  const currentItem = list[index]
-  const targetItem = list[targetIndex]
+  const targetFilteredIndex = direction === 'up' ? filteredIndex - 1 : filteredIndex + 1
+  if (targetFilteredIndex < 0 || targetFilteredIndex >= filteredList.length) return
   
-  // Swap their positions in the array
-  list[index] = targetItem
-  list[targetIndex] = currentItem
+  const targetItem = filteredList[targetFilteredIndex]
   
-  // Re-assign sequential order numbers
-  list.forEach((item, idx) => {
-    item.order = idx + 1
+  // Find their indices in the main list
+  const mainList = customSheetCategories.value
+  const index = mainList.indexOf(item)
+  const targetIndex = mainList.indexOf(targetItem)
+  if (index === -1 || targetIndex === -1) return
+  
+  // Swap their positions in the main list
+  mainList[index] = targetItem
+  mainList[targetIndex] = item
+  
+  // Re-assign sequential order numbers (descending)
+  mainList.forEach((it, idx) => {
+    it.order = mainList.length - idx
   })
   
   // Update the reactive ref array reference to trigger Vue's reactivity
-  customSheetCategories.value = [...list]
+  customSheetCategories.value = [...mainList]
   
   // Save the changes to backend for items that have an id
   try {
-    const itemsToSave = [currentItem, targetItem].filter(item => item.id)
-    for (const item of itemsToSave) {
+    const itemsToSave = [item, targetItem].filter(it => it.id)
+    for (const it of itemsToSave) {
       const payload = {
-        name: item.name.trim(),
-        value1: item.value1 !== null && item.value1 !== undefined ? String(item.value1).trim() : null,
-        value2: item.value2 !== null && item.value2 !== undefined ? String(item.value2).trim() : null,
-        value3: item.value3 !== null && item.value3 !== undefined ? String(item.value3).trim() : null,
-        value4: item.value4 !== null && item.value4 !== undefined ? String(item.value4).trim() : null,
-        order: String(item.order),
-        markup: item.markup !== null && item.markup !== undefined ? String(item.markup).trim() : null,
-        default: item.default !== null && item.default !== undefined ? String(item.default).trim() : null,
-        active: item.active === 0 || item.active === false ? 0 : 1
+        name: it.name.trim(),
+        value1: it.value1 !== null && it.value1 !== undefined ? String(it.value1).trim() : null,
+        value2: it.value2 !== null && it.value2 !== undefined ? String(it.value2).trim() : null,
+        value3: it.value3 !== null && it.value3 !== undefined ? String(it.value3).trim() : null,
+        order: String(it.order),
+        markup: it.markup !== null && it.markup !== undefined ? String(it.markup).trim() : null,
+        default: it.default !== null && it.default !== undefined ? String(it.default).trim() : null,
+        active: it.active === 0 || it.active === false ? 0 : 1
       }
-      await api.put(`/values/${item.id}`, payload)
+      await api.put(`/values/${it.id}`, payload)
     }
     
     // Sync metadata store cache
@@ -1301,12 +1616,45 @@ onMounted(async () => {
 
 // Watch active tab to load data lazily (e.g. only get employee data when rendering the employee list)
 watch(activeTab, (newTab) => {
+  // Clear deactivation flags on tab change
+  employees.value.forEach(emp => {
+    emp.justDeactivated = false
+  })
+  valuesList.value.forEach(v => {
+    v.justDeactivated = false
+  })
+
   if (newTab === 'employees') {
     getEmployees()
   } else if (newTab === 'values') {
     getValues()
   }
 }, { immediate: true })
+
+// Watch hide inactive checkboxes to reset temporary visibility flags when toggled back on
+watch(hideInactiveEmployees, (newVal) => {
+  if (newVal) {
+    employees.value.forEach(emp => {
+      emp.justDeactivated = false
+    })
+  }
+})
+
+watch(hideInactiveCustomSheets, (newVal) => {
+  if (newVal) {
+    customSheets.value.forEach(v => {
+      v.justDeactivated = false
+    })
+  }
+})
+
+watch(hideInactiveCategories, (newVal) => {
+  if (newVal) {
+    customSheetCategories.value.forEach(v => {
+      v.justDeactivated = false
+    })
+  }
+})
 
 
 // Watch settings state to sync local variables if changed elsewhere

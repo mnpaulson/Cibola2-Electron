@@ -32,15 +32,17 @@
       </v-list>
 
       <template v-slot:append>
-        <v-divider></v-divider>
-        <v-list density="compact" nav>
-          <v-list-item
-            :prepend-icon="isRail ? 'mdi-chevron-double-right' : 'mdi-chevron-double-left'"
-            title="Collapse"
-            @click="isRail = !isRail"
-            class="menu-item-transition"
-          ></v-list-item>
-        </v-list>
+        <div class="drawer-append">
+          <v-divider></v-divider>
+          <v-list density="compact" nav class="drawer-append-list">
+            <v-list-item
+              :prepend-icon="isRail ? 'mdi-chevron-double-right' : 'mdi-chevron-double-left'"
+              title="Collapse"
+              @click="isRail = !isRail"
+              class="menu-item-transition"
+            ></v-list-item>
+          </v-list>
+        </div>
       </template>
     </v-navigation-drawer>
 
@@ -85,8 +87,8 @@
           </div>
 
           <v-row justify="center" class="mt-2">
-            <!-- Customer Search & Create (Simplified / Minimalist Layout) -->
-            <v-col cols="12" md="8" lg="6">
+            <!-- Left Column: Search & Quick Actions -->
+            <v-col cols="12" md="6" lg="5" class="mb-6 mb-md-0">
               <MetalPricesCard class="mb-6" />
 
               <div class="mb-6">
@@ -139,6 +141,12 @@
                   New Job
                 </v-btn>
               </div>
+            </v-col>
+
+            <!-- Right Column: Recently Viewed & Recently Created Records -->
+            <v-col cols="12" md="6" lg="5">
+              <RecentlyViewed class="mb-6" />
+              <RecentlyCreated />
             </v-col>
           </v-row>
         </div>
@@ -222,6 +230,9 @@ import CustomerForm from './components/CustomerForm.vue'
 import MetalPricesCard from './components/MetalPricesCard.vue'
 import CreditManager from './components/CreditManager.vue'
 import CustomSheetManager from './components/CustomSheetManager.vue'
+import RecentlyViewed from './components/RecentlyViewed.vue'
+import RecentlyCreated from './components/RecentlyCreated.vue'
+import { loadRecentlyViewed } from './store/recentlyViewed'
 import { toastState, showToast } from './store/toast'
 
 const theme = useTheme()
@@ -231,6 +242,7 @@ onMounted(async () => {
   if (settingsState.serverURL) {
     startHeartbeat(settingsState.serverURL)
   }
+  loadRecentlyViewed()
 })
 
 // Watch serverURL settings to restart heartbeat if URL changes
@@ -384,5 +396,20 @@ const currentMenuIcon = computed(() => {
 
 .max-width-600 {
   max-width: 600px;
+}
+
+.drawer-append {
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-append-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 </style>

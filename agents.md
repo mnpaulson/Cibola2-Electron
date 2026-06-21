@@ -169,6 +169,7 @@ When implementing forms that require uploading or photographing jewelry items (s
 For static assets (such as `logo.png`) that need to render inside the headless print BrowserWindow:
 * **Avoid Local File Paths**: Do not use local paths (`file://...`) or relative paths (such as `/logo.png`) in the HTML `src` attributes. Because the print layout is loaded via a sandboxed `data:text/html` URL, the Chromium engine blocks local resource loading due to same-origin policies.
 * **Inline Base64 Encoding**: Convert static print assets into base64 Data URLs and export them from dedicated utility modules (such as [logo.js](file:///c:/dev/Cibola2-Electron/src/utils/logo.js)). Import them into form components and embed them directly inside the print HTML string as inline image data.
+* **Print Template Separation**: Keep component files clean and modular by moving print HTML templates and associated styling into separate utility modules under `src/utils/` (e.g., [jobPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/jobPrintTemplate.js), [creditPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/creditPrintTemplate.js), and [customSheetPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/customSheetPrintTemplate.js)). The template function should accept plain parameters (`job`, `customer`, `activeEmployees`) to avoid directly accessing Vue reactive state/refs, and handle base64 assets and server URLs internally.
 
 ---
 
@@ -211,6 +212,7 @@ To keep user feedback notifications consistent and avoid cluttering views with d
 * **Payload Sanitation**: Always strip client-side temporary identifiers (like `clientId-X` strings) from estimate IDs and estimate values before posting/putting payloads to SQLite.
 * **Custom Sheet Image Attachments**: Custom design sheets support attaching design jewelry photos or drawings. Use `<AttachedImages>` component inside the custom sheet form, binding to `sheet.custom_images` with `delete-endpoint="/customsheets/images"`. Trigger camera captures via `attachedImagesRef.value.openCamera()`.
 * **Custom Sheet Printing**: Printing custom sheet estimates uses a dedicated Custom Sheet Printer configured in local settings (`settingsState.printers.custom`), falling back to a headless window layout with base64 embedded assets. If the custom sheet has attached images, they will render in a grid layout (`.images-grid`) at the bottom of the printed page.
+* **Inactive Categories and Options Filtering**: To prevent cluttering the form, categories explicitly marked inactive (`active !== 1`) and individual options marked inactive (`active === 0`) must be filtered out from option selection and list headers on the form. However, if a loaded custom sheet estimate already uses an inactive category or option, it must be merged back into the visible form options to ensure the saved data displays correctly.
 
 ---
 
@@ -230,6 +232,18 @@ Custom configurations are stored in the global `values` database table and categ
 * `type_id = 3`: Custom Sheet values (displays Name, Category combobox, Base Price, Metal Type, Markup, and Default Quantity; Formula and Order columns are hidden).
 * `type_id = 4`: Custom Sheet Categories (displays Category Name and display Order, and provides up/down arrow buttons to easily reorder categories and automatically update order values on the backend).
 
+* **Auto-Save Protocol**: Manual save buttons are removed. Changes are automatically saved to the database:
+  - On the `@blur` event for text fields.
+  - On selection/change for comboboxes.
+  - Reactive `@update:model-value` toggles for the active switches.
+* **Save Status Indicator**: A cloud status icon is shown next to the Delete button:
+  - `pending` (Amber / `mdi-cloud-upload-outline`): Changes made but not yet saved (blur to commit).
+  - `saving` (Blue / `mdi-cloud-sync-outline`): Actively saving.
+  - `saved` (Green / `mdi-check-circle-outline`): Save succeeded (held for exactly 3 seconds to avoid rapid blinking before resetting).
+  - `synced` (Grey / `mdi-cloud-check-outline`): Standard resting state (no pending edits).
+* **Dedicated Active Columns**: The active/inactive `v-switch` is located in a dedicated "Active" column header to the left of "Actions". The "Actions" column contains only the status indicator and the full outlined "Delete" button.
+* **Inactive Record Filtering & Deactivation Visibility**: Inactive employees, custom sheet values, and custom sheet categories can be dynamically hidden in the lists using local "Hide Inactive" checkboxes. To prevent disorientation when an active item is toggled to inactive, a temporary visibility flag (`justDeactivated`) keeps the record visible until the tab is switched, the component is refreshed, or the checkbox is cycled off and on. This is handled via computed lists (`filteredEmployees`, `filteredCustomSheets`, and `filteredCustomSheetCategories`).
+* **Category Reordering Under Filters**: When reordering categories with `moveCategory(item, direction)` while inactive categories are hidden, the swap operation finds the adjacent visible item from the filtered list, swaps their positions in the main categories list, and updates order numbers sequentially.
 * **Performance Optimization (No Tab Animations)**: To avoid interface lag and maintain fast view switching when loading values tables, all sliding and opacity transition animations on `<v-window-item>` elements are disabled. Always include `:transition="false"` and `:reverse-transition="false"` props on configuration windows, and do not introduce custom CSS transitions that slow down DOM updates.
 
 Always trigger `await refreshMetadata()` in the store after any values updates, creates, or deletions to synchronize the UI's reactive cache.
@@ -240,7 +254,7 @@ Always trigger `await refreshMetadata()` in the store after any values updates, 
 * **Collapse Mechanism**: The navigation sidebar behaves as a collapsible rail. Instead of fully hiding the sidebar, it shrinks to show only the navigation icons and allow for direct navigation.
 * **State Control**: The sidebar's state is managed using the reactive reference `isRail` in `App.vue`, which is bound to the `v-model:rail` property of the `v-navigation-drawer`. The drawer has the `permanent` prop so that it is never fully hidden.
 * **Toggle Buttons**:
-  1. A chevron toggle button is located at the bottom of the navigation drawer (defined in the `append` slot of `v-navigation-drawer`).
+  1. A chevron toggle button is located at the bottom of the navigation drawer (defined in the `append` slot of `v-navigation-drawer`). To align the divider above this button with the top of the `FormBottomNavigation` component, the append container (`.drawer-append`) is set to `64px` in height with the `v-divider` at the top and the collapse list vertically centered via flex utilities.
   2. The app-bar menu icon (`v-app-bar-nav-icon`) also toggles the `isRail` state.
 * **Layout Adjustments**:
   * The top logo list item uses a dynamic class `:class="isRail ? 'px-2 py-4' : 'pa-4'"` to align the avatar nicely in both expanded and collapsed (rail) states.
@@ -270,6 +284,57 @@ For transactional form pages (JobForm, CreditForm, CustomSheetForm):
   ```
 * **Combined Discard / Delete**: The Discard and Delete actions are combined into a single action slot at the far right. It displays a grey 'Discard' button if the record is unsaved (`show-delete` is false) and a red 'Delete' button if the record is saved (`show-delete` is true).
 * **Form Padding**: When using the fixed bottom navigation layout, add the `pb-20` class (adds 80px bottom padding) to the wrapping `<v-card>` element to prevent the bottom actions bar from covering form fields or image gallery sections.
+---
 
+## 24. Unified Customer History and Records List
+When rendering related historical records (Jobs, Store Credits, and Custom Sheets) under a selected customer profile (e.g., in `CustomerManager.vue`):
+* **No Tab Navigation**: Do not separate historical records into individual tabs or views. Combine them all into a single unified list.
+* **Column Setup & Order**: The table columns must be in this order:
+  1. **Id**: prefixed with `#` (header label `Id`).
+  2. **Record Type**: displays `Job`, `Store Credit`, or `Custom Sheet` (header label `Record Type`).
+  3. **Details**: custom rendered details for each item based on its type (header label `Details`).
+  4. **Created**: last column, displaying the formatted local creation date (header label `Created`).
+* **Column Sorting**: All columns must be sortable using the interactive `.sortable-header` class with sorting chevrons. The default sorting must be by record creation date descending (`created_at` descending).
+* **Details Column Formatting**:
+  - **Jobs**: Display only the estimate. If the estimate is 0 or missing, display `'No Estimate'`. Do not display the job's due date in this list.
+  - **Store Credits**: Display the payout amount. If the credit value is 0 or missing, display `'No Final Credit'`.
+  - **Custom Sheets**: Display the custom design sheet's name.
+
+---
+
+## 25. Recently Viewed Records Dashboard Component
+To track and display recently viewed records on the Dashboard:
+* **Reactive Store**: The global recently viewed records state and tracking are managed in [recentlyViewed.js](file:///c:/dev/Cibola2-Electron/src/store/recentlyViewed.js).
+* **Automatic Tracking**: The store contains a reactive watcher that monitors `sessionState` parameter changes (`activeTab`, `selectedCustomerId`, `activeJobId`, `activeCreditId`, `activeSheetId`). Whenever a valid, saved record is opened (ID > 0) in its respective tab, the store automatically fetches the record's details (using `api.get`) and adds or moves it to the top of the history list.
+* **LocalStorage Persistence**: The history is automatically saved to and loaded from `localStorage` under the key `recently_viewed_records` so it persists across reloads/restarts.
+* **Details and Formats**: The cached recently viewed records match the fields and logic of `CustomerManager.vue` related records list:
+  - `id`: Record ID.
+  - `type`: `'job' | 'credit' | 'sheet' | 'customer'`.
+  - `typeName`: Display name of the type.
+  - `details`:
+    - Jobs: `Estimate: $XX.XX` (or `'No Estimate'`).
+    - Store Credits: `Payout: $XX.XX` (or `'No Final Credit'`).
+    - Custom Sheets: Custom sheet name.
+    - Customers: Customer's full name.
+  - `customerName`: Customer's full name (for jobs, credits, sheets).
+  - `thumbnail`: For jobs, a path to the first attached image (or `null` if none) to render a 36x36 thumbnail.
+  - `created_at`: The creation date of the record.
+* **Component Rendering**: Render the `<RecentlyViewed />` widget from [RecentlyViewed.vue](file:///c:/dev/Cibola2-Electron/src/components/RecentlyViewed.vue) on the dashboard. The table columns must be in this order:
+  1. **Preview**: 36x36 cover image of the job thumbnail, or a type-colored avatar displaying the type-specific icon if no thumbnail image exists.
+  2. **Type**: Displays the type name text (e.g. Job, Store Credit, Customer, Custom Sheet).
+  3. **Record**: Displays the record ID (prefixed with `#`).
+  4. **Details**: Custom rendered details for each item.
+  5. **Created**: Displays the formatted local creation date.
+  - Whenever a record is saved or updated, call `refreshRecentRecord(type, id)` to fetch the latest details and update the history cache.
+
+---
+
+## 26. Recently Created Records Dashboard Component
+To display recently created records in the database on the Dashboard:
+* **Component File**: [RecentlyCreated.vue](file:///c:/dev/Cibola2-Electron/src/components/RecentlyCreated.vue)
+* **API Invocations**: Fetches the newest records from the backend (`GET /jobs`, `GET /goldcredits`, `GET /customsheets`, `GET /customers`), normalizes them into a unified format, combines them, sorts by `created_at` descending, and slices the top 10.
+* **Thumbnail Loading**: For any `job` in the top 10, a nested request is sent to `GET /jobs/:id` to pull full details and populate `thumbnail` with the first attached image (if any).
+* **Auto-Refresh**: Automatically refreshes its database records list every 5 minutes on mount. The interval is cleared on unmount.
+* **Manual Refresh**: Includes a refresh icon button in the header that triggers `fetchRecords` on click and displays a loading spinner.
 
 

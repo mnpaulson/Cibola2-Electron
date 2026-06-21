@@ -74,152 +74,94 @@
 
           <v-divider></v-divider>
 
-          <!-- History Tabs -->
-          <v-tabs v-model="activeTab" bg-color="surface" align-tabs="start" density="comfortable">
-            <v-tab value="jobs" class="text-caption font-weight-bold">
-              <v-icon start>mdi-briefcase</v-icon>
-              Jobs ({{ jobs.length }})
-            </v-tab>
-            <v-tab value="credits" class="text-caption font-weight-bold">
-              <v-icon start>mdi-currency-usd</v-icon>
-              Store Credits ({{ credits.length }})
-            </v-tab>
-            <v-tab value="sheets" class="text-caption font-weight-bold">
-              <v-icon start>mdi-file-document-multiple</v-icon>
-              Custom Sheets ({{ customSheets.length }})
-            </v-tab>
-          </v-tabs>
-
-          <v-divider></v-divider>
-
-          <!-- Tabs Windows -->
+          <!-- Unified History Table -->
           <v-card-text class="pa-0">
-            <v-window v-model="activeTab">
-              <!-- Jobs Tab Window -->
-              <v-window-item value="jobs">
-                <v-table hover fixed-header class="history-table">
-                  <thead>
-                    <tr>
-                      <th class="text-left font-weight-bold text-caption py-2">Job ID</th>
-                      <th class="text-left font-weight-bold text-caption py-2">Estimate</th>
-                      <th class="text-left font-weight-bold text-caption py-2">Created</th>
-                      <th class="text-left font-weight-bold text-caption py-2">Due Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-if="loadingHistory" class="text-center">
-                      <td colspan="4" class="py-6">
-                        <v-progress-circular indeterminate color="primary"></v-progress-circular>
-                      </td>
-                    </tr>
-                    <tr v-else-if="jobs.length === 0" class="text-center">
-                      <td colspan="4" class="py-6 text-medium-emphasis text-caption italic">
-                        No jobs found for this customer.
-                      </td>
-                    </tr>
-                    <tr
-                      v-else
-                      v-for="job in jobs"
-                      :key="job.id"
-                      class="cursor-pointer transition-row"
-                      @click="goToJob(job.id)"
-                    >
-                      <td class="font-weight-bold text-primary">#{{ job.id }}</td>
-                      <td>${{ (job.estimate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
-                      <td class="text-medium-emphasis text-caption">{{ formatDate(job.created_at) }}</td>
-                      <td>
-                        {{ job.due_date || 'No due date' }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </v-table>
-              </v-window-item>
-
-              <!-- Credits Tab Window -->
-              <v-window-item value="credits">
-                <v-table hover fixed-header class="history-table">
-                  <thead>
-                    <tr>
-                      <th class="text-left font-weight-bold text-caption py-2">Credit ID</th>
-                      <th class="text-left font-weight-bold text-caption py-2">Gold CAD Value</th>
-                      <th class="text-left font-weight-bold text-caption py-2">Plat CAD Value</th>
-                      <th class="text-left font-weight-bold text-caption py-2">Created</th>
-                      <th class="text-left font-weight-bold text-caption py-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-if="loadingHistory" class="text-center">
-                      <td colspan="5" class="py-6">
-                        <v-progress-circular indeterminate color="primary"></v-progress-circular>
-                      </td>
-                    </tr>
-                    <tr v-else-if="credits.length === 0" class="text-center">
-                      <td colspan="5" class="py-6 text-medium-emphasis text-caption italic">
-                        No store credits found for this customer.
-                      </td>
-                    </tr>
-                    <tr
-                      v-else
-                      v-for="credit in credits"
-                      :key="credit.id"
-                      class="cursor-pointer transition-row"
-                      @click="goToCredit(credit.id)"
-                    >
-                      <td class="font-weight-bold text-primary">#{{ credit.id }}</td>
-                      <td>${{ (credit.gold_cad || 0).toFixed(2) }}</td>
-                      <td>${{ (credit.plat_cad || 0).toFixed(2) }}</td>
-                      <td class="text-medium-emphasis text-caption">{{ formatDate(credit.created_at) }}</td>
-                      <td>
-                        <v-chip
-                          :color="credit.used ? 'success' : 'info'"
-                          size="x-small"
-                          variant="flat"
-                          class="font-weight-bold"
-                        >
-                          {{ credit.used ? 'Redeemed' : 'Active' }}
-                        </v-chip>
-                      </td>
-                    </tr>
-                  </tbody>
-                </v-table>
-              </v-window-item>
-
-              <!-- Custom Sheets Tab Window -->
-              <v-window-item value="sheets">
-                <v-table hover fixed-header class="history-table">
-                  <thead>
-                    <tr>
-                      <th class="text-left font-weight-bold text-caption py-2">Sheet ID</th>
-                      <th class="text-left font-weight-bold text-caption py-2">Sheet Name</th>
-                      <th class="text-left font-weight-bold text-caption py-2">Created</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-if="loadingHistory" class="text-center">
-                      <td colspan="3" class="py-6">
-                        <v-progress-circular indeterminate color="primary"></v-progress-circular>
-                      </td>
-                    </tr>
-                    <tr v-else-if="customSheets.length === 0" class="text-center">
-                      <td colspan="3" class="py-6 text-medium-emphasis text-caption italic">
-                        No custom sheets found for this customer.
-                      </td>
-                    </tr>
-                    <tr
-                      v-else
-                      v-for="sheet in customSheets"
-                      :key="sheet.id"
-                      class="cursor-pointer transition-row"
-                      @click="goToCustomSheet(sheet.id)"
-                    >
-                      <td class="font-weight-bold text-primary">#{{ sheet.id }}</td>
-                      <td class="font-weight-medium">{{ sheet.name }}</td>
-                      <td class="text-medium-emphasis text-caption">{{ formatDate(sheet.created_at) }}</td>
-                    </tr>
-                  </tbody>
-                </v-table>
-              </v-window-item>
-            </v-window>
+            <v-table hover fixed-header class="history-table">
+              <thead>
+                <tr>
+                  <th
+                    class="text-left font-weight-bold text-caption py-2 sortable-header"
+                    @click="toggleHistorySort('id')"
+                  >
+                    <div class="d-flex align-center">
+                      Id
+                      <v-icon size="small" class="ml-1" v-if="historySortBy === 'id'">
+                        {{ historySortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                      </v-icon>
+                    </div>
+                  </th>
+                  <th
+                    class="text-left font-weight-bold text-caption py-2 sortable-header"
+                    @click="toggleHistorySort('type')"
+                  >
+                    <div class="d-flex align-center">
+                      Record Type
+                      <v-icon size="small" class="ml-1" v-if="historySortBy === 'type'">
+                        {{ historySortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                      </v-icon>
+                    </div>
+                  </th>
+                  <th
+                    class="text-left font-weight-bold text-caption py-2 sortable-header"
+                    @click="toggleHistorySort('details')"
+                  >
+                    <div class="d-flex align-center">
+                      Details
+                      <v-icon size="small" class="ml-1" v-if="historySortBy === 'details'">
+                        {{ historySortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                      </v-icon>
+                    </div>
+                  </th>
+                  <th
+                    class="text-left font-weight-bold text-caption py-2 sortable-header"
+                    @click="toggleHistorySort('created_at')"
+                  >
+                    <div class="d-flex align-center">
+                      Created
+                      <v-icon size="small" class="ml-1" v-if="historySortBy === 'created_at'">
+                        {{ historySortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+                      </v-icon>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="loadingHistory" class="text-center">
+                  <td colspan="4" class="py-6">
+                    <v-progress-circular indeterminate color="primary"></v-progress-circular>
+                  </td>
+                </tr>
+                <tr v-else-if="sortedHistory.length === 0" class="text-center">
+                  <td colspan="4" class="py-6 text-medium-emphasis text-caption italic">
+                    No records found for this customer.
+                  </td>
+                </tr>
+                <tr
+                  v-else
+                  v-for="item in sortedHistory"
+                  :key="item.type + '-' + item.id"
+                  class="cursor-pointer transition-row"
+                  @click="goToRecord(item)"
+                >
+                  <td class="font-weight-bold text-primary">#{{ item.id }}</td>
+                  <td>{{ item.typeName }}</td>
+                  <td>
+                    <template v-if="item.type === 'job'">
+                      <span v-if="!item.original.estimate || Number(item.original.estimate) === 0">No Estimate</span>
+                      <span v-else>Estimate: <strong>${{ Number(item.original.estimate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
+                    </template>
+                    <template v-else-if="item.type === 'credit'">
+                      <span v-if="!item.original.credit_value || Number(item.original.credit_value) === 0">No Final Credit</span>
+                      <span v-else>Payout: <strong>${{ Number(item.original.credit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
+                    </template>
+                    <template v-else-if="item.type === 'sheet'">
+                      <span>{{ item.original.name }}</span>
+                    </template>
+                  </td>
+                  <td class="text-medium-emphasis text-caption">{{ formatDate(item.created_at) }}</td>
+                </tr>
+              </tbody>
+            </v-table>
           </v-card-text>
         </v-card>
       </v-col>
@@ -387,6 +329,7 @@ import { formatLocalDate, formatCityProv } from '../utils/dates'
 import CustomerForm from './CustomerForm.vue'
 import DirectoryPagination from './DirectoryPagination.vue'
 import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue'
+import { removeRecentRecord } from '../store/recentlyViewed'
 
 // Local State
 // Local State
@@ -412,10 +355,83 @@ const customSheets = ref([])
 // Directory listings
 const customersDirectory = ref([])
 
-// Persisted navigation-friendly states
-const activeTab = computed({
-  get: () => sessionState.customerActiveSubTab,
-  set: (val) => { sessionState.customerActiveSubTab = val }
+// Combined history and sorting logic
+const combinedHistory = computed(() => {
+  const list = []
+  
+  jobs.value.forEach(job => {
+    const hasEstimate = job.estimate && Number(job.estimate) !== 0
+    const detailsText = hasEstimate
+      ? `Estimate: $${Number(job.estimate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : 'No Estimate'
+    list.push({
+      id: job.id,
+      type: 'job',
+      typeName: 'Job',
+      details: detailsText,
+      created_at: job.created_at || '',
+      original: job
+    })
+  })
+  
+  credits.value.forEach(credit => {
+    const hasCredit = credit.credit_value && Number(credit.credit_value) !== 0
+    const detailsText = hasCredit
+      ? `Payout: $${Number(credit.credit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : 'No Final Credit'
+    list.push({
+      id: credit.id,
+      type: 'credit',
+      typeName: 'Store Credit',
+      details: detailsText,
+      created_at: credit.created_at || '',
+      original: credit
+    })
+  })
+  
+  customSheets.value.forEach(sheet => {
+    list.push({
+      id: sheet.id,
+      type: 'sheet',
+      typeName: 'Custom Sheet',
+      details: sheet.name || '',
+      created_at: sheet.created_at || '',
+      original: sheet
+    })
+  })
+  
+  return list
+})
+
+const historySortBy = ref('created_at')
+const historySortDesc = ref(true)
+
+const toggleHistorySort = (field) => {
+  if (historySortBy.value === field) {
+    historySortDesc.value = !historySortDesc.value
+  } else {
+    historySortBy.value = field
+    historySortDesc.value = field === 'created_at' ? true : false
+  }
+}
+
+const sortedHistory = computed(() => {
+  const list = [...combinedHistory.value]
+  return list.sort((a, b) => {
+    let comparison = 0
+    if (historySortBy.value === 'id') {
+      comparison = a.id - b.id
+    } else if (historySortBy.value === 'type') {
+      comparison = a.typeName.localeCompare(b.typeName)
+    } else if (historySortBy.value === 'details') {
+      comparison = a.details.localeCompare(b.details)
+    } else if (historySortBy.value === 'created_at') {
+      const dateA = a.created_at || ''
+      const dateB = b.created_at || ''
+      comparison = dateA.localeCompare(dateB)
+    }
+    return historySortDesc.value ? -comparison : comparison
+  })
 })
 
 const directorySearch = computed({
@@ -546,8 +562,10 @@ const handleNewCustomer = (newId) => {
 
 // Filtered directory matching search input
 const filteredDirectory = computed(() => {
-  const q = directorySearch.value.trim().toLowerCase()
-  if (!q) return customersDirectory.value
+  const queryStr = directorySearch.value.trim().toLowerCase()
+  if (!queryStr) return customersDirectory.value
+
+  const queryWords = queryStr.split(/\s+/).filter(Boolean)
 
   return customersDirectory.value.filter(c => {
     const fname = (c.fname || '').toLowerCase()
@@ -555,12 +573,15 @@ const filteredDirectory = computed(() => {
     const phone = (c.phone || '').toLowerCase()
     const email = (c.email || '').toLowerCase()
     const city = (c.addr_city || '').toLowerCase()
-    return (
-      fname.includes(q) ||
-      lname.includes(q) ||
-      phone.includes(q) ||
-      email.includes(q) ||
-      city.includes(q)
+    const fullName = `${fname} ${lname}`
+
+    return queryWords.every(word => 
+      fname.includes(word) ||
+      lname.includes(word) ||
+      fullName.includes(word) ||
+      phone.includes(word) ||
+      email.includes(word) ||
+      city.includes(word)
     )
   })
 })
@@ -604,8 +625,10 @@ const closeDeleteDialog = () => {
 const submitDeleteCustomer = async () => {
   loadingHistory.value = true
   try {
-    const result = await api.delete(`/customers/${selectedId.value}`)
+    const custIdToDelete = selectedId.value
+    const result = await api.delete(`/customers/${custIdToDelete}`)
     if (result) {
+      removeRecentRecord('customer', custIdToDelete)
       deleteDialog.value = false
       selectedId.value = null
     }
@@ -635,6 +658,16 @@ const goToCredit = (creditId) => {
 const goToCustomSheet = (sheetId) => {
   console.log('Navigating to custom sheet ID:', sheetId)
   navigateTo('custom', { activeSheetId: sheetId, selectedCustomerId: selectedId.value })
+}
+
+const goToRecord = (item) => {
+  if (item.type === 'job') {
+    goToJob(item.id)
+  } else if (item.type === 'credit') {
+    goToCredit(item.id)
+  } else if (item.type === 'sheet') {
+    goToCustomSheet(item.id)
+  }
 }
 
 onMounted(() => {

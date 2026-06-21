@@ -98,6 +98,7 @@
                   color="primary"
                   density="comfortable"
                   title="Copy Sum to Final Amount"
+                  :disabled="disabled"
                   @click="copySumValue"
                 ></v-btn>
               </div>
@@ -113,6 +114,7 @@
                     step="0.01"
                     class="final-credit-input text-h4 font-weight-bold text-success"
                     placeholder="0.00"
+                    :disabled="disabled"
                   />
                 </div>
               </div>
@@ -280,8 +282,9 @@ import { settingsState } from '../store/settings'
 import { metadataState, refreshMetadata } from '../store/metadata'
 import { navigateBack, navigateTo } from '../store/session'
 import { formatLocalDate } from '../utils/dates'
-import { logoBase64 } from '../utils/logo'
+import { generateCreditPrintHTML } from '../utils/creditPrintTemplate'
 import { showToast } from '../store/toast'
+import { removeRecentRecord, refreshRecentRecord } from '../store/recentlyViewed'
 import { calculateGoldCreditValue, getAdjustedMarkup, calculateGoldCreditUnitPrice } from '../utils/pricing'
 import AttachedImages from './AttachedImages.vue'
 import CustomerForm from './CustomerForm.vue'
@@ -613,6 +616,10 @@ async function saveOrUpdateCredit(print = false, close = false) {
     showToast('Please select a customer first.', 'warning')
     return
   }
+
+  if ((parseFloat(credit.credit_value) || 0) === 0) {
+    credit.credit_value = credit.total
+  }
   
   loading.value = true
   try {
@@ -657,6 +664,7 @@ async function saveOrUpdateCredit(print = false, close = false) {
       Object.assign(credit, savedCredit)
       emit('update:creditId', savedCredit.id)
       emit('saved', savedCredit)
+      refreshRecentRecord('credit', savedCredit.id)
       
       if (print) {
         await executeHeadlessPrint()
@@ -691,7 +699,12 @@ async function executeHeadlessPrint() {
     return
   }
   
-  const htmlContent = generatePrintHTML()
+  const htmlContent = generateCreditPrintHTML({
+    credit,
+    customer: customerObj.value,
+    itemList: itemList.value,
+    activeEmployees: activeEmployees.value
+  })
   
   try {
     const result = await window.electronAPI.printDocument({
@@ -708,274 +721,6 @@ async function executeHeadlessPrint() {
   }
 }
 
-// Generate the printable standard letter-size layout (portrait)
-function generatePrintHTML() {
-  const emp = activeEmployees.value.find(e => e.id === credit.employee_id)
-  const employeeName = emp ? emp.name : 'Unassigned'
-  const customerName = customerObj.value ? `${customerObj.value.fname} ${customerObj.value.lname}` : '—'
-  const creditDate = credit.created_at ? formatLocalDate(credit.created_at, 'long') : formatLocalDate(new Date().toISOString(), 'long')
-  const itemsTotal = `$${credit.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  const finalPayout = `$${(credit.credit_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  
-  // Format breakdown rows
-  let itemsHTML = ''
-  itemList.value.forEach(item => {
-    const itemName = item.itemObj ? item.itemObj.name : 'Unknown Item'
-    const unitText = item.itemObj?.value3 === 'Other' ? 'units' : 'g'
-    itemsHTML += `
-      <tr>
-        <td>${itemName}</td>
-        <td class="right">${item.weight} ${unitText}</td>
-        <td class="right">${item.multiplier}</td>
-        <td class="right">${item.markup}</td>
-        <td class="right">$${item.unitPrice.toFixed(2)}/${unitText}</td>
-        <td class="right font-weight-bold">$${item.value.toFixed(2)}</td>
-      </tr>
-    `
-  })
-  
-  // Format attached images
-  let imagesHTML = ''
-  credit.credit_images.forEach(img => {
-    // Resolve full URL
-    let fullUrl = ''
-    if (img.image) {
-      if (img.image.startsWith('data:')) {
-        fullUrl = img.image
-      } else {
-        const base = settingsState.serverURL.replace(/\/$/, '')
-        const path = img.image.startsWith('/') ? img.image : `/${img.image}`
-        fullUrl = `${base}${path}`
-      }
-    }
-    
-    imagesHTML += `
-      <div class="image-card">
-        <img src="${fullUrl}" />
-        <p>${img.note || ''}</p>
-      </div>
-    `
-  })
-  
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    * {
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-      box-sizing: border-box;
-    }
-    body {
-      width: 8.5in;
-      height: 11in;
-      margin: 0;
-      padding: 0.5in;
-      font-family: Arial, sans-serif;
-      color: black;
-      background: white;
-    }
-    @page {
-      size: letter;
-      margin: 0mm;
-    }
-    .print-container {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-    .header-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 20px;
-    }
-    .logo {
-      max-height: 1.2in;
-      object-fit: contain;
-    }
-    .title {
-      font-size: 1.8em;
-      font-weight: bold;
-      text-transform: uppercase;
-      text-align: right;
-    }
-    .meta-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 20px;
-    }
-    .meta-table td {
-      padding: 6px;
-      font-size: 1.1em;
-    }
-    .meta-label {
-      font-weight: bold;
-      color: #555;
-      width: 15%;
-    }
-    .meta-value {
-      border-bottom: 1px solid #ccc;
-    }
-    .items-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 30px;
-    }
-    .items-table th, .items-table td {
-      border: 1px solid #ddd;
-      padding: 10px;
-      text-align: left;
-    }
-    .items-table th {
-      background-color: #f5f5f5;
-      font-weight: bold;
-    }
-    .items-table td.right, .items-table th.right {
-      text-align: right;
-    }
-    .total-row {
-      font-weight: bold;
-      font-size: 1.2em;
-      background-color: #eee;
-    }
-    .warning-box {
-      border: 2px solid red;
-      color: red;
-      font-weight: bold;
-      text-align: center;
-      padding: 10px;
-      font-size: 1.2em;
-      margin-bottom: 30px;
-      text-transform: uppercase;
-    }
-    .notes-box {
-      border: 1px solid #ccc;
-      padding: 15px;
-      min-height: 100px;
-      margin-bottom: 30px;
-      font-size: 1em;
-      background-color: #fafafa;
-    }
-    .images-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 15px;
-      margin-bottom: 40px;
-    }
-    .image-card {
-      border: 1px solid #ccc;
-      padding: 4px;
-      display: flex;
-      flex-direction: column;
-    }
-    .image-card img {
-      width: 100%;
-      height: 1.2in;
-      object-fit: cover;
-    }
-    .image-card p {
-      font-size: 0.8em;
-      margin: 4px 0 0 0;
-      text-align: center;
-      color: #666;
-    }
-    .signatures {
-      display: flex;
-      justify-content: space-between;
-      margin-top: auto;
-      padding-top: 20px;
-    }
-    .sig-line {
-      width: 45%;
-      border-top: 1.5px solid black;
-      text-align: center;
-      padding-top: 6px;
-      font-weight: bold;
-      font-size: 1em;
-    }
-  </style>
-</head>
-<body>
-  <div class="print-container">
-    <div>
-      <table class="header-table">
-        <tr>
-          <td><img class="logo" src="${logoBase64}" alt="Logo"></td>
-          <td class="title">Scrap Gold Credit Record</td>
-        </tr>
-      </table>
-
-      <table class="meta-table">
-        <tr>
-          <td class="meta-label">Customer:</td>
-          <td class="meta-value" colspan="3">${customerName}</td>
-        </tr>
-        <tr>
-          <td class="meta-label">Date:</td>
-          <td class="meta-value">${creditDate}</td>
-          <td class="meta-label" style="padding-left:20px;">Employee:</td>
-          <td class="meta-value">${employeeName}</td>
-        </tr>
-        <tr>
-          <td class="meta-label">Type:</td>
-          <td class="meta-value" style="text-transform: capitalize;">${credit.credit_type}</td>
-          <td class="meta-label" style="padding-left:20px;">Cheque/Invoice:</td>
-          <td class="meta-value"></td>
-        </tr>
-      </table>
-
-      <div class="warning-box">
-        ALL PURCHASES ARE FINAL - NO EXCEPTIONS
-      </div>
-
-      <table class="items-table">
-        <thead>
-          <tr>
-            <th>Item / Karat</th>
-            <th class="right">Weight (g) / Qty</th>
-            <th class="right">Multiplier</th>
-            <th class="right">Markup</th>
-            <th class="right">Unit Price</th>
-            <th class="right">Total Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemsHTML}
-          <tr class="total-row">
-            <td colspan="5" class="right">Items Value Sum:</td>
-            <td class="right">${itemsTotal}</td>
-          </tr>
-          <tr class="total-row" style="background-color: #e2f0d9;">
-            <td colspan="5" class="right">Finalized Credit Amount:</td>
-            <td class="right">${finalPayout}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      ${credit.note ? `
-      <div style="font-weight:bold; margin-bottom:5px;">Credit Notes:</div>
-      <div class="notes-box">${credit.note}</div>
-      ` : ''}
-
-      ${imagesHTML ? `
-      <div style="font-weight:bold; margin-bottom:5px;">Attached Photos:</div>
-      <div class="images-grid">${imagesHTML}</div>
-      ` : ''}
-    </div>
-
-    <div class="signatures">
-      <div class="sig-line">Customer Signature</div>
-      <div class="sig-line">Operator Signature</div>
-    </div>
-  </div>
-</body>
-</html>
-  `
-}
-
 function discardCredit() {
   navigateBack()
 }
@@ -984,8 +729,10 @@ async function submitDeleteCredit() {
   if (!credit.id) return
   loading.value = true
   try {
-    const res = await api.delete(`/goldcredits/${credit.id}`)
+    const creditIdToDelete = credit.id
+    const res = await api.delete(`/goldcredits/${creditIdToDelete}`)
     if (res) {
+      removeRecentRecord('credit', creditIdToDelete)
       isDeleteOpen.value = false
       navigateBack()
     }
@@ -1035,6 +782,10 @@ async function submitDeleteCredit() {
 }
 .final-credit-input:focus {
   border-bottom: 2px solid rgb(var(--v-theme-success));
+}
+.final-credit-input:disabled {
+  border-bottom: none;
+  opacity: 0.8;
 }
 /* Hide number input spinners */
 .final-credit-input::-webkit-outer-spin-button,

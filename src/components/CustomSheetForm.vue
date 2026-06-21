@@ -62,16 +62,6 @@
               v-model:platinum="localPlatSpot"
               v-model:date="localSpotDate"
             />
-            <v-btn
-              color="primary"
-              variant="outlined"
-              size="small"
-              class="mt-2 w-100"
-              prepend-icon="mdi-cached"
-              @click="updateAllMetalPricesToNewest"
-            >
-              Update Estimates to Newest Spot Prices
-            </v-btn>
           </v-col>
         </v-row>
 
@@ -82,6 +72,7 @@
             Estimates Configured
           </div>
           <div class="d-flex gap-2">
+
             <v-btn
               color="primary"
               variant="outlined"
@@ -100,6 +91,15 @@
               @click="copyActiveEstimate"
             >
               Copy Active
+            </v-btn>
+            <v-btn
+              color="warning"
+              variant="outlined"
+              size="small"
+              prepend-icon="mdi-cached"
+              @click="updateAllMetalPricesToNewest"
+            >
+              Update Estimates Metal Prices
             </v-btn>
           </div>
         </div>
@@ -186,12 +186,12 @@
 
             <!-- Header row (visible on sm and up) -->
             <v-row v-if="activeEstimate.estValues.length > 0" class="d-none d-sm-flex text-caption font-weight-bold text-medium-emphasis border-b pb-1 mb-2 px-1">
-              <v-col cols="3">Item / Description</v-col>
-              <v-col cols="1">Amt/Weight</v-col>
-              <v-col cols="2">Price Per</v-col>
-              <v-col cols="2">Modifier</v-col>
-              <v-col cols="1">Markup</v-col>
-              <v-col cols="2" class="text-right pr-4">Total</v-col>
+              <v-col cols="6">Item / Description</v-col>
+              <v-col cols="1">Amt/Weight ×</v-col>
+              <v-col cols="1">Price Per ×</v-col>
+              <v-col cols="1">Multiplier ×</v-col>
+              <v-col cols="1">Markup =</v-col>
+              <v-col cols="1" class="text-left">Total</v-col>
               <v-col cols="1" class="text-right"></v-col>
             </v-row>
 
@@ -222,7 +222,7 @@
               >
                 <v-row align="center" class="line-item-row my-1">
                   <!-- Combobox -->
-                  <v-col cols="12" sm="3" md="3" class="py-1">
+                  <v-col cols="12" sm="6" md="6" class="py-1">
                     <v-combobox
                       v-model="val.selectedOption"
                       :items="getOptionsForCategory(category)"
@@ -245,12 +245,13 @@
                       variant="underlined"
                       density="compact"
                       hide-details
+                      suffix="×"
                       @input="recalculateItem(val)"
                     ></v-text-field>
                   </v-col>
 
                   <!-- Price Per (basePrice) -->
-                  <v-col cols="3" sm="2" md="2" class="py-1">
+                  <v-col cols="3" sm="1" md="1" class="py-1">
                     <v-text-field
                       v-model="val.basePrice"
                       placeholder="0.00"
@@ -260,12 +261,13 @@
                       density="compact"
                       hide-details
                       prefix="$"
+                      suffix="×"
                       @input="onBasePriceManualChange(val)"
                     ></v-text-field>
                   </v-col>
 
                   <!-- Modifier (priceModifier) -->
-                  <v-col cols="3" sm="2" md="2" class="py-1">
+                  <v-col cols="3" sm="1" md="1" class="py-1">
                     <v-text-field
                       v-model="val.priceModifier"
                       placeholder="1.00"
@@ -274,6 +276,7 @@
                       variant="underlined"
                       density="compact"
                       hide-details
+                      suffix="×"
                       @input="onModifierChange(val)"
                     ></v-text-field>
                   </v-col>
@@ -288,12 +291,13 @@
                       variant="underlined"
                       density="compact"
                       hide-details
+                      suffix="="
                       @input="onModifierChange(val)"
                     ></v-text-field>
                   </v-col>
 
                   <!-- Total display -->
-                  <v-col cols="12" sm="2" md="2" class="py-1 d-flex flex-sm-column align-center align-sm-end justify-space-between pr-4">
+                  <v-col cols="12" sm="1" md="1" class="py-1 d-flex flex-sm-column align-center align-sm-start justify-space-between">
                     <span class="text-caption text-medium-emphasis d-sm-none">Total</span>
                     <span class="text-subtitle-2 font-weight-bold text-success">
                       ${{ (calculateItemTotal(val) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
@@ -408,8 +412,9 @@ import { settingsState } from '../store/settings'
 import { metadataState } from '../store/metadata'
 import { navigateBack, navigateTo } from '../store/session'
 import { formatLocalDate } from '../utils/dates'
-import { logoBase64 } from '../utils/logo'
+import { generateCustomSheetPrintHTML } from '../utils/customSheetPrintTemplate'
 import { showToast } from '../store/toast'
+import { removeRecentRecord, refreshRecentRecord } from '../store/recentlyViewed'
 import { calculateCustomSheetPricePer, calculateCustomSheetItemTotal } from '../utils/pricing'
 import AttachedImages from './AttachedImages.vue'
 import CustomerForm from './CustomerForm.vue'
@@ -490,9 +495,9 @@ const categories = computed(() => {
     const sortedCats = [...metadataState.customSheetCategories]
       .filter(c => c.active === 1)
       .sort((a, b) => {
-        const orderA = a.order !== null && a.order !== undefined && a.order !== '' ? parseInt(a.order) : 999
-        const orderB = b.order !== null && b.order !== undefined && b.order !== '' ? parseInt(b.order) : 999
-        return orderA - orderB
+        const orderA = a.order !== null && a.order !== undefined && a.order !== '' ? parseInt(a.order) : -999
+        const orderB = b.order !== null && b.order !== undefined && b.order !== '' ? parseInt(b.order) : -999
+        return orderB - orderA
       })
     cats = sortedCats.map(c => c.name)
   }
@@ -502,8 +507,13 @@ const categories = computed(() => {
   if (Array.isArray(metadataState.customSheets)) {
     metadataState.customSheets.forEach(item => {
       if (item.value1 && item.value1 !== 'Extra' && !catsSet.has(item.value1)) {
-        catsSet.add(item.value1)
-        cats.push(item.value1)
+        // Only merge if the category is not explicitly set to inactive
+        const categoryConfig = metadataState.customSheetCategories?.find(c => c.name === item.value1)
+        const isInactive = categoryConfig && categoryConfig.active !== 1
+        if (!isInactive) {
+          catsSet.add(item.value1)
+          cats.push(item.value1)
+        }
       }
     })
   }
@@ -527,12 +537,12 @@ const categories = computed(() => {
 
 const extras = computed(() => {
   if (!Array.isArray(metadataState.customSheets)) return []
-  return metadataState.customSheets.filter(item => item.value1 === 'Extra')
+  return metadataState.customSheets.filter(item => item.value1 === 'Extra' && item.active !== 0)
 })
 
 function getOptionsForCategory(category) {
   if (!Array.isArray(metadataState.customSheets)) return []
-  return metadataState.customSheets.filter(item => item.value1 === category)
+  return metadataState.customSheets.filter(item => item.value1 === category && item.active !== 0)
 }
 
 function getItemsForCategory(est, category) {
@@ -587,7 +597,6 @@ function onItemTypeChange(val) {
   if (val.selectedOption && typeof val.selectedOption === 'object') {
     val.name = val.selectedOption.name
     val.priceType = val.selectedOption.value3 || ''
-    val.formula = val.selectedOption.value4 || ''
     val.optionBasePrice = parseFloat(val.selectedOption.value2) || 0
     const optionMarkup = parseFloat(val.selectedOption.markup)
     val.markup = isNaN(optionMarkup) || optionMarkup <= 0 ? 1 : optionMarkup
@@ -596,7 +605,6 @@ function onItemTypeChange(val) {
     recalculateItem(val)
   } else if (typeof val.selectedOption === 'string') {
     val.name = val.selectedOption
-    val.formula = 'BaseOnly'
     val.priceType = ''
     val.optionBasePrice = parseFloat(val.basePrice) || 0
     val.markup = 1
@@ -683,7 +691,6 @@ function addExtraItem(est, extraOption) {
     priceModifier: 1,
     priceType: extraOption.value3 || '',
     selectedOption: extraOption,
-    formula: extraOption.value4 || 'BaseOnly',
     optionBasePrice: parseFloat(extraOption.value2) || 0,
     isManualOverride: false,
     showModifiers: false
@@ -798,7 +805,6 @@ async function loadSheet(id) {
               priceModifier: parseFloat(val.priceModifier) || 0,
               priceType: val.priceType || '',
               selectedOption: opt || val.name,
-              formula: opt ? opt.value4 : 'BaseOnly',
               optionBasePrice: opt ? parseFloat(opt.value2) || 0 : 0,
               isManualOverride: !opt,
               showModifiers: false
@@ -1012,6 +1018,7 @@ async function saveOrUpdateSheet(print = false, close = false) {
       showToast(sheet.id ? 'Custom Sheet updated successfully' : 'Custom Sheet saved successfully', 'success')
       emit('update:sheetId', savedSheet.id)
       emit('saved', savedSheet)
+      refreshRecentRecord('sheet', savedSheet.id)
       
       if (print) {
         await executeHeadlessPrint()
@@ -1046,7 +1053,10 @@ async function executeHeadlessPrint() {
     return
   }
 
-  const htmlContent = generatePrintHTML()
+  const htmlContent = generateCustomSheetPrintHTML({
+    sheet,
+    customer: customerObj.value
+  })
 
   try {
     const result = await window.electronAPI.printDocument({
@@ -1066,7 +1076,10 @@ async function executeHeadlessPrint() {
 }
 
 function downloadPrintPreview() {
-  const htmlContent = generatePrintHTML()
+  const htmlContent = generateCustomSheetPrintHTML({
+    sheet,
+    customer: customerObj.value
+  })
   const blob = new Blob([htmlContent], { type: 'text/html' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -1084,10 +1097,12 @@ async function submitDeleteSheet() {
   if (!sheet.id) return
   loading.value = true
   try {
-    const res = await api.delete(`/customsheets/${sheet.id}`)
+    const sheetIdToDelete = sheet.id
+    const res = await api.delete(`/customsheets/${sheetIdToDelete}`)
     if (res) {
+      removeRecentRecord('sheet', sheetIdToDelete)
       isDeleteSheetOpen.value = false
-      showToast(`Custom Sheet #${sheet.id} deleted successfully`, 'warning')
+      showToast(`Custom Sheet #${sheetIdToDelete} deleted successfully`, 'warning')
       navigateBack()
     }
   } catch (err) {
@@ -1100,314 +1115,7 @@ async function submitDeleteSheet() {
 
 const formatDate = (dateStr) => formatLocalDate(dateStr, 'long')
 
-// Generate HTML representation for Custom Sheet Estimates
-function generatePrintHTML() {
-  const customerName = customerObj.value ? `${customerObj.value.fname} ${customerObj.value.lname}` : '—'
-  const customerPhone = customerObj.value?.phone || ''
-  const customerEmail = customerObj.value?.email || ''
-  const sheetDate = sheet.created_at ? formatLocalDate(sheet.created_at, 'long') : formatLocalDate(new Date().toISOString(), 'long')
 
-  // Generate Estimate Columns
-  let estimatesHTML = ''
-  sheet.estimates.forEach(est => {
-    let itemsHTML = ''
-    est.estValues.forEach(val => {
-      const amtVal = parseFloat(val.amt) || 0
-      const priceVal = calculatePricePer(val)
-      const totalVal = amtVal * priceVal
-      
-      itemsHTML += `
-        <tr>
-          <td class="item-name">${val.name || 'Unknown'}</td>
-          <td class="item-type">${val.type || ''}</td>
-          <td class="right">${amtVal.toFixed(2)}</td>
-          <td class="right">$${priceVal.toFixed(2)}</td>
-          <td class="right font-weight-bold">$${totalVal.toFixed(2)}</td>
-        </tr>
-      `
-    })
-
-    const estTotal = calculateEstimateTotal(est)
-    const primaryBadge = est.isPrimary ? '<span class="primary-badge">PRIMARY OPTION</span>' : ''
-
-    estimatesHTML += `
-      <div class="estimate-section">
-        <div class="estimate-header">
-          <h3>${est.name} ${primaryBadge}</h3>
-          <p class="estimate-note">${est.note || ''}</p>
-        </div>
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th style="width: 35%;">Item / Description</th>
-              <th style="width: 20%;">Category</th>
-              <th style="width: 15%;" class="right">Amt / Weight(g)</th>
-              <th style="width: 15%;" class="right">Price Per</th>
-              <th style="width: 15%;" class="right">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHTML || '<tr><td colspan="5" class="center italic">No items configured</td></tr>'}
-          </tbody>
-        </table>
-        <div class="estimate-footer">
-          Total Estimate Payout Value: <span class="total-amount">$${estTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-        </div>
-      </div>
-    `
-  })
-
-  // Format attached images
-  let imagesHTML = ''
-  if (Array.isArray(sheet.custom_images)) {
-    sheet.custom_images.forEach(img => {
-      let fullUrl = ''
-      if (img.image) {
-        if (img.image.startsWith('data:')) {
-          fullUrl = img.image
-        } else {
-          const base = settingsState.serverURL.replace(/\/$/, '')
-          const path = img.image.startsWith('/') ? img.image : `/${img.image}`
-          fullUrl = `${base}${path}`
-        }
-      }
-      imagesHTML += `
-        <div class="image-card">
-          <img src="${fullUrl}" />
-          <p>${img.note || ''}</p>
-        </div>
-      `
-    })
-  }
-
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    * {
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-      box-sizing: border-box;
-    }
-    body {
-      font-family: Arial, sans-serif;
-      padding: 0.4in;
-      margin: 0;
-      background: white;
-      color: black;
-    }
-    .header-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 20px;
-      border-bottom: 2px solid #333;
-      padding-bottom: 10px;
-    }
-    .store-logo {
-      height: 60px;
-    }
-    .store-info {
-      text-align: right;
-      font-size: 11px;
-      line-height: 1.4;
-    }
-    .sheet-title {
-      font-size: 24px;
-      font-weight: bold;
-      color: #333;
-      margin: 15px 0 5px 0;
-    }
-    .metadata-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 30px;
-      background-color: #f9f9f9;
-      border: 1px solid #ddd;
-    }
-    .metadata-table td {
-      padding: 10px;
-      font-size: 13px;
-      border: 1px solid #ddd;
-    }
-    .estimate-section {
-      margin-bottom: 30px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      overflow: hidden;
-      page-break-inside: avoid;
-    }
-    .estimate-header {
-      background-color: #f1f1f1;
-      padding: 12px 15px;
-      border-bottom: 1px solid #ccc;
-    }
-    .estimate-header h3 {
-      margin: 0 0 5px 0;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .primary-badge {
-      background-color: #4caf50;
-      color: white;
-      font-size: 10px;
-      padding: 3px 8px;
-      border-radius: 10px;
-      font-weight: bold;
-    }
-    .estimate-note {
-      margin: 0;
-      font-size: 12px;
-      color: #666;
-    }
-    .items-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .items-table th {
-      background-color: #fafafa;
-      text-align: left;
-      font-size: 12px;
-      font-weight: bold;
-      padding: 8px 15px;
-      border-bottom: 1px solid #eee;
-    }
-    .items-table td {
-      padding: 8px 15px;
-      font-size: 12px;
-      border-bottom: 1px solid #eee;
-    }
-    .right {
-      text-align: right;
-    }
-    .center {
-      text-align: center;
-    }
-    .italic {
-      font-style: italic;
-    }
-    .estimate-footer {
-      background-color: #fafafa;
-      padding: 12px 15px;
-      text-align: right;
-      font-size: 14px;
-      font-weight: bold;
-      border-top: 1px solid #eee;
-    }
-    .total-amount {
-      color: #2e7d32;
-      font-size: 18px;
-      margin-left: 5px;
-    }
-    .images-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 15px;
-      margin-top: 30px;
-      margin-bottom: 30px;
-      page-break-inside: avoid;
-    }
-    .image-card {
-      border: 1px solid #ccc;
-      padding: 4px;
-      display: flex;
-      flex-direction: column;
-    }
-    .image-card img {
-      width: 100%;
-      height: 1.2in;
-      object-fit: cover;
-    }
-    .image-card p {
-      font-size: 0.8em;
-      margin: 4px 0 0 0;
-      text-align: center;
-      color: #666;
-    }
-    .footer {
-      margin-top: 50px;
-      text-align: center;
-      font-size: 10px;
-      color: #999;
-      border-top: 1px solid #eee;
-      padding-top: 15px;
-    }
-    .signature-container {
-      margin-top: 40px;
-      display: flex;
-      justify-content: space-between;
-      page-break-inside: avoid;
-    }
-    .signature-box {
-      width: 45%;
-      border-top: 1px solid #999;
-      text-align: center;
-      padding-top: 5px;
-      font-size: 12px;
-      color: #666;
-    }
-  </style>
-</head>
-<body>
-  <table class="header-table">
-    <tr>
-      <td>
-        <img src="${logoBase64}" class="store-logo" />
-      </td>
-      <td class="store-info">
-        <strong>Cibola II Admin Terminal</strong><br/>
-        Jewelry Custom Design & Estimates<br/>
-        Phone: (123) 456-7890 | Email: support@cibola.com
-      </td>
-    </tr>
-  </table>
-
-  <div class="sheet-title">Custom Design Sheet Estimate</div>
-  
-  <table class="metadata-table">
-    <tr>
-      <td style="width: 15%;"><strong>Sheet ID:</strong></td>
-      <td style="width: 35%;">#${sheet.id || 'Draft'}</td>
-      <td style="width: 15%;"><strong>Date:</strong></td>
-      <td style="width: 35%;">${sheetDate}</td>
-    </tr>
-    <tr>
-      <td><strong>Customer:</strong></td>
-      <td>${customerName}</td>
-      <td><strong>Contact:</strong></td>
-      <td>${customerPhone} ${customerPhone && customerEmail ? '|' : ''} ${customerEmail}</td>
-    </tr>
-    <tr>
-      <td><strong>Description:</strong></td>
-      <td colspan="3">${sheet.name} ${sheet.note ? `<br/><small>${sheet.note}</small>` : ''}</td>
-    </tr>
-  </table>
-
-  ${estimatesHTML}
-
-  ${imagesHTML ? `
-  <div style="font-weight:bold; margin-top:20px; margin-bottom:5px;">Attached Design Photos:</div>
-  <div class="images-grid">${imagesHTML}</div>
-  ` : ''}
-
-  <div class="signature-container">
-    <div class="signature-box" style="margin-top: 30px;">
-      Consultant Signature
-    </div>
-    <div class="signature-box" style="margin-top: 30px;">
-      Customer Authorization
-    </div>
-  </div>
-
-  <div class="footer">
-    <p>This document is a design estimation sheet. Final jewelry purchase and processing prices may vary based on market changes. Thank you for your business!</p>
-  </div>
-</body>
-</html>
-  `
-}
 
 onMounted(() => {
   loadDefaultSpotPrices()
