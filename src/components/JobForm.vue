@@ -313,6 +313,7 @@ watch(() => props.customerId, async (newId) => {
       emit('customerId', newId)
     } catch (err) {
       console.error('Failed to load customer details:', err)
+      showToast('Failed to load customer details: ' + err.message, 'warning')
     }
   } else if (!newId && props.jobId === null) {
     customerObj.value = null
@@ -386,6 +387,9 @@ async function loadJob(id) {
     }
   } catch (err) {
     console.error('Failed to load job details:', err)
+    showToast('Failed to load job: ' + err.message, 'error')
+    removeRecentRecord('job', id)
+    navigateBack()
   } finally {
     loading.value = false
   }

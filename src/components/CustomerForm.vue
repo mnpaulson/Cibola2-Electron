@@ -381,6 +381,9 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { api } from '../utils/api'
 import Fuse from 'fuse.js'
+import { showToast } from '../store/toast'
+import { removeRecentRecord } from '../store/recentlyViewed'
+import { sessionState, navigateBack } from '../store/session'
 
 const props = defineProps({
   modelValue: {
@@ -639,6 +642,13 @@ async function loadCustomer(id) {
     }
   } catch (err) {
     console.error('Failed to load customer:', err)
+    showToast('Failed to load customer details: ' + err.message, 'error')
+    removeRecentRecord('customer', id)
+    emit('update:modelValue', null)
+    emit('select', null)
+    if (sessionState.activeTab === 'customers') {
+      navigateBack()
+    }
   } finally {
     loading.value = false
   }

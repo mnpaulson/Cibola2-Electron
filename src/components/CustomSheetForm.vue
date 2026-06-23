@@ -92,6 +92,16 @@
               >
                 Update Prices
               </v-btn>
+              <v-btn
+                color="grey"
+                variant="outlined"
+                size="small"
+                class="flex-grow-1"
+                prepend-icon="mdi-cog"
+                @click="navigateToCustomSheetsConfig"
+              >
+                Configure Sheets
+              </v-btn>
             </div>
             <MetalPricesCard
               small
@@ -199,139 +209,178 @@
 
             <v-divider class="my-4"></v-divider>
 
+            <!-- Estimate Items Header & Add Item Dropdown -->
+            <div class="d-flex align-center justify-space-between mb-4">
+              <div class="text-subtitle-1 font-weight-bold d-flex align-center">
+                <v-icon start color="primary" class="mr-1">mdi-format-list-bulleted</v-icon>
+                Estimate Items
+              </div>
+              
+              <v-menu offset-y transition="slide-y-transition" v-if="categories.length > 0">
+                <template v-slot:activator="{ props }">
+                  <v-btn
+                    color="primary"
+                    v-bind="props"
+                    prepend-icon="mdi-plus"
+                    class="text-none font-weight-medium"
+                    size="small"
+                  >
+                    Add Item
+                  </v-btn>
+                </template>
+                <v-list density="comfortable">
+                  <v-list-item
+                    v-for="cat in categories"
+                    :key="cat"
+                    :title="`Add ${cat}`"
+                    @click="addEmptyItem(activeEstimate, cat)"
+                  >
+                    <template v-slot:prepend>
+                      <v-icon size="18">mdi-plus</v-icon>
+                    </template>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
+            </div>
+
             <!-- Header row (visible on sm and up) -->
             <v-row v-if="activeEstimate.estValues.length > 0" class="d-none d-sm-flex text-caption font-weight-bold text-medium-emphasis border-b pb-1 mb-2 px-1">
-              <v-col cols="6">Item / Description</v-col>
+              <v-col cols="5">Item / Description</v-col>
               <v-col cols="1">Amt/Weight ×</v-col>
               <v-col cols="1">Price Per ×</v-col>
               <v-col cols="1">Multiplier ×</v-col>
               <v-col cols="1">Markup =</v-col>
               <v-col cols="1" class="text-left">Total</v-col>
-              <v-col cols="1" class="text-right"></v-col>
+              <v-col cols="2" class="text-right"></v-col>
             </v-row>
 
             <!-- Line Items categories -->
-            <div v-for="category in categories" :key="category" class="mb-6">
-              <div class="d-flex align-center justify-space-between mb-3">
-                <div class="text-subtitle-2 font-weight-bold text-primary d-flex align-center">
-                  <v-icon size="18" class="mr-1">mdi-chevron-right</v-icon>
-                  {{ category }}
+            <template v-for="category in categories" :key="category">
+              <div v-if="getItemsForCategory(activeEstimate, category).length > 0" class="mb-6">
+                <div class="d-flex align-center justify-space-between mb-3">
+                  <div class="text-subtitle-2 font-weight-bold text-primary d-flex align-center">
+                    <v-icon size="18" class="mr-1">mdi-chevron-right</v-icon>
+                    {{ category }}
+                  </div>
+                  <v-btn
+                    variant="text"
+                    color="primary"
+                    prepend-icon="mdi-plus"
+                    size="small"
+                    class="text-none"
+                    @click="addEmptyItem(activeEstimate, category)"
+                  >
+                    Add {{ category }}
+                  </v-btn>
                 </div>
-                <v-btn
-                  variant="text"
-                  color="primary"
-                  prepend-icon="mdi-plus"
-                  size="small"
-                  class="text-none"
-                  @click="addEmptyItem(activeEstimate, category)"
+
+                <!-- List of items under category -->
+                <div
+                  v-for="val in getItemsForCategory(activeEstimate, category)"
+                  :key="val.id"
+                  class="mb-3 line-item-container"
                 >
-                  Add {{ category }}
-                </v-btn>
+                  <v-row align="center" class="line-item-row my-1">
+                    <!-- Combobox -->
+                    <v-col cols="12" sm="5" md="5" class="py-1">
+                      <v-combobox
+                        v-model="val.selectedOption"
+                        :items="getOptionsForCategory(category)"
+                        item-title="name"
+                        placeholder="Select item type or type custom"
+                        variant="underlined"
+                        density="compact"
+                        hide-details
+                        @update:model-value="onItemTypeChange(val)"
+                      ></v-combobox>
+                    </v-col>
+
+                    <!-- Amt/Weight -->
+                    <v-col cols="3" sm="1" md="1" class="py-1">
+                      <v-text-field
+                        v-model="val.amt"
+                        placeholder="0.00"
+                        type="number"
+                        step="0.01"
+                        variant="underlined"
+                        density="compact"
+                        hide-details
+                        suffix="×"
+                        @input="recalculateItem(val)"
+                      ></v-text-field>
+                    </v-col>
+
+                    <!-- Price Per (basePrice) -->
+                    <v-col cols="3" sm="1" md="1" class="py-1">
+                      <v-text-field
+                        v-model="val.basePrice"
+                        placeholder="0.00"
+                        type="number"
+                        step="0.01"
+                        variant="underlined"
+                        density="compact"
+                        hide-details
+                        prefix="$"
+                        suffix="×"
+                        @input="onBasePriceManualChange(val)"
+                      ></v-text-field>
+                    </v-col>
+
+                    <!-- Modifier (priceModifier) -->
+                    <v-col cols="3" sm="1" md="1" class="py-1">
+                      <v-text-field
+                        v-model="val.priceModifier"
+                        placeholder="1.00"
+                        type="number"
+                        step="0.01"
+                        variant="underlined"
+                        density="compact"
+                        hide-details
+                        suffix="×"
+                        @input="onModifierChange(val)"
+                      ></v-text-field>
+                    </v-col>
+
+                    <!-- Markup (markup) -->
+                    <v-col cols="3" sm="1" md="1" class="py-1">
+                      <v-text-field
+                        v-model="val.markup"
+                        placeholder="1.00"
+                        type="number"
+                        step="0.01"
+                        variant="underlined"
+                        density="compact"
+                        hide-details
+                        suffix="="
+                        @input="onModifierChange(val)"
+                      ></v-text-field>
+                    </v-col>
+
+                    <!-- Total display -->
+                    <v-col cols="12" sm="1" md="1" class="py-1 d-flex flex-sm-column align-center align-sm-start justify-space-between">
+                      <span class="text-caption text-medium-emphasis d-sm-none">Total</span>
+                      <span class="text-subtitle-2 font-weight-bold text-success">
+                        ${{ (calculateItemTotal(val) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                      </span>
+                    </v-col>
+
+                    <!-- Delete Action -->
+                    <v-col cols="12" sm="2" md="2" class="py-1 d-flex justify-end align-center">
+                      <v-btn
+                        color="error"
+                        variant="outlined"
+                        size="x-small"
+                        prepend-icon="mdi-trash-can-outline"
+                        class="text-none font-weight-medium rounded-pill"
+                        @click="deleteItem(activeEstimate, val.id)"
+                      >
+                        Delete
+                      </v-btn>
+                    </v-col>
+                  </v-row>
+                </div>
               </div>
-
-              <!-- List of items under category -->
-              <div
-                v-for="val in getItemsForCategory(activeEstimate, category)"
-                :key="val.id"
-                class="mb-3 line-item-container"
-              >
-                <v-row align="center" class="line-item-row my-1">
-                  <!-- Combobox -->
-                  <v-col cols="12" sm="6" md="6" class="py-1">
-                    <v-combobox
-                      v-model="val.selectedOption"
-                      :items="getOptionsForCategory(category)"
-                      item-title="name"
-                      placeholder="Select item type or type custom"
-                      variant="underlined"
-                      density="compact"
-                      hide-details
-                      @update:model-value="onItemTypeChange(val)"
-                    ></v-combobox>
-                  </v-col>
-
-                  <!-- Amt/Weight -->
-                  <v-col cols="3" sm="1" md="1" class="py-1">
-                    <v-text-field
-                      v-model="val.amt"
-                      placeholder="0.00"
-                      type="number"
-                      step="0.01"
-                      variant="underlined"
-                      density="compact"
-                      hide-details
-                      suffix="×"
-                      @input="recalculateItem(val)"
-                    ></v-text-field>
-                  </v-col>
-
-                  <!-- Price Per (basePrice) -->
-                  <v-col cols="3" sm="1" md="1" class="py-1">
-                    <v-text-field
-                      v-model="val.basePrice"
-                      placeholder="0.00"
-                      type="number"
-                      step="0.01"
-                      variant="underlined"
-                      density="compact"
-                      hide-details
-                      prefix="$"
-                      suffix="×"
-                      @input="onBasePriceManualChange(val)"
-                    ></v-text-field>
-                  </v-col>
-
-                  <!-- Modifier (priceModifier) -->
-                  <v-col cols="3" sm="1" md="1" class="py-1">
-                    <v-text-field
-                      v-model="val.priceModifier"
-                      placeholder="1.00"
-                      type="number"
-                      step="0.01"
-                      variant="underlined"
-                      density="compact"
-                      hide-details
-                      suffix="×"
-                      @input="onModifierChange(val)"
-                    ></v-text-field>
-                  </v-col>
-
-                  <!-- Markup (markup) -->
-                  <v-col cols="3" sm="1" md="1" class="py-1">
-                    <v-text-field
-                      v-model="val.markup"
-                      placeholder="1.00"
-                      type="number"
-                      step="0.01"
-                      variant="underlined"
-                      density="compact"
-                      hide-details
-                      suffix="="
-                      @input="onModifierChange(val)"
-                    ></v-text-field>
-                  </v-col>
-
-                  <!-- Total display -->
-                  <v-col cols="12" sm="1" md="1" class="py-1 d-flex flex-sm-column align-center align-sm-start justify-space-between">
-                    <span class="text-caption text-medium-emphasis d-sm-none">Total</span>
-                    <span class="text-subtitle-2 font-weight-bold text-success">
-                      ${{ (calculateItemTotal(val) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
-                    </span>
-                  </v-col>
-
-                  <!-- Delete Action -->
-                  <v-col cols="12" sm="1" md="1" class="py-1 d-flex justify-end">
-                    <v-btn
-                      icon="mdi-trash-can-outline"
-                      color="error"
-                      variant="text"
-                      density="comfortable"
-                      @click="deleteItem(activeEstimate, val.id)"
-                    ></v-btn>
-                  </v-col>
-                </v-row>
-              </div>
-            </div>
+            </template>
 
             <!-- Extras buttons -->
             <div v-if="extras.length > 0" class="mb-4">
@@ -426,7 +475,12 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { api } from '../utils/api'
 import { settingsState } from '../store/settings'
 import { metadataState } from '../store/metadata'
-import { navigateBack, navigateTo } from '../store/session'
+import { navigateBack, navigateTo, sessionState } from '../store/session'
+
+const navigateToCustomSheetsConfig = () => {
+  sessionState.configActiveSection = 'custom-sheet'
+  navigateTo('config')
+}
 import { formatLocalDate } from '../utils/dates'
 import { generateCustomSheetPrintHTML } from '../utils/customSheetPrintTemplate'
 import { showToast } from '../store/toast'
@@ -871,6 +925,8 @@ async function loadSheet(id) {
   } catch (err) {
     console.error('Failed to load custom sheet:', err)
     showToast('Failed to load custom sheet: ' + err.message, 'error')
+    removeRecentRecord('sheet', id)
+    navigateBack()
   } finally {
     loading.value = false
   }
@@ -885,6 +941,7 @@ watch(() => props.customerId, async (newId) => {
       emit('customerId', newId)
     } catch (err) {
       console.error('Failed to load customer details:', err)
+      showToast('Failed to load customer details: ' + err.message, 'warning')
     }
   } else if (!newId && props.sheetId === null) {
     customerObj.value = null

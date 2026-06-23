@@ -472,6 +472,9 @@ async function loadCredit(id) {
     }
   } catch (err) {
     console.error('Failed to load credit payout details:', err)
+    showToast('Failed to load credit: ' + err.message, 'error')
+    removeRecentRecord('credit', id)
+    navigateBack()
   } finally {
     loading.value = false
   }
@@ -486,6 +489,7 @@ watch(() => props.customerId, async (newId) => {
       emit('customerId', newId)
     } catch (err) {
       console.error('Failed to load customer details:', err)
+      showToast('Failed to load customer details: ' + err.message, 'warning')
     }
   } else if (!newId && props.creditId === null) {
     customerObj.value = null

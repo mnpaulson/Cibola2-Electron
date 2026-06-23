@@ -9,6 +9,23 @@ export const recentlyViewedState = reactive({
 // Map to prevent redundant concurrent fetches for the same record
 const pendingFetches = new Set()
 
+async function resolveCustomerName(customerId, existingCustomer) {
+  if (existingCustomer) {
+    return `${existingCustomer.fname} ${existingCustomer.lname}`.trim()
+  }
+  if (customerId) {
+    try {
+      const customer = await api.get(`/customers/${customerId}`)
+      if (customer) {
+        return `${customer.fname} ${customer.lname}`.trim()
+      }
+    } catch (err) {
+      console.error('[RecentlyViewed] Failed to resolve customer name:', err)
+    }
+  }
+  return ''
+}
+
 // Load from localStorage
 export function loadRecentlyViewed() {
   try {
@@ -79,6 +96,7 @@ export async function refreshRecentRecord(type, id) {
         const details = hasEstimate
           ? `Estimate: $${Number(job.estimate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : 'No Estimate'
+        const customerName = await resolveCustomerName(job.customer_id, job.customer)
 
         addRecentRecord({
           id: job.id,
@@ -86,7 +104,7 @@ export async function refreshRecentRecord(type, id) {
           typeName: 'Job',
           details,
           customerId: job.customer_id,
-          customerName: job.customer ? `${job.customer.fname} ${job.customer.lname}`.trim() : '',
+          customerName,
           created_at: job.created_at || '',
           thumbnail,
           viewedAt: Date.now()
@@ -99,6 +117,7 @@ export async function refreshRecentRecord(type, id) {
         const details = hasCredit
           ? `Payout: $${Number(credit.credit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : 'No Final Credit'
+        const customerName = await resolveCustomerName(credit.customer_id, credit.customer)
 
         addRecentRecord({
           id: credit.id,
@@ -106,7 +125,7 @@ export async function refreshRecentRecord(type, id) {
           typeName: 'Credit',
           details,
           customerId: credit.customer_id,
-          customerName: credit.customer ? `${credit.customer.fname} ${credit.customer.lname}`.trim() : '',
+          customerName,
           created_at: credit.created_at || '',
           thumbnail: null,
           viewedAt: Date.now()
@@ -115,13 +134,14 @@ export async function refreshRecentRecord(type, id) {
     } else if (type === 'sheet') {
       const sheet = await api.get(`/customsheets/${id}`)
       if (sheet && sheet.id) {
+        const customerName = await resolveCustomerName(sheet.customer_id, sheet.customer)
         addRecentRecord({
           id: sheet.id,
           type: 'sheet',
           typeName: 'Sheet',
           details: sheet.name || '',
           customerId: sheet.customer_id,
-          customerName: sheet.customer ? `${sheet.customer.fname} ${sheet.customer.lname}`.trim() : '',
+          customerName,
           created_at: sheet.created_at || '',
           thumbnail: null,
           viewedAt: Date.now()

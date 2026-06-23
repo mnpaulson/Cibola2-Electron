@@ -1,172 +1,102 @@
 <template>
   <div>
-    <!-- Widescreen Layout: 2 Columns when a customer is selected -->
-    <v-row v-if="selectedId">
-      <!-- Left Column: Reusable Customer details & form card -->
-      <v-col cols="12" md="4" lg="4">
-        <CustomerForm
-          v-model="selectedId"
-          :clearable="false"
-          @select="handleCustomerSelect"
-          @new-customer="handleNewCustomer"
-        />
+    <!-- Layout when a customer is selected -->
+    <div v-if="selectedId">
+      <!-- Top Row: Customer Details (Wide Layout) -->
+      <v-row>
+        <v-col cols="12">
+          <CustomerForm
+            v-model="selectedId"
+            :clearable="false"
+            :show-activity="true"
+            @select="handleCustomerSelect"
+            @new-customer="handleNewCustomer"
+          />
+        </v-col>
+      </v-row>
 
-        <!-- Danger Zone: Delete customer button below the card -->
-        <v-card class="mt-4 border-error" elevation="2" border>
-          <v-card-text class="d-flex align-center justify-space-between py-3">
-            <div>
-              <div class="text-subtitle-2 font-weight-bold text-error">Danger Zone</div>
-              <div class="text-caption text-medium-emphasis">Delete customer profile and all history</div>
-            </div>
-            <v-btn
-              color="error"
-              variant="flat"
-              prepend-icon="mdi-delete"
-              size="small"
-              @click="openDeleteDialog"
-            >
-              Delete
-            </v-btn>
-          </v-card-text>
-        </v-card>
-      </v-col>
+      <!-- Bottom Row: History & Actions Two-Column Layout -->
+      <v-row class="mt-4">
+        <!-- First Column: Associated Records (Jobs, Credits, Sheets) -->
+        <v-col cols="12" md="8">
+          <v-card elevation="3" class="history-card rounded-lg">
+            <!-- Toolbar with Quick Actions -->
+            <v-card-item class="bg-accent1 text-white py-3">
+              <v-row no-gutters align="center" justify="space-between">
+                <v-col class="text-subtitle-1 font-weight-bold">
+                  Activity & Records: {{ customerName }}
+                </v-col>
+                <v-col class="d-flex justify-end gap-2 shrink">
+                  <v-btn
+                    color="job"
+                    variant="elevated"
+                    prepend-icon="mdi-briefcase-outline"
+                    size="small"
+                    @click="createNewRecord('jobs')"
+                  >
+                    New Job
+                  </v-btn>
+                  <v-btn
+                    color="credit"
+                    variant="elevated"
+                    prepend-icon="mdi-credit-card-outline"
+                    size="small"
+                    @click="createNewRecord('credits')"
+                  >
+                    New Credit
+                  </v-btn>
+                  <v-btn
+                    color="sheet"
+                    variant="elevated"
+                    prepend-icon="mdi-list-box-outline"
+                    size="small"
+                    @click="createNewRecord('customsheets')"
+                  >
+                    New Sheet
+                  </v-btn>
+                </v-col>
+              </v-row>
+            </v-card-item>
 
-      <!-- Right Column: Associated Records (Jobs, Credits, Sheets) -->
-      <v-col cols="12" md="8" lg="8">
-        <v-card elevation="3" class="history-card rounded-lg">
-          <!-- Toolbar with Quick Actions -->
-          <v-card-item class="bg-accent1 text-white py-3">
-            <v-row no-gutters align="center" justify="space-between">
-              <v-col class="text-subtitle-1 font-weight-bold">
-                Activity & Records: {{ customerName }}
-              </v-col>
-              <v-col class="d-flex justify-end gap-2 shrink">
-                <v-btn
-                  color="job"
-                  variant="elevated"
-                  prepend-icon="mdi-briefcase-outline"
-                  size="small"
-                  @click="createNewRecord('jobs')"
-                >
-                  New Job
-                </v-btn>
-                <v-btn
-                  color="credit"
-                  variant="elevated"
-                  prepend-icon="mdi-credit-card-outline"
-                  size="small"
-                  @click="createNewRecord('credits')"
-                >
-                  New Credit
-                </v-btn>
-                <v-btn
-                  color="sheet"
-                  variant="elevated"
-                  prepend-icon="mdi-list-box-outline"
-                  size="small"
-                  @click="createNewRecord('customsheets')"
-                >
-                  New Sheet
-                </v-btn>
-              </v-col>
-            </v-row>
-          </v-card-item>
+            <v-divider></v-divider>
 
-          <v-divider></v-divider>
+            <!-- Unified History Table -->
+            <v-card-text class="pa-0">
+              <UnifiedRecordTable
+                :records="combinedHistory"
+                :loading="loadingHistory"
+                sortable
+                :show-customer-name="false"
+                empty-icon="mdi-file-outline"
+                empty-title="No records found for this customer."
+              />
+            </v-card-text>
+          </v-card>
+        </v-col>
 
-          <!-- Unified History Table -->
-          <v-card-text class="pa-0">
-            <v-table hover fixed-header class="history-table">
-              <thead>
-                <tr>
-                  <th
-                    class="text-left font-weight-bold text-caption py-2 sortable-header"
-                    @click="toggleHistorySort('id')"
-                  >
-                    <div class="d-flex align-center">
-                      Id
-                      <v-icon size="small" class="ml-1" v-if="historySortBy === 'id'">
-                        {{ historySortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
-                      </v-icon>
-                    </div>
-                  </th>
-                  <th
-                    class="text-left font-weight-bold text-caption py-2 sortable-header"
-                    @click="toggleHistorySort('type')"
-                  >
-                    <div class="d-flex align-center">
-                      Record Type
-                      <v-icon size="small" class="ml-1" v-if="historySortBy === 'type'">
-                        {{ historySortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
-                      </v-icon>
-                    </div>
-                  </th>
-                  <th
-                    class="text-left font-weight-bold text-caption py-2 sortable-header"
-                    @click="toggleHistorySort('details')"
-                  >
-                    <div class="d-flex align-center">
-                      Details
-                      <v-icon size="small" class="ml-1" v-if="historySortBy === 'details'">
-                        {{ historySortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
-                      </v-icon>
-                    </div>
-                  </th>
-                  <th
-                    class="text-left font-weight-bold text-caption py-2 sortable-header"
-                    @click="toggleHistorySort('created_at')"
-                  >
-                    <div class="d-flex align-center">
-                      Created
-                      <v-icon size="small" class="ml-1" v-if="historySortBy === 'created_at'">
-                        {{ historySortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
-                      </v-icon>
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="loadingHistory" class="text-center">
-                  <td colspan="4" class="py-6">
-                    <v-progress-circular indeterminate color="primary"></v-progress-circular>
-                  </td>
-                </tr>
-                <tr v-else-if="sortedHistory.length === 0" class="text-center">
-                  <td colspan="4" class="py-6 text-medium-emphasis text-caption italic">
-                    No records found for this customer.
-                  </td>
-                </tr>
-                <tr
-                  v-else
-                  v-for="item in sortedHistory"
-                  :key="item.type + '-' + item.id"
-                  class="cursor-pointer transition-row accent-border-row"
-                  :class="'record-accent-' + item.type"
-                  @click="goToRecord(item)"
-                >
-                  <td class="font-weight-bold" :class="'text-' + getTypeColor(item.type)">#{{ item.id }}</td>
-                  <td :class="'text-' + getTypeColor(item.type)">{{ item.typeName }}</td>
-                  <td>
-                    <template v-if="item.type === 'job'">
-                      <span v-if="!item.original.estimate || Number(item.original.estimate) === 0">No Estimate</span>
-                      <span v-else>Estimate: <strong>${{ Number(item.original.estimate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
-                    </template>
-                    <template v-else-if="item.type === 'credit'">
-                      <span v-if="!item.original.credit_value || Number(item.original.credit_value) === 0">No Final Credit</span>
-                      <span v-else>Payout: <strong>${{ Number(item.original.credit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
-                    </template>
-                    <template v-else-if="item.type === 'sheet'">
-                      <span>{{ item.original.name }}</span>
-                    </template>
-                  </td>
-                  <td class="text-medium-emphasis text-caption">{{ formatDate(item.created_at) }}</td>
-                </tr>
-              </tbody>
-            </v-table>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+        <!-- Second Column: Actions / Danger Zone (Add more here later) -->
+        <v-col cols="12" md="4">
+          <!-- Danger Zone: Delete customer button -->
+          <v-card class="border-error rounded-lg" elevation="2" border>
+            <v-card-text class="d-flex align-center justify-space-between py-3">
+              <div>
+                <div class="text-subtitle-2 font-weight-bold text-error">Danger Zone</div>
+                <div class="text-caption text-medium-emphasis">Delete customer profile and all history</div>
+              </div>
+              <v-btn
+                color="error"
+                variant="flat"
+                prepend-icon="mdi-delete"
+                size="small"
+                @click="openDeleteDialog"
+              >
+                Delete
+              </v-btn>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </div>
 
     <!-- Master Customer Directory (When no customer is selected) -->
     <v-row v-else>
@@ -331,23 +261,10 @@ import CustomerForm from './CustomerForm.vue'
 import DirectoryPagination from './DirectoryPagination.vue'
 import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue'
 import { removeRecentRecord } from '../store/recentlyViewed'
+import UnifiedRecordTable from './UnifiedRecordTable.vue'
 
 // Local State
-function getTypeColor(type) {
-  switch (type) {
-    case 'job':
-      return 'job'
-    case 'credit':
-      return 'credit'
-    case 'sheet':
-    case 'custom':
-      return 'sheet'
-    case 'customer':
-      return 'customer'
-    default:
-      return 'grey'
-  }
-}
+
 
 // Local State
 const selectedId = ref(null)
@@ -387,6 +304,7 @@ const combinedHistory = computed(() => {
       typeName: 'Job',
       details: detailsText,
       created_at: job.created_at || '',
+      thumbnail: job.thumbnail || null,
       original: job
     })
   })
@@ -402,6 +320,7 @@ const combinedHistory = computed(() => {
       typeName: 'Credit',
       details: detailsText,
       created_at: credit.created_at || '',
+      thumbnail: null,
       original: credit
     })
   })
@@ -413,6 +332,7 @@ const combinedHistory = computed(() => {
       typeName: 'Sheet',
       details: sheet.name || '',
       created_at: sheet.created_at || '',
+      thumbnail: null,
       original: sheet
     })
   })
@@ -420,36 +340,7 @@ const combinedHistory = computed(() => {
   return list
 })
 
-const historySortBy = ref('created_at')
-const historySortDesc = ref(true)
 
-const toggleHistorySort = (field) => {
-  if (historySortBy.value === field) {
-    historySortDesc.value = !historySortDesc.value
-  } else {
-    historySortBy.value = field
-    historySortDesc.value = field === 'created_at' ? true : false
-  }
-}
-
-const sortedHistory = computed(() => {
-  const list = [...combinedHistory.value]
-  return list.sort((a, b) => {
-    let comparison = 0
-    if (historySortBy.value === 'id') {
-      comparison = a.id - b.id
-    } else if (historySortBy.value === 'type') {
-      comparison = a.typeName.localeCompare(b.typeName)
-    } else if (historySortBy.value === 'details') {
-      comparison = a.details.localeCompare(b.details)
-    } else if (historySortBy.value === 'created_at') {
-      const dateA = a.created_at || ''
-      const dateB = b.created_at || ''
-      comparison = dateA.localeCompare(dateB)
-    }
-    return historySortDesc.value ? -comparison : comparison
-  })
-})
 
 const directorySearch = computed({
   get: () => sessionState.customerSearchQuery,
@@ -520,7 +411,22 @@ const fetchAssociatedHistory = async (customerId) => {
       api.get(`/customsheets?customer_id=${customerId}`)
     ])
     
-    jobs.value = jobsData || []
+    // Fetch job details in parallel to load thumbnails
+    const jobsWithThumbnails = await Promise.all(
+      (jobsData || []).map(async (job) => {
+        try {
+          const fullJob = await api.get(`/jobs/${job.id}`)
+          if (fullJob && fullJob.job_images && fullJob.job_images.length > 0) {
+            job.thumbnail = fullJob.job_images[0].image
+          }
+        } catch (err) {
+          console.error('[CustomerManager] Failed to load job thumbnail:', err)
+        }
+        return job
+      })
+    )
+    
+    jobs.value = jobsWithThumbnails
     credits.value = creditsData || []
     customSheets.value = sheetsData || []
   } catch (err) {
@@ -661,31 +567,7 @@ const formatDate = (dateStr) => formatLocalDate(dateStr, 'empty-dash')
 
 
 
-// Navigation links to view existing records
-const goToJob = (jobId) => {
-  console.log('Navigating to job ID:', jobId)
-  navigateTo('jobs', { activeJobId: jobId, selectedCustomerId: selectedId.value })
-}
 
-const goToCredit = (creditId) => {
-  console.log('Navigating to credit ID:', creditId)
-  navigateTo('credits', { activeCreditId: creditId, selectedCustomerId: selectedId.value })
-}
-
-const goToCustomSheet = (sheetId) => {
-  console.log('Navigating to custom sheet ID:', sheetId)
-  navigateTo('custom', { activeSheetId: sheetId, selectedCustomerId: selectedId.value })
-}
-
-const goToRecord = (item) => {
-  if (item.type === 'job') {
-    goToJob(item.id)
-  } else if (item.type === 'credit') {
-    goToCredit(item.id)
-  } else if (item.type === 'sheet') {
-    goToCustomSheet(item.id)
-  }
-}
 
 onMounted(() => {
   // Directory loading is handled by the immediate watch on selectedId
@@ -702,7 +584,6 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.history-table :deep(th),
 .directory-table :deep(th) {
   background-color: rgba(var(--v-theme-surface-variant), 0.04) !important;
 }

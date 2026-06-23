@@ -24,93 +24,14 @@
 
     <!-- Table of Records -->
     <v-card-text class="pa-0">
-      <v-table hover fixed-header class="recently-created-table" style="table-layout: fixed; width: 100%;" v-if="records.length > 0">
-        <thead>
-          <tr>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 50px;">Preview</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 80px;">Type</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 65px;">Record</th>
-            <th class="text-left font-weight-bold text-caption py-2">Details</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 80px;">Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="item in records"
-            :key="item.type + '-' + item.id"
-            class="cursor-pointer transition-row accent-border-row"
-            :class="'record-accent-' + item.type"
-            @click="goToRecord(item)"
-          >
-            <!-- Preview / Thumbnail Column -->
-            <td class="py-2">
-              <v-img
-                v-if="item.type === 'job' && item.thumbnail"
-                :src="getImageUrl(item.thumbnail)"
-                width="36"
-                height="36"
-                cover
-                class="rounded border"
-                bg-color="grey-lighten-4"
-              >
-                <template v-slot:placeholder>
-                  <div class="d-flex align-center justify-center fill-height bg-grey-lighten-4">
-                    <v-progress-circular indeterminate size="12" width="2" color="primary"></v-progress-circular>
-                  </div>
-                </template>
-              </v-img>
-              <v-avatar v-else :color="getTypeColor(item.type)" variant="tonal" size="36" class="rounded border">
-                <v-icon size="18">{{ getTypeIcon(item.type) }}</v-icon>
-              </v-avatar>
-            </td>
-
-            <!-- Record Type Column -->
-            <td class="py-2">
-              <span class="text-body-2 font-weight-bold" :class="'text-' + getTypeColor(item.type)">{{ item.typeName }}</span>
-            </td>
-
-            <!-- Record ID Column -->
-            <td class="py-2">
-              <span class="font-weight-bold text-medium-emphasis text-body-2">#{{ item.id }}</span>
-            </td>
-
-            <!-- Details Column -->
-            <td class="py-2">
-              <div class="text-body-2 font-weight-medium text-truncate" style="max-width: 120px;">
-                {{ item.details }}
-              </div>
-              <div
-                v-if="item.customerName && item.type !== 'customer'"
-                class="text-caption text-medium-emphasis text-truncate"
-                style="max-width: 120px;"
-              >
-                <v-icon size="12" class="mr-0.5">mdi-account</v-icon>
-                {{ item.customerName }}
-              </div>
-            </td>
-
-            <!-- Created Date Column -->
-            <td class="py-2 text-medium-emphasis text-caption">
-              {{ formatDate(item.created_at) }}
-            </td>
-          </tr>
-        </tbody>
-      </v-table>
-
-      <!-- Empty State / Loading State -->
-      <div v-else-if="loading" class="d-flex flex-column align-center justify-center py-12">
-        <v-progress-circular indeterminate size="36" color="primary"></v-progress-circular>
-        <div class="mt-2 text-caption text-medium-emphasis">Fetching recently created records...</div>
-      </div>
-      <div v-else class="d-flex flex-column align-center justify-center py-12 text-center">
-        <v-avatar color="grey-lighten-3" size="64" class="mb-3">
-          <v-icon size="32" color="grey-darken-1">mdi-plus-circle-outline</v-icon>
-        </v-avatar>
-        <div class="text-subtitle-2 font-weight-bold text-medium-emphasis">No Created Records</div>
-        <div class="text-caption text-medium-emphasis px-4">
-          No recently created records found in the database.
-        </div>
-      </div>
+      <UnifiedRecordTable
+        :records="records"
+        :loading="loading"
+        loading-text="Fetching recently created records..."
+        empty-icon="mdi-plus-circle-outline"
+        empty-title="No Created Records"
+        empty-subtitle="No recently created records found in the database."
+      />
     </v-card-text>
   </v-card>
 </template>
@@ -118,9 +39,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { api } from '../utils/api'
-import { navigateTo, sessionState } from '../store/session'
-import { settingsState } from '../store/settings'
-import { formatLocalDate } from '../utils/dates'
+import { sessionState } from '../store/session'
+import UnifiedRecordTable from './UnifiedRecordTable.vue'
 
 const records = ref([])
 const loading = ref(false)
@@ -139,6 +59,8 @@ async function fetchRecords() {
       api.get('/customers')
     ])
 
+    const customerMap = new Map((customersData || []).map(c => [c.id, `${c.fname} ${c.lname}`.trim()]))
+
     // 1. Normalize Jobs
     const formattedJobs = (jobsData || []).map(job => ({
       id: job.id,
@@ -148,7 +70,7 @@ async function fetchRecords() {
         ? `Estimate: $${Number(job.estimate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         : 'No Estimate',
       customerId: job.customer_id,
-      customerName: job.customer ? `${job.customer.fname} ${job.customer.lname}`.trim() : '',
+      customerName: job.customer ? `${job.customer.fname} ${job.customer.lname}`.trim() : (customerMap.get(job.customer_id) || ''),
       created_at: job.created_at || '',
       thumbnail: null
     }))
@@ -162,7 +84,7 @@ async function fetchRecords() {
         ? `Payout: $${Number(credit.credit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         : 'No Final Credit',
       customerId: credit.customer_id,
-      customerName: credit.customer ? `${credit.customer.fname} ${credit.customer.lname}`.trim() : '',
+      customerName: credit.customer ? `${credit.customer.fname} ${credit.customer.lname}`.trim() : (customerMap.get(credit.customer_id) || ''),
       created_at: credit.created_at || '',
       thumbnail: null
     }))
@@ -174,7 +96,7 @@ async function fetchRecords() {
       typeName: 'Sheet',
       details: sheet.name || '',
       customerId: sheet.customer_id,
-      customerName: sheet.customer ? `${sheet.customer.fname} ${sheet.customer.lname}`.trim() : '',
+      customerName: sheet.customer ? `${sheet.customer.fname} ${sheet.customer.lname}`.trim() : (customerMap.get(sheet.customer_id) || ''),
       created_at: sheet.created_at || '',
       thumbnail: null
     }))
@@ -231,65 +153,6 @@ async function fetchRecords() {
   }
 }
 
-// Resolve absolute image URL for thumbnails
-function getImageUrl(imgStr) {
-  if (!imgStr) return ''
-  if (imgStr.startsWith('data:')) {
-    return imgStr
-  }
-  const base = settingsState.serverURL?.replace(/\/$/, '') || ''
-  const path = imgStr.startsWith('/') ? imgStr : `/${imgStr}`
-  return `${base}${path}`
-}
-
-// Map record type to standard icon
-function getTypeIcon(type) {
-  switch (type) {
-    case 'job':
-      return 'mdi-briefcase-outline'
-    case 'credit':
-      return 'mdi-credit-card-outline'
-    case 'sheet':
-      return 'mdi-list-box-outline'
-    case 'customer':
-      return 'mdi-account'
-    default:
-      return 'mdi-help-circle'
-  }
-}
-
-// Map record type to harmonious color
-function getTypeColor(type) {
-  switch (type) {
-    case 'job':
-      return 'job'
-    case 'credit':
-      return 'credit'
-    case 'sheet':
-      return 'sheet'
-    case 'customer':
-      return 'customer'
-    default:
-      return 'grey'
-  }
-}
-
-// Format date
-const formatDate = (dateStr) => formatLocalDate(dateStr, 'empty-dash')
-
-// Navigate to selected record
-function goToRecord(item) {
-  if (item.type === 'job') {
-    navigateTo('jobs', { activeJobId: item.id, selectedCustomerId: item.customerId })
-  } else if (item.type === 'credit') {
-    navigateTo('credits', { activeCreditId: item.id, selectedCustomerId: item.customerId })
-  } else if (item.type === 'sheet') {
-    navigateTo('custom', { activeSheetId: item.id, selectedCustomerId: item.customerId })
-  } else if (item.type === 'customer') {
-    navigateTo('customers', { selectedCustomerId: item.id })
-  }
-}
-
 // Watch connection status to auto-fetch once connected
 watch(
   () => sessionState.connectionStatus,
@@ -317,25 +180,5 @@ onUnmounted(() => {
 .recently-created-card {
   border: 1px solid rgba(var(--v-border-color), 0.12);
   overflow: hidden;
-}
-
-.recently-created-table :deep(th) {
-  background-color: rgba(var(--v-theme-surface-variant), 0.04) !important;
-}
-
-.cursor-pointer {
-  cursor: pointer;
-}
-
-.transition-row {
-  transition: background-color 0.2s ease, transform 0.2s ease;
-}
-
-.transition-row:hover {
-  background-color: rgba(var(--v-theme-primary), 0.05) !important;
-}
-
-.border {
-  border: 1px solid rgba(var(--v-border-color), 0.12) !important;
 }
 </style>

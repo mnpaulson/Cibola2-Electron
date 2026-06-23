@@ -520,6 +520,9 @@ const handleNotificationClick = (notif) => {
 
 const handleTabClick = (value) => {
   // Sidebar clicking navigates to the top-level list of that tab (resets parameters)
+  if (value === 'config') {
+    sessionState.configActiveSection = 'local'
+  }
   navigateTo(value)
 }
 const isDark = ref(true)
@@ -577,6 +580,10 @@ const currentMenuIcon = computed(() => {
 }
 .menu-item-transition:hover {
   transform: translateX(4px);
+}
+
+:deep(.v-navigation-drawer), :deep(.v-navigation-drawer__content) {
+  overflow-x: hidden !important;
 }
 
 .stat-card {

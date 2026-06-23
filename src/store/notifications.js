@@ -1,5 +1,16 @@
 import { reactive } from 'vue'
 import { showToast } from './toast'
+import pkg from '../../package.json'
+
+// Dynamically generate a simulated version that is higher than the current package version
+function getSimulatedNextVersion() {
+  const current = pkg.version || '1.0.0'
+  const parts = current.split('.').map(Number)
+  if (parts.length === 3 && !parts.some(isNaN)) {
+    return `${parts[0] + 1}.0.0`
+  }
+  return '2.0.0'
+}
 
 export const notificationsState = reactive({
   list: [],
@@ -125,7 +136,7 @@ export function initUpdaterListeners() {
         addNotification({
           id: 'new-version-downloaded',
           title: 'Update Downloaded',
-          message: `Version ${info.version || '1.1.0'} has been downloaded. Restart to install.`,
+          message: `Version ${info.version || getSimulatedNextVersion()} has been downloaded. Restart to install.`,
           color: 'success',
           icon: 'mdi-restart'
         })
@@ -146,14 +157,15 @@ export async function checkUpdates(silent = false) {
   
   if (notificationsState.updateSimulated) {
     setTimeout(() => {
-      notificationsState.latestVersion = '1.1.0'
-      notificationsState.releaseNotes = '<h3>v1.1.0 Features</h3><ul><li>Added customer duplicate merging functionality</li><li>Reworked job printer speed optimizations</li><li>Fixed gold credit spot price evaluation UI bugs</li></ul>'
+      const nextVer = getSimulatedNextVersion()
+      notificationsState.latestVersion = nextVer
+      notificationsState.releaseNotes = `<h3>v${nextVer} Features</h3><ul><li>Added customer duplicate merging functionality</li><li>Reworked job printer speed optimizations</li><li>Fixed gold credit spot price evaluation UI bugs</li></ul>`
       notificationsState.updateStatus = 'available'
       
       addNotification({
         id: 'new-version',
         title: 'New Version Available',
-        message: 'Version 1.1.0 is available for download.',
+        message: `Version ${nextVer} is available for download.`,
         color: 'info',
         icon: 'mdi-cloud-download-outline'
       })
@@ -223,10 +235,11 @@ export async function downloadUpdates() {
         notificationsState.updateStatus = 'downloaded'
         showToast('Simulated Download Complete!', 'success')
         
+        const nextVer = getSimulatedNextVersion()
         addNotification({
           id: 'new-version-downloaded',
           title: 'Update Downloaded',
-          message: 'Version 1.1.0 has been downloaded. Restart to install.',
+          message: `Version ${nextVer} has been downloaded. Restart to install.`,
           color: 'success',
           icon: 'mdi-restart'
         })

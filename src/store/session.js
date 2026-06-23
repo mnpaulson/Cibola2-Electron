@@ -30,7 +30,8 @@ export const sessionState = reactive({
   creditSearchQuery: '',
   creditCurrentPage: 1,
   sheetSearchQuery: '',
-  sheetCurrentPage: 1
+  sheetCurrentPage: 1,
+  configActiveSection: 'local'
 })
 
 let isNavigatingHistory = false

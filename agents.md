@@ -119,6 +119,7 @@ Always reuse these core components rather than rebuilding their functionality:
 * **[CameraCapture.vue](file:///c:/dev/Cibola2-Electron/src/components/CameraCapture.vue)**: Handles webcam permissions, multi-device selection, alignment masks, exports base64 JPEG at maximum resolution (`canvas.toDataURL('image/jpeg', 1.0)`), and defaults the camera light/torch to ON with an interactive UI toggle and fallback constraints. Pre-queries devices list on mount to bypass permission checks on opening, and utilizes a 10-second cool-down window to keep the stream warm when closing and quickly reopening the dialog.
 * **[ImageDropzone.vue](file:///C:/dev/Cibola2-Electron/src/components/ImageDropzone.vue)**: Supports drag-and-drop or file input uploads, emitting the base64 data URL. Supports `:compact` mode for grid embedding.
 * **[AttachedImages.vue](file:///C:/dev/Cibola2-Electron/src/components/AttachedImages.vue)**: Embedded image gallery with lightboxes, description note inputs, camera/upload triggers, and database delete capabilities. Supports `disable-add` prop (boolean) to hide the upload/capture dropzone tile and prevent new image additions.
+* **[UnifiedRecordTable.vue](file:///c:/dev/Cibola2-Electron/src/components/UnifiedRecordTable.vue)**: Reusable list rendering table. Used on the Dashboard (Recent lists) and Customer Manager (Unified History tab) to display record listings with support for type colors, left border highlights, job thumbnails/fallback icons, sorting logic, and custom empty/loading states.
 * **[DirectoryPagination.vue](file:///C:/dev/Cibola2-Electron/src/components/DirectoryPagination.vue)**: Handles paginating tabular views and search pages.
 * **[DeleteConfirmationDialog.vue](file:///C:/dev/Cibola2-Electron/src/components/DeleteConfirmationDialog.vue)**: Confirmation dialog requiring match validation keys (e.g. typing customer last name) and checkbox acknowledgement.
 * **[MetalPricesCard.vue](file:///c:/dev/Cibola2-Electron/src/components/MetalPricesCard.vue)**: Used in Large mode (dashboard) or `small` mode (transactional forms). Handles spot syncs, manual overrides, price staleness, and database metadata updates. Disable state must be bound on historical items.
@@ -177,4 +178,35 @@ When the customer card is rendered at the top of record views (`JobForm.vue`, `C
   * Notes column: `:md="showActivity ? 4 : 6" v-if="!hideNotes"`
 * **Record Counts Mapping**: The component maps `job_count`, `credit_count`, and `custom_sheet_count` from the backend `GET /customers/:id` response, defaulting to `0` if not present.
 * **Preservation on Save**: When executing customer profile edits, the local state counts are explicitly preserved to prevent them from being overwritten if the update response does not return counts.
+
+---
+## 19. Non-Existent Record Navigation & Recovery Protocol
+When an operator attempts to navigate to a record (Job, Credit, Custom Sheet, Customer) that does not exist in the database (e.g. clicking on a deleted entry from Recently Viewed history):
+* **User Feedback**: Display a clear error toast indicating the load failure using `showToast('Failed to load ...', 'error')`.
+* **History Cleanup**: Proactively call `removeRecentRecord(type, id)` from `src/store/recentlyViewed.js` to purge the deleted record from the operator's Recently Viewed list.
+* **Auto-Navigation Recovery**: Redirect the user away from the empty, half-loaded view immediately by calling `navigateBack()`.
+* **Sub-Form Loading Warnings**: In components containing nested lookups (e.g., job forms trying to load details of a customer), failures to load secondary linked models must display a warning toast to notify the operator instead of failing silently.
+
+---
+## 20. Admin Panel & Sub-component Refactoring Layout
+To keep the Admin settings component clean and maintainable, the local parameters, employee directories, and configuration settings are separated into dedicated subcomponents:
+* **Admin Layout Shell**: [Admin.vue](file:///c:/dev/Cibola2-Electron/src/components/Admin.vue) implements a left-aligned sidebar `.admin-sidebar` side-by-side with the content window using CSS flexbox. It displays a navigation list of settings modules: Local Settings, Employees, and Custom Values.
+* **Custom Values Grouping**: The three custom values sections (Custom Sheets, Sheet Categories, Gold Credits) are structured as flat, non-collapsible sub-items under a `<v-list-subheader>` to keep them visible at all times, with less indentation (`pl-4`).
+* **Dedicated Sub-Components**: All content pages are extracted into individual files under `src/components/admin/`:
+  * [LocalSettingsAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/LocalSettingsAdmin.vue): Local parameters (network connection URL, camera configuration, printer routing, and update triggers).
+  * [EmployeesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/EmployeesAdmin.vue): Store employee directory table, profile editor, active status toggles, and deletion confirmation dialog.
+  * [CustomValuesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/CustomValuesAdmin.vue): Unified configurations table. It accepts a `section` prop from `Admin.vue` to determine which dynamic table configuration to mount (Custom Sheets, Categories, or Gold Credits multipliers). All database lookup loading and inline table status tools (mark pending, save on blur, up/down category order movements) are self-contained here.
+
+---
+## 21. Application Versioning Configuration
+To update the version of the application:
+1. **Electron Client**: Update the `"version"` field in the client [package.json](file:///c:/dev/Cibola2-Electron/package.json) and [package-lock.json](file:///c:/dev/Cibola2-Electron/package-lock.json).
+2. **Backend Server**: Update the `"version"` field in the backend [package.json](file:///c:/dev/cibola2/package.json) and [package-lock.json](file:///c:/dev/cibola2/package-lock.json).
+
+> [!NOTE]
+> The renderer fallback version in [LocalSettingsAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/LocalSettingsAdmin.vue) and the update simulation logic in [notifications.js](file:///c:/dev/Cibola2-Electron/src/store/notifications.js) import and resolve client version parameters dynamically from `package.json` at build time. No manual changes are required in those components.
+
+
+
+
 
