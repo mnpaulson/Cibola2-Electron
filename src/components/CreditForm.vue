@@ -1,13 +1,13 @@
 <template>
   <v-card class="credit-card pb-20" elevation="3" :loading="loading">
     <!-- Header -->
-    <v-card-item class="bg-primary text-white py-3">
-      <v-card-title class="font-weight-bold text-subtitle-1 d-flex align-center">
+    <v-card-item class="bg-accent1 text-white py-3">
+      <v-card-title class="font-weight-bold d-flex align-center">
         <v-icon start class="mr-2">mdi-credit-card-outline</v-icon>
         {{ credit.id ? `Edit Gold Credit #${credit.id}` : 'New Gold Credit Payout' }}
         <v-spacer></v-spacer>
-        <span v-if="credit.created_at" class="text-caption font-weight-medium">
-          Date: {{ formatDate(credit.created_at) }}
+        <span v-if="credit.created_at" class="font-weight-medium">
+          Credit Date: {{ formatDate(credit.created_at) }}
         </span>
       </v-card-title>
     </v-card-item>
@@ -23,6 +23,7 @@
           :hide-notes="false"
           :clickable-name="true"
           :lock-notes="true"
+          :show-activity="true"
           @select="handleCustomerSelect"
           @click-name="navigateTo('customers', { selectedCustomerId: credit.customer_id })"
           @dirty-state-change="isCustomerDirty = $event"
@@ -247,6 +248,7 @@
           ref="attachedImagesRef"
           v-model="credit.credit_images"
           delete-endpoint="/goldcredits/images"
+          :disable-add="disabled"
         />
       </v-form>
     </v-card-text>
@@ -341,6 +343,7 @@ const credit = reactive({
   plat_cad: 0,
   metalPriceDate: '',
   creditDate: '',
+  created_at: '',
   used: false,
   note: '',
   credit_type: 'cash',
@@ -401,6 +404,7 @@ function resetCreditFields() {
   credit.plat_cad = 0
   credit.metalPriceDate = ''
   credit.creditDate = todayString.value
+  credit.created_at = ''
   credit.used = false
   credit.note = ''
   credit.credit_type = 'cash'
@@ -442,6 +446,7 @@ async function loadCredit(id) {
       credit.plat_cad = data.plat_cad || 0
       credit.metalPriceDate = data.gold_date || ''
       credit.creditDate = data.created_at ? data.created_at.split(' ')[0] : ''
+      credit.created_at = data.created_at || ''
       credit.used = !!data.used
       credit.note = data.note || ''
       credit.credit_type = data.credit_type || 'credit'

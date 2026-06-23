@@ -1,17 +1,11 @@
 <template>
   <v-card
-    class="image-dropzone d-flex flex-column align-center justify-center cursor-pointer transition-all"
+    class="image-dropzone-container d-flex flex-column"
     :class="{
-      'dropzone-dragging': isDragging,
       'dropzone-compact': compact,
       'dropzone-expanded': !compact
     }"
-    variant="outlined"
-    @dragover.prevent="onDragOver"
-    @dragenter.prevent="onDragEnter"
-    @dragleave.prevent="onDragLeave"
-    @drop.prevent="onDrop"
-    @click="triggerFileInput"
+    variant="flat"
   >
     <!-- Hidden file input -->
     <input
@@ -23,26 +17,45 @@
       @change="onFileChange"
     />
 
-    <!-- Compact Layout -->
-    <template v-if="compact">
-      <v-icon size="32" color="primary" class="mb-1">mdi-image-plus</v-icon>
-      <span class="text-caption font-weight-bold text-medium-emphasis">Add Photo</span>
-      <span class="text-caption-2 text-disabled text-center px-2">Drag or Click</span>
-    </template>
+    <!-- Top Half: Capture Button -->
+    <div
+      class="capture-area d-flex align-center justify-center cursor-pointer text-primary"
+      @click="emit('open-camera')"
+    >
+      <v-icon size="24" class="mr-2">mdi-camera</v-icon>
+      <span class="text-subtitle-2 font-weight-bold">Capture Photo</span>
+    </div>
 
-    <!-- Expanded Layout -->
-    <template v-else>
-      <v-icon size="48" color="primary" class="mb-2">mdi-cloud-upload-outline</v-icon>
-      <span class="text-body-1 font-weight-bold text-center mb-1">
-        Drag & drop photos here
-      </span>
-      <span class="text-body-2 text-medium-emphasis text-center mb-2">
-        or <span class="text-primary font-weight-medium">click to browse</span> files
-      </span>
-      <span class="text-caption text-disabled">
-        Supports JPEG, PNG
-      </span>
-    </template>
+    <v-divider></v-divider>
+
+    <!-- Bottom Half: Drop Zone -->
+    <div
+      class="drop-area d-flex flex-column align-center justify-center cursor-pointer"
+      :class="{ 'dropzone-dragging': isDragging }"
+      @dragover.prevent="onDragOver"
+      @dragenter.prevent="onDragEnter"
+      @dragleave.prevent="onDragLeave"
+      @drop.prevent="onDrop"
+      @click="triggerFileInput"
+    >
+      <!-- Compact Layout -->
+      <template v-if="compact">
+        <v-icon size="24" color="primary" class="mb-0.5">mdi-image-plus</v-icon>
+        <span class="text-caption font-weight-bold text-medium-emphasis">Upload Photo</span>
+        <span class="text-caption-2 text-disabled text-center">Drag or Click</span>
+      </template>
+
+      <!-- Expanded Layout -->
+      <template v-else>
+        <v-icon size="36" color="primary" class="mb-1">mdi-cloud-upload-outline</v-icon>
+        <span class="text-body-2 font-weight-bold text-center">
+          Drag & drop photos here
+        </span>
+        <span class="text-caption text-medium-emphasis text-center">
+          or <span class="text-primary font-weight-semibold">click to browse</span>
+        </span>
+      </template>
+    </div>
   </v-card>
 </template>
 
@@ -57,7 +70,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['upload'])
+const emit = defineEmits(['upload', 'open-camera'])
 
 const fileInputRef = ref(null)
 const isDragging = ref(false)
@@ -117,47 +130,58 @@ const processFiles = (files) => {
 </script>
 
 <style scoped>
-.image-dropzone {
-  border-style: dashed !important;
-  border-width: 2px !important;
-  border-color: rgba(var(--v-theme-primary), 0.4) !important;
+.image-dropzone-container {
+  border: 2px dashed rgba(var(--v-theme-primary), 0.4) !important;
+  border-radius: 8px;
   background-color: rgba(var(--v-theme-surface-variant), 0.02);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.25s ease;
   overflow: hidden;
-  position: relative;
+  box-sizing: border-box;
 }
 
-.image-dropzone:hover {
+.image-dropzone-container:hover {
   border-color: rgb(var(--v-theme-primary)) !important;
-  background-color: rgba(var(--v-theme-primary), 0.04);
-  transform: translateY(-1px);
-}
-
-.dropzone-dragging {
-  border-color: rgb(var(--v-theme-success)) !important;
-  background-color: rgba(var(--v-theme-success), 0.08) !important;
-  box-shadow: 0 0 10px rgba(var(--v-theme-success), 0.2);
-  transform: scale(0.99);
-}
-
-.dropzone-expanded {
-  min-height: 180px;
-  width: 100%;
-  padding: 24px;
-  border-radius: 12px;
 }
 
 .dropzone-compact {
-  height: 150px;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  height: 232px;
+  width: 100%;
 }
 
-.transition-all {
+.dropzone-expanded {
+  min-height: 185px;
+  width: 100%;
+}
+
+.capture-area {
+  height: 50%;
+  width: 100%;
   transition: all 0.2s ease;
+  background-color: transparent;
+  flex: 1;
+  user-select: none;
+}
+
+.capture-area:hover {
+  background-color: rgba(var(--v-theme-primary), 0.06);
+}
+
+.drop-area {
+  height: 50%;
+  width: 100%;
+  transition: all 0.2s ease;
+  background-color: transparent;
+  flex: 1;
+  user-select: none;
+}
+
+.drop-area:hover {
+  background-color: rgba(var(--v-theme-primary), 0.04);
+}
+
+.dropzone-dragging {
+  background-color: rgba(var(--v-theme-success), 0.08) !important;
+  box-shadow: inset 0 0 10px rgba(var(--v-theme-success), 0.15);
 }
 
 .text-caption-2 {

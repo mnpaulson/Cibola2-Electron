@@ -6,7 +6,7 @@
       <v-col cols="12" md="4" lg="4">
         <CustomerForm
           v-model="selectedId"
-          :clearable="true"
+          :clearable="false"
           @select="handleCustomerSelect"
           @new-customer="handleNewCustomer"
         />
@@ -35,14 +35,14 @@
       <v-col cols="12" md="8" lg="8">
         <v-card elevation="3" class="history-card rounded-lg">
           <!-- Toolbar with Quick Actions -->
-          <v-card-item class="bg-surface-variant py-3">
+          <v-card-item class="bg-accent1 text-white py-3">
             <v-row no-gutters align="center" justify="space-between">
               <v-col class="text-subtitle-1 font-weight-bold">
                 Activity & Records: {{ customerName }}
               </v-col>
               <v-col class="d-flex justify-end gap-2 shrink">
                 <v-btn
-                  color="primary"
+                  color="job"
                   variant="elevated"
                   prepend-icon="mdi-briefcase-outline"
                   size="small"
@@ -51,18 +51,18 @@
                   New Job
                 </v-btn>
                 <v-btn
-                  color="warning"
+                  color="credit"
                   variant="elevated"
-                  prepend-icon="mdi-wallet-membership"
+                  prepend-icon="mdi-credit-card-outline"
                   size="small"
                   @click="createNewRecord('credits')"
                 >
                   New Credit
                 </v-btn>
                 <v-btn
-                  color="info"
+                  color="sheet"
                   variant="elevated"
-                  prepend-icon="mdi-file-document-outline"
+                  prepend-icon="mdi-list-box-outline"
                   size="small"
                   @click="createNewRecord('customsheets')"
                 >
@@ -140,11 +140,12 @@
                   v-else
                   v-for="item in sortedHistory"
                   :key="item.type + '-' + item.id"
-                  class="cursor-pointer transition-row"
+                  class="cursor-pointer transition-row accent-border-row"
+                  :class="'record-accent-' + item.type"
                   @click="goToRecord(item)"
                 >
-                  <td class="font-weight-bold text-primary">#{{ item.id }}</td>
-                  <td>{{ item.typeName }}</td>
+                  <td class="font-weight-bold" :class="'text-' + getTypeColor(item.type)">#{{ item.id }}</td>
+                  <td :class="'text-' + getTypeColor(item.type)">{{ item.typeName }}</td>
                   <td>
                     <template v-if="item.type === 'job'">
                       <span v-if="!item.original.estimate || Number(item.original.estimate) === 0">No Estimate</span>
@@ -171,7 +172,7 @@
     <v-row v-else>
       <v-col cols="12">
         <v-card elevation="2" class="directory-card rounded-lg">
-          <v-card-item class="bg-primary text-white py-3">
+          <v-card-item class="bg-accent1 text-white py-3">
             <v-row no-gutters align="center" justify="space-between">
               <v-col class="text-h6 font-weight-bold">
                 <v-icon start class="mr-2">mdi-account-box-multiple</v-icon>
@@ -192,10 +193,10 @@
               </v-col>
               <v-col class="shrink ml-3">
                 <v-btn
-                  color="white"
+                  color="customer"
                   variant="flat"
                   prepend-icon="mdi-account-plus"
-                  size="small"
+                  height="40"
                   @click="openNewCustomerDirectly"
                 >
                   New Customer
@@ -252,10 +253,10 @@
                 v-else
                 v-for="cust in paginatedDirectory"
                 :key="cust.id"
-                class="cursor-pointer transition-row hover-shadow"
+                class="cursor-pointer transition-row hover-shadow accent-border-row record-accent-customer"
                 @click="navigateTo('customers', { selectedCustomerId: cust.id })"
               >
-                <td class="font-weight-bold text-body-2 text-primary py-3">
+                <td class="font-weight-bold text-body-2 py-3 text-customer">
                   {{ cust.fname }} {{ cust.lname }}
                 </td>
                 <td class="text-body-2">{{ cust.phone || '—' }}</td>
@@ -313,7 +314,7 @@
         Deleting this customer will permanently delete all associated items:
         <ul class="pl-4 mt-1">
           <li><strong>{{ jobs.length }}</strong> Jobs and their photos</li>
-          <li><strong>{{ credits.length }}</strong> Store Credits</li>
+          <li><strong>{{ credits.length }}</strong> Credits</li>
           <li><strong>{{ customSheets.length }}</strong> Custom Sheets</li>
         </ul>
       </v-alert>
@@ -332,6 +333,22 @@ import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue'
 import { removeRecentRecord } from '../store/recentlyViewed'
 
 // Local State
+function getTypeColor(type) {
+  switch (type) {
+    case 'job':
+      return 'job'
+    case 'credit':
+      return 'credit'
+    case 'sheet':
+    case 'custom':
+      return 'sheet'
+    case 'customer':
+      return 'customer'
+    default:
+      return 'grey'
+  }
+}
+
 // Local State
 const selectedId = ref(null)
 
@@ -382,7 +399,7 @@ const combinedHistory = computed(() => {
     list.push({
       id: credit.id,
       type: 'credit',
-      typeName: 'Store Credit',
+      typeName: 'Credit',
       details: detailsText,
       created_at: credit.created_at || '',
       original: credit
@@ -393,7 +410,7 @@ const combinedHistory = computed(() => {
     list.push({
       id: sheet.id,
       type: 'sheet',
-      typeName: 'Custom Sheet',
+      typeName: 'Sheet',
       details: sheet.name || '',
       created_at: sheet.created_at || '',
       original: sheet

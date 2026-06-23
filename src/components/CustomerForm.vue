@@ -1,7 +1,10 @@
 <template>
   <v-card
     class="customer-card"
-    :class="{ 'flat-customer-card': flat && currentState === 'search' }"
+    :class="{ 
+      'flat-customer-card': flat && currentState === 'search',
+      'record-accent-customer': currentState === 'info'
+    }"
     :elevation="(flat && currentState === 'search') ? 0 : 3"
     :variant="(flat && currentState === 'search') ? 'flat' : 'elevated'"
     :loading="loading"
@@ -67,7 +70,7 @@
       <v-fade-transition hide-on-leave>
         <div v-if="currentState === 'info'" class="customer-info-container">
           <v-row>
-            <v-col cols="12" md="6" class="py-1">
+            <v-col cols="12" :md="showActivity ? (hideNotes ? 6 : 4) : (hideNotes ? 12 : 6)" class="py-1">
               <div class="mb-2">
                 <div>
                   <h3
@@ -113,7 +116,7 @@
             </v-col>
 
             <!-- Customer Notes -->
-            <v-col cols="12" md="6" v-if="!hideNotes">
+            <v-col cols="12" :md="showActivity ? 4 : 6" v-if="!hideNotes">
               <!-- Pulsing Warning Alert when a customer note exists (only above the note field itself) -->
               <v-alert
                 v-if="customer.note"
@@ -174,6 +177,49 @@
                   </v-btn>
                 </div>
               </v-expand-transition>
+            </v-col>
+
+            <!-- Activity Summary Column -->
+            <v-col cols="12" :md="hideNotes ? 6 : 4" class="py-1" v-if="showActivity">
+              <div class="activity-summary-column pl-md-4">
+                <div class="text-caption text-medium-emphasis mb-2 font-weight-bold uppercase tracking-wider">
+                  Activity Summary
+                </div>
+                <div class="d-flex flex-column gap-2">
+                  <!-- Jobs Count -->
+                  <div class="stat-card d-flex align-center justify-space-between pa-2 rounded-lg">
+                    <div class="d-flex align-center">
+                      <v-avatar size="32" class="bg-job-avatar text-white mr-3">
+                        <v-icon size="18">mdi-briefcase-outline</v-icon>
+                      </v-avatar>
+                      <span class="text-body-2 font-weight-medium">Total Jobs</span>
+                    </div>
+                    <span class="text-subtitle-1 font-weight-bold text-job pr-2">{{ customer.job_count ?? 0 }}</span>
+                  </div>
+
+                  <!-- Gold Credits Count -->
+                  <div class="stat-card d-flex align-center justify-space-between pa-2 rounded-lg">
+                    <div class="d-flex align-center">
+                      <v-avatar size="32" class="bg-credit-avatar text-white mr-3">
+                        <v-icon size="18">mdi-credit-card-outline</v-icon>
+                      </v-avatar>
+                      <span class="text-body-2 font-weight-medium">Gold Credits</span>
+                    </div>
+                    <span class="text-subtitle-1 font-weight-bold text-credit pr-2">{{ customer.credit_count ?? 0 }}</span>
+                  </div>
+
+                  <!-- Custom Sheets Count -->
+                  <div class="stat-card d-flex align-center justify-space-between pa-2 rounded-lg">
+                    <div class="d-flex align-center">
+                      <v-avatar size="32" class="bg-sheet-avatar text-white mr-3">
+                        <v-icon size="18">mdi-list-box-outline</v-icon>
+                      </v-avatar>
+                      <span class="text-body-2 font-weight-medium">Custom Sheets</span>
+                    </div>
+                    <span class="text-subtitle-1 font-weight-bold text-sheet pr-2">{{ customer.custom_sheet_count ?? 0 }}</span>
+                  </div>
+                </div>
+              </div>
             </v-col>
           </v-row>
         </div>
@@ -302,7 +348,7 @@
           size="small"
           @click="currentState = 'form'"
         >
-          Edit Profile
+          Edit
         </v-btn>
       </template>
 
@@ -368,6 +414,10 @@ const props = defineProps({
   lockNotes: {
     type: Boolean,
     default: false
+  },
+  showActivity: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -403,7 +453,10 @@ const customer = reactive({
   addr_prov: '',
   addr_postal: '',
   addr_country: '',
-  note: ''
+  note: '',
+  job_count: 0,
+  credit_count: 0,
+  custom_sheet_count: 0
 })
 
 // Validation Rules
@@ -575,6 +628,9 @@ async function loadCustomer(id) {
     const data = await api.get(`/customers/${id}`)
     if (data) {
       Object.assign(customer, data)
+      customer.job_count = data.job_count ?? 0
+      customer.credit_count = data.credit_count ?? 0
+      customer.custom_sheet_count = data.custom_sheet_count ?? 0
       startingNote.value = data.note || ''
       currentState.value = 'info'
       isNotesLocked.value = props.lockNotes
@@ -655,6 +711,9 @@ function resetFormFields() {
   customer.addr_postal = ''
   customer.addr_country = ''
   customer.note = ''
+  customer.job_count = 0
+  customer.credit_count = 0
+  customer.custom_sheet_count = 0
   startingNote.value = ''
   noteSavingStatus.value = ''
   isNotesLocked.value = props.lockNotes
@@ -701,7 +760,16 @@ async function saveCustomer() {
     }
 
     if (responseData) {
+      const currentJobCount = customer.job_count
+      const currentCreditCount = customer.credit_count
+      const currentSheetCount = customer.custom_sheet_count
+
       Object.assign(customer, responseData)
+
+      customer.job_count = responseData.job_count ?? currentJobCount
+      customer.credit_count = responseData.credit_count ?? currentCreditCount
+      customer.custom_sheet_count = responseData.custom_sheet_count ?? currentSheetCount
+
       startingNote.value = responseData.note || ''
       currentState.value = 'info'
       emit('update:modelValue', responseData.id)
@@ -851,5 +919,38 @@ onMounted(() => {
 .locked-textarea :deep(.v-field) {
   background-color: rgba(var(--v-theme-on-surface), 0.03) !important;
   border-radius: 8px !important;
+}
+
+.stat-card {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border: 1px solid rgba(var(--v-border-color), 0.08);
+  background: rgba(var(--v-theme-on-surface), 0.02);
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  background: rgba(var(--v-theme-on-surface), 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+@media (min-width: 960px) {
+  .border-left-md {
+    border-left: 1px solid rgba(var(--v-border-color), 0.12);
+  }
+}
+
+.tracking-wider {
+  letter-spacing: 0.08em;
+}
+
+.bg-job-avatar {
+  background-color: rgb(var(--v-theme-job)) !important;
+}
+
+.bg-credit-avatar {
+  background-color: rgb(var(--v-theme-credit)) !important;
+}
+
+.bg-sheet-avatar {
+  background-color: rgb(var(--v-theme-sheet)) !important;
 }
 </style>

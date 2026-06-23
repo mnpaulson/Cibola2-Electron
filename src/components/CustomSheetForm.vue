@@ -1,12 +1,12 @@
 <template>
   <v-card class="sheet-card pb-20" elevation="3" :loading="loading">
     <!-- Header -->
-    <v-card-item class="bg-primary text-white py-3">
-      <v-card-title class="font-weight-bold text-subtitle-1 d-flex align-center">
+    <v-card-item class="bg-accent1 text-white py-3">
+      <v-card-title class="font-weight-bold bg-accent1 d-flex align-center">
         <v-icon start class="mr-2">mdi-list-box-outline</v-icon>
         {{ sheet.id ? `Edit Custom Sheet #${sheet.id}` : 'New Custom Sheet' }}
         <v-spacer></v-spacer>
-        <span v-if="sheet.created_at" class="text-caption font-weight-medium">
+        <span v-if="sheet.created_at" class="font-weight-medium">
           Created: {{ formatDate(sheet.created_at) }}
         </span>
       </v-card-title>
@@ -23,6 +23,7 @@
           :hide-notes="false"
           :clickable-name="true"
           :lock-notes="true"
+          :show-activity="true"
           @select="handleCustomerSelect"
           @click-name="navigateTo('customers', { selectedCustomerId: sheet.customer_id })"
           @dirty-state-change="isCustomerDirty = $event"

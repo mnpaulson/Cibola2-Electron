@@ -32,3 +32,8 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Local environment files
+.env
+.env.local
+.env.*.local

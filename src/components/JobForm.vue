@@ -1,12 +1,12 @@
 <template>
   <v-card class="job-card pb-20" elevation="3" :loading="loading">
     <!-- Header -->
-    <v-card-item class="bg-primary text-white py-3">
-      <v-card-title class="font-weight-bold text-subtitle-1 d-flex align-center">
+    <v-card-item class="bg-accent1 text-white py-3">
+      <v-card-title class="font-weight-bold d-flex align-center">
         <v-icon start class="mr-2">mdi-briefcase-outline</v-icon>
         {{ job.id ? `Edit Job #${job.id}` : 'Create New Job' }}
         <v-spacer></v-spacer>
-        <span v-if="job.created_at" class="text-caption font-weight-medium">
+        <span v-if="job.created_at" class="font-weight-medium">
           Created: {{ formatDate(job.created_at) }}
         </span>
       </v-card-title>
@@ -24,6 +24,7 @@
             :hide-notes="false"
             :clickable-name="true"
             :lock-notes="true"
+            :show-activity="true"
             @select="handleCustomerSelect"
             @click-name="navigateTo('customers', { selectedCustomerId: job.customer_id })"
             @dirty-state-change="isCustomerDirty = $event"
@@ -57,31 +58,19 @@
               density="compact"
             ></v-select>
 
-            <v-menu
-              v-model="dateMenu"
-              :close-on-content-click="false"
-              transition="scale-transition"
-              min-width="auto"
-            >
-              <template v-slot:activator="{ props }">
-                <v-text-field
-                  v-model="dueDateModel"
-                  label="Due Date"
-                  prepend-inner-icon="mdi-calendar"
-                  readonly
-                  v-bind="props"
-                  variant="outlined"
-                  density="compact"
-                  clearable
-                ></v-text-field>
-              </template>
-              <v-date-picker
-                v-model="dueDateValue"
-                no-title
-                color="primary"
-                @update:model-value="dateMenu = false"
-              ></v-date-picker>
-            </v-menu>
+            <v-text-field
+              ref="dateInputRef"
+              v-model="job.due_date"
+              label="Due Date"
+              type="date"
+              prepend-inner-icon="mdi-calendar"
+              variant="outlined"
+              density="compact"
+              @click:prepend-inner="showDatePicker"
+              @click="showDatePicker"
+              class="custom-date-field"
+              clearable
+            ></v-text-field>
 
             <v-text-field
               v-model="job.deposit"
@@ -121,6 +110,17 @@
         </v-row>
       </v-form>
 
+      <!-- Print Limits Warning -->
+      <v-alert
+        v-if="showPrintLimitWarning"
+        type="warning"
+        variant="tonal"
+        class="mt-4 mb-2"
+        density="compact"
+      >
+        {{ printWarningText }}
+      </v-alert>
+
       <!-- Attached Jewelry Images Grid -->
       <v-row class="mt-4">
         <v-col cols="12">
@@ -150,7 +150,7 @@
       :disable-save="!isFormValid || isCustomerDirty"
       :show-print-close="true"
       :disable-print-close="!isFormValid || isCustomerDirty"
-      :disable-print="isCustomerDirty"
+      :disable-print="isCustomerDirty || isJobDirty"
       :customer-dirty="isCustomerDirty"
       @discard="discardJob"
       @delete="isDeleteJobOpen = true"
@@ -204,40 +204,14 @@ const isCustomerDirty = ref(false)
 const isDeleteJobOpen = ref(false)
 
 const customerObj = ref(null)
-const dateMenu = ref(false)
+const dateInputRef = ref(null)
 
-const dueDateModel = computed({
-  get() {
-    return formatDate(job.due_date)
-  },
-  set(val) {
-    if (!val) {
-      job.due_date = ''
-    }
+function showDatePicker() {
+  const input = dateInputRef.value?.$el.querySelector('input')
+  if (input && typeof input.showPicker === 'function') {
+    input.showPicker()
   }
-})
-
-const dueDateValue = computed({
-  get() {
-    if (!job.due_date) return null
-    const parts = job.due_date.split('-')
-    if (parts.length === 3) {
-      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10))
-    }
-    return null
-  },
-  set(val) {
-    if (!val) {
-      job.due_date = ''
-      return
-    }
-    const dateObj = new Date(val)
-    const year = dateObj.getFullYear()
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-    const day = String(dateObj.getDate()).padStart(2, '0')
-    job.due_date = `${year}-${month}-${day}`
-  }
-})
+}
 
 const job = reactive({
   id: null,
@@ -253,6 +227,42 @@ const job = reactive({
   completed_at: '',
   created_at: '',
   job_images: []
+})
+
+const savedJobState = ref('')
+
+function takeSnapshot() {
+  savedJobState.value = JSON.stringify({
+    customer_id: job.customer_id,
+    employee_id: job.employee_id,
+    estimate: job.estimate,
+    deposit: job.deposit,
+    est_note: job.est_note,
+    note: job.note,
+    appraisal: job.appraisal,
+    vital_date: job.vital_date,
+    due_date: job.due_date,
+    job_images: (job.job_images || []).map(img => ({ id: img.id, note: img.note }))
+  })
+}
+
+const isJobDirty = computed(() => {
+  if (!job.id) return true
+
+  const currentState = JSON.stringify({
+    customer_id: job.customer_id,
+    employee_id: job.employee_id,
+    estimate: job.estimate,
+    deposit: job.deposit,
+    est_note: job.est_note,
+    note: job.note,
+    appraisal: job.appraisal,
+    vital_date: job.vital_date,
+    due_date: job.due_date,
+    job_images: (job.job_images || []).map(img => ({ id: img.id, note: img.note }))
+  })
+
+  return currentState !== savedJobState.value
 })
 
 // Rules
@@ -276,6 +286,22 @@ const today = computed(() => {
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+})
+
+const showPrintLimitWarning = computed(() => {
+  const images = job.job_images || []
+  const imgCount = images.length
+  const noteCount = images.filter(img => img.note && img.note.trim()).length
+  const combined = imgCount + noteCount
+  return imgCount > 12 || combined > 16
+})
+
+const printWarningText = computed(() => {
+  const images = job.job_images || []
+  const imgCount = images.length
+  const noteCount = images.filter(img => img.note && img.note.trim()).length
+  const combined = imgCount + noteCount
+  return `Warning: Print layout limits exceeded. You have (${imgCount} images, ${combined} combined items). The printed out supports up to 12 images or 16 combined images and notes. Some images or notes will be omitted from the printed out.`
 })
 
 // Fetch customer when customerId prop updates
@@ -332,6 +358,8 @@ function resetJobFields() {
   job.completed_at = ''
   job.created_at = ''
   job.job_images = []
+  
+  takeSnapshot()
 }
 
 // Load Job details from API
@@ -353,6 +381,8 @@ async function loadJob(id) {
       job.completed_at = data.completed_at || ''
       job.created_at = data.created_at || ''
       job.job_images = data.job_images || []
+      
+      takeSnapshot()
     }
   } catch (err) {
     console.error('Failed to load job details:', err)
@@ -395,6 +425,7 @@ async function saveOrUpdateJob(print = false, close = false) {
     }
 
     if (savedJob) {
+      const isNew = !job.id
       Object.assign(job, savedJob)
       emit('update:jobId', savedJob.id)
       emit('saved', savedJob)
@@ -406,9 +437,11 @@ async function saveOrUpdateJob(print = false, close = false) {
 
       if (close) {
         navigateBack()
-      } else if (!job.id) {
+      } else if (isNew) {
         // Switch view to edit mode for the saved job
         loadJob(savedJob.id)
+      } else {
+        takeSnapshot()
       }
     }
   } catch (err) {
@@ -425,12 +458,11 @@ async function printOnly() {
     showToast('Please save or discard customer note/profile changes first.', 'warning')
     return
   }
-  if (!job.id) {
-    // Save first to get an ID before printing
-    await saveOrUpdateJob(true, false)
-  } else {
-    await executeHeadlessPrint()
+  if (isJobDirty.value) {
+    showToast('Please save your job changes before printing.', 'warning')
+    return
   }
+  await executeHeadlessPrint()
 }
 
 function downloadPrintPreview() {
@@ -544,5 +576,9 @@ async function executeHeadlessPrint() {
   .custom-est-textarea :deep(textarea) {
     height: 100% !important;
   }
+}
+.custom-date-field :deep(input[type="date"]::-webkit-calendar-picker-indicator) {
+  display: none;
+  -webkit-appearance: none;
 }
 </style>

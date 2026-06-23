@@ -1,7 +1,7 @@
 <template>
   <v-card class="recently-viewed-card rounded-lg" elevation="2" border>
     <!-- Header -->
-    <v-card-item class="bg-primary text-white py-3">
+    <v-card-item class="bg-accent1 text-white py-3">
       <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center">
         <v-icon start class="mr-2">mdi-history</v-icon>
         Recently Viewed Records
@@ -26,18 +26,19 @@
       <v-table hover fixed-header class="recently-viewed-table" style="table-layout: fixed; width: 100%;" v-if="records.length > 0">
         <thead>
           <tr>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 55px;">Preview</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 90px;">Type</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 70px;">Record</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 50px;">Preview</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 80px;">Type</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 65px;">Record</th>
             <th class="text-left font-weight-bold text-caption py-2">Details</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 90px;">Created</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 80px;">Created</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="item in records"
             :key="item.type + '-' + item.id"
-            class="cursor-pointer transition-row"
+            class="cursor-pointer transition-row accent-border-row"
+            :class="'record-accent-' + item.type"
             @click="goToRecord(item)"
           >
             <!-- Preview / Thumbnail Column -->
@@ -64,12 +65,12 @@
 
             <!-- Record Type Column -->
             <td class="py-2">
-              <span class="text-body-2 font-weight-medium">{{ item.typeName }}</span>
+              <span class="text-body-2 font-weight-bold" :class="'text-' + getTypeColor(item.type)">{{ item.typeName }}</span>
             </td>
 
             <!-- Record ID Column -->
             <td class="py-2">
-              <span class="font-weight-bold text-primary text-body-2">#{{ item.id }}</span>
+              <span class="font-weight-bold text-medium-emphasis text-body-2">#{{ item.id }}</span>
             </td>
 
             <!-- Details Column -->
@@ -150,13 +151,13 @@ function getTypeIcon(type) {
 function getTypeColor(type) {
   switch (type) {
     case 'job':
-      return 'primary' // blue
+      return 'job'
     case 'credit':
-      return 'warning' // amber
+      return 'credit'
     case 'sheet':
-      return 'info' // teal
+      return 'sheet'
     case 'customer':
-      return 'secondary' // purple
+      return 'customer'
     default:
       return 'grey'
   }
@@ -210,7 +211,4 @@ function clearHistory() {
   border: 1px solid rgba(var(--v-border-color), 0.12) !important;
 }
 
-.mt-0.5 {
-  margin-top: 2px;
-}
 </style>

@@ -64,52 +64,54 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
   const day = String(d.getDate()).padStart(2, '0')
   const todayDateStr = formatPrintDate(`${year}-${month}-${day}`)
 
-  // Get first 6 images
-  const jobImages = job.job_images && Array.isArray(job.job_images) ? job.job_images.slice(0, 6) : []
+  // Get first 16 images
+  const jobImages = job.job_images && Array.isArray(job.job_images) ? job.job_images.slice(0, 16) : []
 
-  let q1ImagesHTML = ''
-  let q2ImagesHTML = ''
+  const allItems = []
 
   for (let i = 0; i < jobImages.length; i++) {
     const img = jobImages[i]
     const imgUrl = getImageUrl(img.image)
     const imgNote = (img.note || '').trim()
 
-    const isQ1 = (i < 3)
-    const rowClass = isQ1 ? 'q1-row' : 'q2-row'
-
-    const rowHTML = `
-      <div class="image-row ${rowClass}">
+    // Add Image Card
+    allItems.push(`
+      <div class="image-card">
         <div class="img-cell">
           <img src="${imgUrl}" />
         </div>
-        <div class="note-cell ${imgNote ? '' : 'ruled-lines'}">
-          ${imgNote ? `<div class="note-text">${imgNote}</div>` : ''}
-        </div>
       </div>
-    `
+    `)
 
-    if (isQ1) {
-      q1ImagesHTML += rowHTML
-    } else {
-      q2ImagesHTML += rowHTML
+    // Add Note Card if present
+    if (imgNote) {
+      allItems.push(`
+        <div class="image-card note-card">
+          <div class="note-text">${imgNote}</div>
+        </div>
+      `)
     }
   }
 
-  // Bottom Customer Copy (up to 4 images split across Q3 and Q4, 1 per row)
+  const q1ImagesHTML = allItems.slice(0, 6).join('')
+  const q2ImagesHTML = allItems.slice(6, 16).join('')
+
+  // Bottom Customer Copy (up to 12 images split evenly across Q3 and Q4)
   let q3ImagesHTML = ''
   let q4ImagesHTML = ''
+  const limit = Math.min(jobImages.length, 12)
+  const q3Count = Math.ceil(limit / 2)
+  const isTwoCol = jobImages.length > 6
 
-  for (let i = 0; i < jobImages.length; i++) {
+  for (let i = 0; i < limit; i++) {
     const img = jobImages[i]
-    if (i >= 4) break // cap customer copy images at 4 total
     const fullUrl = getImageUrl(img.image)
     const imgHTML = `
       <div class="cust-image-row">
         <img src="${fullUrl}" />
       </div>
     `
-    if (i < 2) {
+    if (i < q3Count) {
       q3ImagesHTML += imgHTML
     } else {
       q4ImagesHTML += imgHTML
@@ -187,16 +189,16 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
     
     /* Folding/Tearing boundaries */
     .q-top-left {
-      border-right: 1px dashed #bbb;
-      border-bottom: 1px dashed #bbb;
+      border-right: 1px solid #FFF;
+      border-bottom: 1px solid #FFF;
       justify-content: flex-start !important;
     }
     .q-top-right {
-      border-bottom: 1px dashed #bbb;
+      border-bottom: 1px solid #FFF;
       justify-content: flex-start !important;
     }
     .q-bottom-left {
-      border-right: 1px dashed #bbb;
+      border-right: 1px solid #FFF;
     }
     .q-bottom-right {
     }
@@ -207,7 +209,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       box-sizing: border-box;
     }
     .text-details {
-      height: 75mm;
+      height: 60mm;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -379,7 +381,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
     }
 
     .notes-block {
-      height: 32mm;
+      height: 18mm;
       margin-bottom: 2px;
     }
     .notes-content {
@@ -402,75 +404,64 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       box-sizing: border-box;
     }
 
-    /* Q1 & Q2: Image Rows (One per Row Layout) */
-    .image-row {
-      display: flex;
-      gap: 0.5mm;
+    /* Q1 & Q2: 2-Column Grid Layout */
+    .image-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5mm;
       width: 100%;
-      align-items: stretch;
       box-sizing: border-box;
     }
-    .q-top-left .image-row + .image-row, .q-top-right .image-row + .image-row {
-      margin-top: 0.5mm;
+    .q1-grid {
+      margin-top: 1.5mm;
     }
-    .q1-row {
-      max-height: 30mm;
+    .image-card {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      box-sizing: border-box;
+      width: 100%;
     }
-    .q2-row {
-      max-height: 30mm;
+    .q1-grid .image-card, .q2-grid .image-card {
+      height: 30mm;
     }
     .img-cell {
-      border: none;
-      border-radius: 4px;
-      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      background: #f9f9f9;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #f9f9f9;
+      overflow: hidden;
       box-sizing: border-box;
     }
-    .q1-row .img-cell {
-        width: 48mm;
-        height: auto;
-        max-height: 28mm;
-    }
-    .q2-row .img-cell {
-      width: 48mm;
-      height: auto;
-      max-height: 30mm;
-    }
     .img-cell img {
-      max-width: 100%;
-      max-height: 100%;
-      width: auto;
-      height: auto;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
       display: block;
     }
-    .note-cell {
-      flex: 1;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 3px 5px;
-      box-sizing: border-box;
-      background: #fff;
-      overflow: hidden;
+    .note-card {
+      padding: 6px 8px;
+      justify-content: center;
+      align-items: center;
+      background: #fafafa;
+      border: 1px dashed #bbb;
     }
     .note-text {
-      font-size: 9px;
-      color: #000;
+      font-size: 9.5px;
+      color: #333;
       line-height: 1.3;
+      text-align: center;
       overflow: hidden;
       text-overflow: ellipsis;
       display: -webkit-box;
       -webkit-box-orient: vertical;
       white-space: pre-wrap;
-    }
-    .q1-row .note-text {
-      -webkit-line-clamp: 4;
-    }
-    .q2-row .note-text {
-      -webkit-line-clamp: 9;
+      word-break: break-word;
+      max-width: 100%;
+      -webkit-line-clamp: 6;
     }
 
     /* Bottom-Left Quadrant (Q3) */
@@ -500,6 +491,12 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       margin-top: 2mm;
       box-sizing: border-box;
       overflow: hidden;
+    }
+    .two-col-grid {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr;
+      grid-auto-rows: 1fr;
+      gap: 1.5mm;
     }
     .cust-image-row {
       width: 100%;
@@ -659,12 +656,16 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       </div>
 
       <!-- Q1 Images Section -->
-      ${q1ImagesHTML}
+      <div class="image-grid q1-grid">
+        ${q1ImagesHTML}
+      </div>
     </div>
 
     <!-- Quadrant 2 (Top Right): Job Images / Sketches -->
     <div class="quadrant q-top-right">
-      ${q2ImagesHTML}
+      <div class="image-grid q2-grid">
+        ${q2ImagesHTML}
+      </div>
     </div>
 
     <!-- Quadrant 3 (Bottom Left): Customer Receipt Copy -->
@@ -678,7 +679,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
         </div>
       </div>
       
-      <div class="q3-image-area">
+      <div class="q3-image-area ${isTwoCol ? 'two-col-grid' : ''}">
         ${q3ImagesHTML}
       </div>
     </div>
@@ -707,7 +708,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       </div>
 
       <!-- Q4 Images Area -->
-      <div class="q4-image-area">
+      <div class="q4-image-area ${isTwoCol ? 'two-col-grid' : ''}">
         ${q4ImagesHTML}
       </div>
 

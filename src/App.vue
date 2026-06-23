@@ -31,7 +31,7 @@
           :value="item.value"
           :active="activeTab === item.value"
           @click="handleTabClick(item.value)"
-          color="primary"
+          :color="getMenuItemColor(item.value)"
           class="menu-item-transition"
         ></v-list-item>
       </v-list>
@@ -82,9 +82,51 @@
 
       <v-spacer></v-spacer>
 
-      <v-btn icon>
-        <v-icon>mdi-bell-outline</v-icon>
-      </v-btn>
+      <!-- Notifications Menu -->
+      <v-menu v-if="notificationsState.list.length > 0" offset-y transition="slide-y-transition" close-on-content-click>
+        <template v-slot:activator="{ props }">
+          <v-btn icon v-bind="props" title="Notifications">
+            <v-badge :content="notificationsState.list.length" color="error" overlap>
+              <v-icon>mdi-bell-outline</v-icon>
+            </v-badge>
+          </v-btn>
+        </template>
+        <v-list width="350" class="pa-0 rounded-lg elevation-4">
+          <v-list-subheader class="bg-primary text-white py-3 px-4 font-weight-bold d-flex justify-space-between align-center">
+            <span class="text-subtitle-1">Notifications</span>
+            <v-btn variant="text" density="compact" size="small" color="white" class="text-none font-weight-medium" @click.stop="clearAllNotifications">
+              Clear All
+            </v-btn>
+          </v-list-subheader>
+          <v-divider></v-divider>
+          <v-list-item
+            v-for="notif in notificationsState.list"
+            :key="notif.id"
+            :title="notif.title"
+            :subtitle="notif.message"
+            class="py-3 cursor-pointer"
+            @click="handleNotificationClick(notif)"
+          >
+            <template v-slot:prepend>
+              <v-avatar :color="notif.color || 'primary'" variant="tonal" size="36" class="mr-3">
+                <v-icon size="20">{{ notif.icon || 'mdi-information' }}</v-icon>
+              </v-avatar>
+            </template>
+            <template v-slot:append>
+              <v-btn
+                icon="mdi-close"
+                variant="text"
+                density="comfortable"
+                size="small"
+                color="medium-emphasis"
+                @click.stop="removeNotification(notif.id)"
+                title="Dismiss"
+              ></v-btn>
+            </template>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+
       <v-btn icon title="Submit Feedback" @click="isFeedbackOpen = true">
         <v-icon>mdi-comment-text-outline</v-icon>
       </v-btn>
@@ -100,9 +142,9 @@
         
         <!-- Dashboard / Overview -->
         <div v-if="activeTab === 'dashboard'">
-          <v-row justify="center" class="mt-4">
+          <v-row class="mt-4">
             <!-- Left Column: Search & Quick Actions -->
-            <v-col cols="12" md="3" class="mb-6 mb-md-0">
+            <v-col cols="12" md="4" class="mb-6 mb-md-0">
 
               <div class="mb-6">
                 <!-- Direct flat customer search component -->
@@ -130,7 +172,7 @@
                 >
                   <template v-slot:append-inner>
                     <v-btn
-                      color="primary"
+                      color="job"
                       icon="mdi-plus"
                       variant="text"
                       density="comfortable"
@@ -144,7 +186,7 @@
               <!-- Quick Action Buttons -->
               <div class="d-flex flex-column">
                 <v-btn
-                  color="primary"
+                  color="job"
                   size="large"
                   prepend-icon="mdi-briefcase-outline"
                   variant="tonal"
@@ -154,7 +196,7 @@
                   New Job
                 </v-btn>
                 <v-btn
-                  color="primary"
+                  color="credit"
                   size="large"
                   prepend-icon="mdi-credit-card-outline"
                   variant="tonal"
@@ -165,7 +207,7 @@
                   New Credit
                 </v-btn>
                 <v-btn
-                  color="primary"
+                  color="sheet"
                   size="large"
                   prepend-icon="mdi-list-box-outline"
                   variant="tonal"
@@ -280,6 +322,13 @@ import RecentlyCreated from './components/RecentlyCreated.vue'
 import { loadRecentlyViewed } from './store/recentlyViewed'
 import { toastState, showToast } from './store/toast'
 import FeedbackDialog from './components/FeedbackDialog.vue'
+import {
+  notificationsState,
+  removeNotification,
+  clearAllNotifications,
+  initUpdaterListeners,
+  checkUpdates
+} from './store/notifications'
 
 const theme = useTheme()
 
@@ -291,6 +340,19 @@ onMounted(async () => {
     startHeartbeat(settingsState.serverURL)
   }
   loadRecentlyViewed()
+
+  // Initialize auto-updater IPC listeners
+  initUpdaterListeners()
+
+  // Initial update check after 5 seconds
+  setTimeout(() => {
+    checkUpdates(true) // Silent check
+  }, 5000)
+
+  // Periodic check every 30 minutes
+  const updateIntervalId = setInterval(() => {
+    checkUpdates(true)
+  }, 30 * 60 * 1000)
 
   let lastBackTime = 0
   const throttleBack = () => {
@@ -351,6 +413,9 @@ onMounted(async () => {
     }
     if (ipcForwardUnsubscribe) {
       ipcForwardUnsubscribe()
+    }
+    if (updateIntervalId) {
+      clearInterval(updateIntervalId)
     }
   }
 })
@@ -446,6 +511,13 @@ const startNewCustomSheetFromDashboard = () => {
   navigateTo('custom', { activeSheetId: 0, selectedCustomerId: null })
 }
 
+const handleNotificationClick = (notif) => {
+  if (notif.id === 'new-version' || notif.id === 'new-version-downloaded') {
+    navigateTo('config')
+  }
+  removeNotification(notif.id)
+}
+
 const handleTabClick = (value) => {
   // Sidebar clicking navigates to the top-level list of that tab (resets parameters)
   navigateTo(value)
@@ -455,6 +527,14 @@ const isDark = ref(true)
 const toggleTheme = () => {
   isDark.value = !isDark.value
   theme.global.name.value = isDark.value ? 'dark' : 'light'
+}
+
+const getMenuItemColor = (value) => {
+  if (value === 'customers') return 'customer'
+  if (value === 'jobs') return 'job'
+  if (value === 'credits') return 'credit'
+  if (value === 'custom') return 'sheet'
+  return 'primary'
 }
 
 const menuItems = [
@@ -537,5 +617,32 @@ const currentMenuIcon = computed(() => {
   justify-content: center;
   padding: 0 !important;
   margin: 0 !important;
+}
+
+/* Global Record Left Accent Highlighting classes */
+.record-accent-job {
+  border-left: 4px solid var(--v-theme-job) !important;
+}
+.record-accent-credit {
+  border-left: 4px solid var(--v-theme-credit) !important;
+}
+.record-accent-sheet {
+  border-left: 4px solid var(--v-theme-sheet) !important;
+}
+.record-accent-customer {
+  border-left: 4px solid var(--v-theme-customer) !important;
+}
+
+/* Styling to align the accent table borders nicely */
+.accent-border-row td:first-child {
+  position: relative;
+}
+
+/* Tone down intensity of white font on bg-accent1 headers in dark mode only */
+.v-theme--dark .bg-accent1,
+.v-theme--dark .bg-accent1 .v-card-title,
+.v-theme--dark .bg-accent1 .v-icon,
+.v-theme--dark .bg-accent1 .v-btn {
+  color: rgba(255, 255, 255, 0.82) !important;
 }
 </style>

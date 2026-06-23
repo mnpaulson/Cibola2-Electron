@@ -116,9 +116,9 @@ To keep user feedback notifications consistent and avoid cluttering views with d
 ## 13. Reusable UI Components
 Always reuse these core components rather than rebuilding their functionality:
 
-* **[CameraCapture.vue](file:///c:/dev/Cibola2-Electron/src/components/CameraCapture.vue)**: Handles webcam permissions, multi-device selection, alignment masks, exports base64 JPEG at maximum resolution (`canvas.toDataURL('image/jpeg', 1.0)`), and defaults the camera light/torch to ON with an interactive UI toggle and fallback constraints for compatibility with older camera hardware.
+* **[CameraCapture.vue](file:///c:/dev/Cibola2-Electron/src/components/CameraCapture.vue)**: Handles webcam permissions, multi-device selection, alignment masks, exports base64 JPEG at maximum resolution (`canvas.toDataURL('image/jpeg', 1.0)`), and defaults the camera light/torch to ON with an interactive UI toggle and fallback constraints. Pre-queries devices list on mount to bypass permission checks on opening, and utilizes a 10-second cool-down window to keep the stream warm when closing and quickly reopening the dialog.
 * **[ImageDropzone.vue](file:///C:/dev/Cibola2-Electron/src/components/ImageDropzone.vue)**: Supports drag-and-drop or file input uploads, emitting the base64 data URL. Supports `:compact` mode for grid embedding.
-* **[AttachedImages.vue](file:///C:/dev/Cibola2-Electron/src/components/AttachedImages.vue)**: Embedded image gallery with lightboxes, description note inputs, camera/upload triggers, and database delete capabilities.
+* **[AttachedImages.vue](file:///C:/dev/Cibola2-Electron/src/components/AttachedImages.vue)**: Embedded image gallery with lightboxes, description note inputs, camera/upload triggers, and database delete capabilities. Supports `disable-add` prop (boolean) to hide the upload/capture dropzone tile and prevent new image additions.
 * **[DirectoryPagination.vue](file:///C:/dev/Cibola2-Electron/src/components/DirectoryPagination.vue)**: Handles paginating tabular views and search pages.
 * **[DeleteConfirmationDialog.vue](file:///C:/dev/Cibola2-Electron/src/components/DeleteConfirmationDialog.vue)**: Confirmation dialog requiring match validation keys (e.g. typing customer last name) and checkbox acknowledgement.
 * **[MetalPricesCard.vue](file:///c:/dev/Cibola2-Electron/src/components/MetalPricesCard.vue)**: Used in Large mode (dashboard) or `small` mode (transactional forms). Handles spot syncs, manual overrides, price staleness, and database metadata updates. Disable state must be bound on historical items.
@@ -141,9 +141,40 @@ To prevent multiple instances of the application from running simultaneously (wh
 
 ---
 
-## 16. Server Address Initialization & Startup Request Guarding
-* **Guarding Requests Until Settings Load**: To prevent sending network requests (e.g., fetching metadata) to the default port (`localhost:8000`) before settings are retrieved from Electron IPC, all API client calls must wait for settings initialization.
-* **API Client Delay**: The client wrapper in [api.js](file:///c:/dev/Cibola2-Electron/src/utils/api.js) automatically awaits `settingsState.isLoaded = true` using a Vue reactive watcher before resolving request URLs.
-* **Heartbeat Watcher Guard**: Any watchers on `settingsState.serverURL` in `App.vue` that trigger `startHeartbeat` must be guarded with `settingsState.isLoaded` to avoid triggering connection attempts or preflight checks against default ports on startup.
+## 16. Global Notifications & Periodic Version Updates
+* **Centralized Store**: To ensure consistency and state persistence across page unmounts/navigation, notifications and updater properties (status, error, latest version, download progress) are maintained in a unified reactive store at [notifications.js](file:///c:/dev/Cibola2-Electron/src/store/notifications.js).
+* **Automatic Background Checks**: Check for updates immediately upon application startup (after a 5-second delay) and repeat the check automatically every 30 minutes.
+* **10-Second Timeout Constraint**: Checking for updates utilizes a 10-second `Promise.race` timeout on the `window.electronAPI.checkForUpdate()` call to avoid infinite spinning states in development or slow connectivity environments.
+* **Resolve Fallback**: In unpacked development mode, `electron-updater` skips checking and resolves successfully without emitting `update-available` or `update-not-available` events. To prevent hanging on `"checking"`, if the IPC call resolves successfully and the status is still `'checking'`, transition it to `'not-available'`.
+* **Notification Activator Behavior**: The notifications dropdown menu and its activator (the bell icon button in the top right app-bar) should be hidden entirely if there are no notifications in `notificationsState.list` to prevent UI clutter.
+* **Click Actions**: Clicking a notification should automatically route the user to the corresponding view (e.g., config for update alerts) and dismiss the notification from the list.
 
+---
+## 17. Core Record Color Theming Protocol
+To help operators scan information rapidly, the application maps each of the 4 core record types to a specific jewel/mineral color theme in both light and dark mode configurations:
+* **Customer**: Amethyst Purple (`customer` theme color key)
+* **Job**: Cobalt Blue (`job` theme color key)
+* **Credit**: Amber Gold (`credit` theme color key)
+* **Custom Sheet**: Emerald Green (`sheet` theme color key)
+
+### Theming Highlights Layout
+The color themes are applied permanently throughout the application using:
+1. **Header Highlights**: Form and Directory header backgrounds are unified to use the standard primary branding blue (`bg-primary`). This matches the application's logo/header font branding and maintains clean, consistent card wrappers.
+2. **Left Accent Border Highlight**: List and Directory table rows display a left-accented colored border highlighting using the `.record-accent-[type]` class. Loaded customer profiles in `CustomerForm.vue` adopt this left-accented border highlight on their container card.
+3. **Record Type & Icon Highlights**: Mapped Record Type text labels (e.g., in lists) and type icons adopt the jewel colors. ID numbers remain standard gray.
+4. **Action Highlights**: Quick action buttons for creating new records adopt their corresponding jewel themes (`job`, `credit`, `sheet`, `customer`).
+### CSS & Custom Theme Classes
+* Dynamic color classes like `text-[type]` (e.g., `text-job`, `text-credit`, `text-sheet`, `text-customer`) and `bg-[type]` are generated automatically by Vuetify based on the active theme's colors configured in `src/main.js`.
+* Always use these theme classes instead of hardcoded hex values or Tailwind styling to maintain responsiveness to theme mode (light/dark) switches.
+* Table rows with left borders should combine `.record-accent-[type]` and `.accent-border-row` to properly align contents.
+
+---
+## 18. Customer Activity Summary (Counts)
+When the customer card is rendered at the top of record views (`JobForm.vue`, `CreditForm.vue`, `CustomSheetForm.vue`), it passes the `show-activity` prop to `CustomerForm.vue`.
+* **Dynamic Grid Layout**: The `CustomerForm.vue` template dynamically adapts the medium-size viewport (`md`) grid columns:
+  * Details column: `:md="showActivity ? (hideNotes ? 6 : 4) : (hideNotes ? 12 : 6)"`
+  * Activity column: `:md="hideNotes ? 6 : 4" v-if="showActivity"`
+  * Notes column: `:md="showActivity ? 4 : 6" v-if="!hideNotes"`
+* **Record Counts Mapping**: The component maps `job_count`, `credit_count`, and `custom_sheet_count` from the backend `GET /customers/:id` response, defaulting to `0` if not present.
+* **Preservation on Save**: When executing customer profile edits, the local state counts are explicitly preserved to prevent them from being overwritten if the update response does not return counts.
 

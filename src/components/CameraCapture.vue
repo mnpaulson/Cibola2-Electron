@@ -104,7 +104,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { settingsState } from '../store/settings'
 
 const props = defineProps({
@@ -129,18 +129,31 @@ const isTorchOn = ref(true)
 const isTorchSupported = ref(false)
 
 let localStream = null
+let cooldownTimer = null
 
-const close = () => {
-  stopStream()
-  emit('update:modelValue', false)
-}
-
-const stopStream = () => {
+const stopStreamImmediately = () => {
+  if (cooldownTimer) {
+    clearTimeout(cooldownTimer)
+    cooldownTimer = null
+  }
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop())
     localStream = null
   }
   isStreaming.value = false
+}
+
+const stopStreamWithCooldown = () => {
+  if (cooldownTimer) return // Already cooling down
+  
+  cooldownTimer = setTimeout(() => {
+    stopStreamImmediately()
+  }, 10000) // 10-second cool-down window
+}
+
+const close = () => {
+  stopStreamWithCooldown()
+  emit('update:modelValue', false)
 }
 
 const getDevices = async () => {
@@ -169,20 +182,65 @@ const getDevices = async () => {
 const initStream = async () => {
   if (!props.modelValue) return
 
-  stopStream()
-  isInitializing.value = true
   errorMsg.value = ''
+
+  // Check if we have an active stream (cooling down) on the selected device, and reuse it immediately
+  let isSameDevice = true
+  if (localStream) {
+    const activeTrack = localStream.getVideoTracks()[0]
+    if (activeTrack) {
+      const settings = activeTrack.getSettings()
+      if (selectedDeviceId.value && settings.deviceId !== selectedDeviceId.value) {
+        isSameDevice = false
+      }
+    }
+  }
+
+  if (localStream && isSameDevice && localStream.getVideoTracks().some(t => t.readyState === 'live')) {
+    if (cooldownTimer) {
+      clearTimeout(cooldownTimer)
+      cooldownTimer = null
+    }
+    isStreaming.value = true
+    isInitializing.value = false
+    
+    // Wait for Vue to render the dialog contents and populate videoRef
+    await nextTick()
+    
+    // Ensure video is playing and attached
+    if (videoRef.value) {
+      if (videoRef.value.srcObject !== localStream) {
+        videoRef.value.srcObject = localStream
+      }
+      try {
+        await videoRef.value.play()
+      } catch (playErr) {
+        console.warn('Failed to play reused video stream:', playErr)
+      }
+    }
+    
+    // Re-apply torch state
+    applyTorchState()
+    return
+  }
+
+  // Otherwise, clean up any stale stream and do a full startup
+  stopStreamImmediately()
+  isInitializing.value = true
   isTorchOn.value = true // Default camera light to on
 
-  // Request permission first to populate device labels if empty
-  try {
-    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
-    tempStream.getTracks().forEach(track => track.stop())
-    await getDevices()
-  } catch (err) {
-    errorMsg.value = 'Failed to access camera permission: ' + err.message
-    isInitializing.value = false
-    return
+  // Request permission first to populate device labels if empty, but ONLY if we don't have them yet
+  const needsPermissionCheck = videoDevices.value.length === 0 || videoDevices.value.every(d => !d.label || d.label.startsWith('Camera '))
+  if (needsPermissionCheck) {
+    try {
+      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true })
+      tempStream.getTracks().forEach(track => track.stop())
+      await getDevices()
+    } catch (err) {
+      errorMsg.value = 'Failed to access camera permission: ' + err.message
+      isInitializing.value = false
+      return
+    }
   }
 
   let width = 4096
@@ -304,17 +362,22 @@ const captureImage = () => {
   }
 }
 
+onMounted(async () => {
+  // Query devices list on mount to pre-populate dropdown options and verify permissions silently
+  await getDevices()
+})
+
 // Watch modelValue to start/stop camera on open/close
 watch(() => props.modelValue, (newVal) => {
   if (newVal) {
     initStream()
   } else {
-    stopStream()
+    stopStreamWithCooldown()
   }
 })
 
 onBeforeUnmount(() => {
-  stopStream()
+  stopStreamImmediately()
 })
 </script>
 

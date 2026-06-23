@@ -54,16 +54,16 @@ To avoid interface lag and maintain fast view switching when loading values tabl
 ---
 
 ## 3. Unified Customer History and Records List
-When rendering related historical records (Jobs, Store Credits, and Custom Sheets) under a selected customer profile (e.g., in `CustomerManager.vue`):
+When rendering related historical records (Jobs, Credits, and Custom Sheets) under a selected customer profile (e.g., in `CustomerManager.vue`):
 * **No Tab Navigation**: Related records are combined into a single unified table list.
 * **Column Setup & Order**:
   1. **Id**: prefixed with `#` (header label `Id`).
-  2. **Record Type**: displays `Job`, `Store Credit`, or `Custom Sheet` (header label `Record Type`).
+  2. **Record Type**: displays `Job`, `Credit`, or `Custom Sheet` (header label `Record Type`).
   3. **Details**: custom rendered details based on the item type (header label `Details`).
   4. **Created**: displays the formatted local creation date (header label `Created`).
 * **Details Column Formatting**:
   * **Jobs**: Display only the estimate. If the estimate is 0 or missing, display `'No Estimate'`. Do not display the job's due date in this list.
-  * **Store Credits**: Display the payout amount. If the credit value is 0 or missing, display `'No Final Credit'`.
+  * **Credits**: Display the payout amount. If the credit value is 0 or missing, display `'No Final Credit'`.
   * **Custom Sheets**: Display the custom design sheet's name.
 
 ---
@@ -78,7 +78,7 @@ When rendering related historical records (Jobs, Store Credits, and Custom Sheet
   * `typeName`: Display name of the type.
   * `details`:
     * Jobs: `Estimate: $XX.XX` (or `'No Estimate'`).
-    * Store Credits: `Payout: $XX.XX` (or `'No Final Credit'`).
+    * Credits: `Payout: $XX.XX` (or `'No Final Credit'`).
     * Custom Sheets: Custom sheet name.
     * Customers: Customer's full name.
   * `customerName`: Customer's full name (for jobs, credits, sheets).
@@ -86,7 +86,7 @@ When rendering related historical records (Jobs, Store Credits, and Custom Sheet
   * `created_at`: The creation date of the record.
 * **Component Rendering**: Render the `<RecentlyViewed />` widget from `RecentlyViewed.vue` on the dashboard. The table columns must be in this order:
   1. **Preview**: 36x36 cover image of the job thumbnail, or a type-colored avatar displaying the type-specific icon if no thumbnail image exists.
-  2. **Type**: Displays the type name text (e.g. Job, Store Credit, Customer, Custom Sheet).
+  2. **Type**: Displays the type name text (e.g. Job, Credit, Customer, Custom Sheet).
   3. **Record**: Displays the record ID (prefixed with `#`).
   4. **Details**: Custom rendered details for each item.
   5. **Created**: Displays the formatted local creation date.

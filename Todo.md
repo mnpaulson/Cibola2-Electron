@@ -10,15 +10,11 @@
 ## Credits
 
 ## Customer
-- Colors on customer page
 - Duplicate detection and merging for customers
-- Add related record totals to customer card visible on jobs etc
-    - First and most recent dates?
 
 ## Config
 
 ## Printing
-- Fit more images onto the first quad.
 
 ## Migration Planning
 - Script to inject .sql file data into sqlite db
@@ -34,9 +30,11 @@
 - More than I can keep track of tbh this whole list is a best effort
 - Side mouse button navigation
 - New feedback button in the top right. Tell your staff!
-- Light and dark mode! Look in the top right
+- Light and dark mode! Look in the top right.
 - New print layouts
 - Just functionality and layout improvements all over the place
+- Warnings on jobs when you exceed the number of images that will fit on the printout
+- Improved camera stream handling. Let me know if you have issues with the camera load time.
 
 ## Dashboard
 - Recently Created records

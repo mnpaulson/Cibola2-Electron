@@ -7,10 +7,10 @@
     </div>
 
     <!-- Attached Jewelry Images Grid -->
-    <v-row dense v-if="images.length > 0">
+    <v-row dense>
       <!-- Dropzone tile inside grid -->
-      <v-col cols="12" sm="6" md="4" lg="3">
-        <ImageDropzone :compact="true" @upload="handlePhotoCaptured" />
+      <v-col v-if="!disableAdd" cols="12" sm="6" md="4" lg="3">
+        <ImageDropzone :compact="true" @upload="handlePhotoCaptured" @open-camera="openCamera" />
       </v-col>
 
       <v-col
@@ -54,9 +54,6 @@
         </v-card>
       </v-col>
     </v-row>
-    <div v-else class="mb-4">
-      <ImageDropzone @upload="handlePhotoCaptured" />
-    </div>
 
     <!-- Camera dialog integration -->
     <CameraCapture v-model="isCameraOpen" @capture="handlePhotoCaptured" />
@@ -101,6 +98,10 @@ const props = defineProps({
   title: {
     type: String,
     default: 'Images'
+  },
+  disableAdd: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -135,6 +136,7 @@ function getImageUrl(imgStr) {
 }
 
 function handlePhotoCaptured(dataUrl) {
+  if (props.disableAdd) return
   const updated = [...images.value, {
     id: null,
     image: dataUrl,
@@ -182,6 +184,7 @@ async function deleteSavedImage() {
 }
 
 function openCamera() {
+  if (props.disableAdd) return
   isCameraOpen.value = true
 }
 

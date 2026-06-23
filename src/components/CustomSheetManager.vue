@@ -16,7 +16,7 @@
       <v-col cols="12">
         <v-card elevation="2" class="directory-card rounded-lg">
           <!-- Directory Header -->
-          <v-card-item class="bg-primary text-white py-3">
+          <v-card-item class="bg-accent1 text-white py-3">
             <v-row no-gutters align="center" justify="space-between">
               <v-col class="text-h6 font-weight-bold d-flex align-center">
                 <v-icon start class="mr-2">mdi-list-box-outline</v-icon>
@@ -38,10 +38,10 @@
               </v-col>
               <v-col class="shrink ml-3">
                 <v-btn
-                  color="white"
+                  color="sheet"
                   variant="flat"
                   prepend-icon="mdi-plus"
-                  size="small"
+                  height="40"
                   @click="startNewSheet"
                 >
                   New Custom Sheet
@@ -99,10 +99,10 @@
                 v-else
                 v-for="sheet in paginatedSheets"
                 :key="sheet.id"
-                class="cursor-pointer transition-row hover-shadow"
+                class="cursor-pointer transition-row hover-shadow accent-border-row record-accent-sheet"
                 @click="openSheetEditor(sheet)"
               >
-                <td class="font-weight-bold text-body-2 text-primary py-3">
+                <td class="font-weight-bold text-body-2 py-3 text-sheet">
                   #{{ sheet.id }}
                 </td>
                 <td class="text-body-2 font-weight-medium">

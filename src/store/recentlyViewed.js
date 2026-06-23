@@ -36,15 +36,15 @@ export function addRecentRecord(record) {
   recentlyViewedState.records = recentlyViewedState.records.filter(
     r => !(r.id === record.id && r.type === record.type)
   )
-  
+
   // Prepend to array
   recentlyViewedState.records.unshift(record)
-  
+
   // Cap at 10 items
   if (recentlyViewedState.records.length > 10) {
     recentlyViewedState.records.pop()
   }
-  
+
   saveRecentlyViewed()
 }
 
@@ -79,7 +79,7 @@ export async function refreshRecentRecord(type, id) {
         const details = hasEstimate
           ? `Estimate: $${Number(job.estimate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : 'No Estimate'
-        
+
         addRecentRecord({
           id: job.id,
           type: 'job',
@@ -99,11 +99,11 @@ export async function refreshRecentRecord(type, id) {
         const details = hasCredit
           ? `Payout: $${Number(credit.credit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : 'No Final Credit'
-        
+
         addRecentRecord({
           id: credit.id,
           type: 'credit',
-          typeName: 'Store Credit',
+          typeName: 'Credit',
           details,
           customerId: credit.customer_id,
           customerName: credit.customer ? `${credit.customer.fname} ${credit.customer.lname}`.trim() : '',
@@ -118,7 +118,7 @@ export async function refreshRecentRecord(type, id) {
         addRecentRecord({
           id: sheet.id,
           type: 'sheet',
-          typeName: 'Custom Sheet',
+          typeName: 'Sheet',
           details: sheet.name || '',
           customerId: sheet.customer_id,
           customerName: sheet.customer ? `${sheet.customer.fname} ${sheet.customer.lname}`.trim() : '',

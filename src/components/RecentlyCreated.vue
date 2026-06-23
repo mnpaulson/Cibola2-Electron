@@ -1,7 +1,7 @@
 <template>
   <v-card class="recently-created-card rounded-lg" elevation="2" border>
     <!-- Header -->
-    <v-card-item class="bg-primary text-white py-3">
+    <v-card-item class="bg-accent1 text-white py-3">
       <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center">
         <v-icon start class="mr-2">mdi-plus-circle-outline</v-icon>
         Recently Created Records
@@ -27,18 +27,19 @@
       <v-table hover fixed-header class="recently-created-table" style="table-layout: fixed; width: 100%;" v-if="records.length > 0">
         <thead>
           <tr>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 55px;">Preview</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 90px;">Type</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 70px;">Record</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 50px;">Preview</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 80px;">Type</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 65px;">Record</th>
             <th class="text-left font-weight-bold text-caption py-2">Details</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 90px;">Created</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 80px;">Created</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="item in records"
             :key="item.type + '-' + item.id"
-            class="cursor-pointer transition-row"
+            class="cursor-pointer transition-row accent-border-row"
+            :class="'record-accent-' + item.type"
             @click="goToRecord(item)"
           >
             <!-- Preview / Thumbnail Column -->
@@ -65,12 +66,12 @@
 
             <!-- Record Type Column -->
             <td class="py-2">
-              <span class="text-body-2 font-weight-medium">{{ item.typeName }}</span>
+              <span class="text-body-2 font-weight-bold" :class="'text-' + getTypeColor(item.type)">{{ item.typeName }}</span>
             </td>
 
             <!-- Record ID Column -->
             <td class="py-2">
-              <span class="font-weight-bold text-primary text-body-2">#{{ item.id }}</span>
+              <span class="font-weight-bold text-medium-emphasis text-body-2">#{{ item.id }}</span>
             </td>
 
             <!-- Details Column -->
@@ -156,7 +157,7 @@ async function fetchRecords() {
     const formattedCredits = (creditsData || []).map(credit => ({
       id: credit.id,
       type: 'credit',
-      typeName: 'Store Credit',
+      typeName: 'Credit',
       details: credit.credit_value && Number(credit.credit_value) !== 0
         ? `Payout: $${Number(credit.credit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         : 'No Final Credit',
@@ -170,7 +171,7 @@ async function fetchRecords() {
     const formattedSheets = (sheetsData || []).map(sheet => ({
       id: sheet.id,
       type: 'sheet',
-      typeName: 'Custom Sheet',
+      typeName: 'Sheet',
       details: sheet.name || '',
       customerId: sheet.customer_id,
       customerName: sheet.customer ? `${sheet.customer.fname} ${sheet.customer.lname}`.trim() : '',
@@ -261,13 +262,13 @@ function getTypeIcon(type) {
 function getTypeColor(type) {
   switch (type) {
     case 'job':
-      return 'primary'
+      return 'job'
     case 'credit':
-      return 'warning'
+      return 'credit'
     case 'sheet':
-      return 'info'
+      return 'sheet'
     case 'customer':
-      return 'secondary'
+      return 'customer'
     default:
       return 'grey'
   }

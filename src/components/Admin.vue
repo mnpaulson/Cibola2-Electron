@@ -238,14 +238,14 @@
                     <div>
                       <div class="text-body-2 font-weight-medium text-right">Latest Version</div>
                       <div class="text-h6 font-weight-bold text-right" :class="latestVersionClass">
-                        {{ latestVersion || 'Not Checked' }}
+                        {{ notificationsState.latestVersion || 'Not Checked' }}
                       </div>
                     </div>
                   </div>
 
                   <!-- Messages / Info Banners -->
                   <v-alert
-                    v-if="updateStatus === 'checking'"
+                    v-if="notificationsState.updateStatus === 'checking'"
                     type="info"
                     variant="tonal"
                     density="comfortable"
@@ -258,7 +258,7 @@
                   </v-alert>
 
                   <v-alert
-                    v-else-if="updateStatus === 'not-available'"
+                    v-else-if="notificationsState.updateStatus === 'not-available'"
                     type="success"
                     variant="tonal"
                     density="comfortable"
@@ -268,18 +268,18 @@
                   </v-alert>
 
                   <v-alert
-                    v-else-if="updateStatus === 'error'"
+                    v-else-if="notificationsState.updateStatus === 'error'"
                     type="error"
                     variant="tonal"
                     density="comfortable"
                     class="mb-4"
                   >
                     <div class="font-weight-bold mb-1">Failed to process update:</div>
-                    <div class="text-caption">{{ updateError }}</div>
+                    <div class="text-caption">{{ notificationsState.updateError }}</div>
                   </v-alert>
 
                   <v-alert
-                    v-else-if="updateStatus === 'downloaded'"
+                    v-else-if="notificationsState.updateStatus === 'downloaded'"
                     type="success"
                     variant="tonal"
                     density="comfortable"
@@ -290,23 +290,23 @@
 
                   <!-- Update Available Panel -->
                   <v-expand-transition>
-                    <div v-if="updateStatus === 'available' || updateStatus === 'downloading' || updateStatus === 'downloaded'">
+                    <div v-if="notificationsState.updateStatus === 'available' || notificationsState.updateStatus === 'downloading' || notificationsState.updateStatus === 'downloaded'">
                       <v-card variant="flat" bg-color="surface-variant" class="pa-3 mb-4 border rounded">
-                        <div class="text-subtitle-2 font-weight-bold mb-1">Release Notes for v{{ latestVersion }}</div>
+                        <div class="text-subtitle-2 font-weight-bold mb-1">Release Notes for v{{ notificationsState.latestVersion }}</div>
                         <div class="release-notes-box text-caption text-medium-emphasis overflow-y-auto" style="max-height: 120px; line-height: 1.4;">
-                          <div v-if="releaseNotes" v-html="releaseNotes"></div>
+                          <div v-if="notificationsState.releaseNotes" v-html="notificationsState.releaseNotes"></div>
                           <div v-else>No release notes provided for this version.</div>
                         </div>
                       </v-card>
                       
                       <!-- Downloading Progress -->
-                      <div v-if="updateStatus === 'downloading'" class="mb-4">
+                      <div v-if="notificationsState.updateStatus === 'downloading'" class="mb-4">
                         <div class="d-flex justify-space-between text-caption mb-1">
                           <span>Downloading update package...</span>
-                          <span class="font-weight-bold">{{ Math.round(downloadProgress.percent) }}%</span>
+                          <span class="font-weight-bold">{{ Math.round(notificationsState.downloadProgress.percent) }}%</span>
                         </div>
                         <v-progress-linear
-                          :model-value="downloadProgress.percent"
+                          :model-value="notificationsState.downloadProgress.percent"
                           color="primary"
                           height="10"
                           striped
@@ -314,8 +314,8 @@
                           class="mb-2"
                         ></v-progress-linear>
                         <div class="d-flex justify-space-between text-caption text-medium-emphasis">
-                          <span>Speed: {{ formatSpeed(downloadProgress.bytesPerSecond) }}</span>
-                          <span>{{ formatBytes(downloadProgress.transferred) }} of {{ formatBytes(downloadProgress.total) }}</span>
+                          <span>Speed: {{ formatSpeed(notificationsState.downloadProgress.bytesPerSecond) }}</span>
+                          <span>{{ formatBytes(notificationsState.downloadProgress.transferred) }} of {{ formatBytes(notificationsState.downloadProgress.total) }}</span>
                         </div>
                       </div>
                     </div>
@@ -324,30 +324,30 @@
                   <!-- Actions -->
                   <div class="d-flex flex-wrap justify-end gap-2 mt-4">
                     <v-btn
-                      v-if="updateStatus === 'idle' || updateStatus === 'not-available' || updateStatus === 'error'"
+                      v-if="notificationsState.updateStatus === 'idle' || notificationsState.updateStatus === 'not-available' || notificationsState.updateStatus === 'error'"
                       variant="tonal"
                       color="primary"
                       prepend-icon="mdi-sync"
-                      :loading="updateStatus === 'checking'"
-                      @click="checkUpdates"
+                      :loading="notificationsState.updateStatus === 'checking'"
+                      @click="triggerCheckUpdates"
                     >
                       Check for Updates
                     </v-btn>
                     
                     <v-btn
-                      v-if="updateStatus === 'available'"
+                      v-if="notificationsState.updateStatus === 'available'"
                       color="primary"
                       prepend-icon="mdi-download"
-                      @click="downloadUpdates"
+                      @click="triggerDownloadUpdates"
                     >
                       Download Update
                     </v-btn>
 
                     <v-btn
-                      v-if="updateStatus === 'downloaded'"
+                      v-if="notificationsState.updateStatus === 'downloaded'"
                       color="success"
                       prepend-icon="mdi-restart"
-                      @click="installUpdates"
+                      @click="triggerInstallUpdates"
                     >
                       Install & Restart
                     </v-btn>
@@ -1070,6 +1070,12 @@ import { api } from '../utils/api'
 import { settingsState, saveSettings, loadSettings } from '../store/settings'
 import { showToast } from '../store/toast'
 import { refreshMetadata } from '../store/metadata'
+import {
+  notificationsState,
+  checkUpdates,
+  downloadUpdates,
+  installUpdates
+} from '../store/notifications'
 
 
 // Navigation state
@@ -1078,20 +1084,6 @@ const valuesSubTab = ref('custom-sheet')
 
 // Application Updates State
 const appVersion = ref('1.0.0')
-const latestVersion = ref('')
-const updateStatus = ref('idle') // 'idle', 'checking', 'available', 'not-available', 'downloading', 'downloaded', 'error'
-const updateError = ref('')
-const releaseNotes = ref('')
-const downloadProgress = reactive({
-  percent: 0,
-  bytesPerSecond: 0,
-  total: 0,
-  transferred: 0
-})
-const updateSimulated = ref(false)
-
-// Cleanup function array for event listeners
-let updateCleanups = []
 
 // Format bytes helper
 function formatBytes(bytes) {
@@ -1110,102 +1102,29 @@ function formatSpeed(bytesPerSecond) {
 
 // Computed text color for latest version
 const latestVersionClass = computed(() => {
-  if (!latestVersion.value) return 'text-medium-emphasis'
-  return latestVersion.value !== appVersion.value ? 'text-warning font-weight-bold' : 'text-success'
+  if (!notificationsState.latestVersion) return 'text-medium-emphasis'
+  return notificationsState.latestVersion !== appVersion.value ? 'text-warning font-weight-bold' : 'text-success'
 })
 
-// Simulated update timer
-let simulationInterval = null
-
-// Check for updates function
-async function checkUpdates() {
-  updateError.value = ''
-  updateStatus.value = 'checking'
-  
-  if (updateSimulated.value) {
-    // Simulate API call
-    setTimeout(() => {
-      latestVersion.value = '1.1.0'
-      releaseNotes.value = '<h3>v1.1.0 Features</h3><ul><li>Added customer duplicate merging functionality</li><li>Reworked job printer speed optimizations</li><li>Fixed gold credit spot price evaluation UI bugs</li></ul>'
-      updateStatus.value = 'available'
-      showToast({ text: 'Simulated Update Found!', color: 'info' })
-    }, 1500)
-    return
+// Proxy simulation toggle to the global notifications store
+const updateSimulated = computed({
+  get: () => notificationsState.updateSimulated,
+  set: (val) => {
+    notificationsState.updateSimulated = val
   }
+})
 
-  if (window.electronAPI && typeof window.electronAPI.checkForUpdate === 'function') {
-    try {
-      const res = await window.electronAPI.checkForUpdate()
-      if (!res.success) {
-        updateStatus.value = 'error'
-        updateError.value = res.error || 'Unknown error during updates check.'
-      }
-    } catch (err) {
-      updateStatus.value = 'error'
-      updateError.value = err.message || err
-    }
-  } else {
-    // Dev or non-Electron mode fallback
-    setTimeout(() => {
-      updateStatus.value = 'error'
-      updateError.value = 'Electron API not available. Make sure the app is running inside Electron.'
-    }, 1000)
-  }
+// Wrapper functions for updates flow actions
+const triggerCheckUpdates = () => {
+  checkUpdates(false)
 }
 
-// Download updates function
-async function downloadUpdates() {
-  if (updateSimulated.value) {
-    updateStatus.value = 'downloading'
-    downloadProgress.percent = 0
-    downloadProgress.bytesPerSecond = 1250000 // 1.25 MB/s
-    downloadProgress.total = 45000000 // 45 MB
-    downloadProgress.transferred = 0
-
-    simulationInterval = setInterval(() => {
-      const step = 45000000 / 20 // 5% chunks
-      downloadProgress.transferred += step
-      downloadProgress.percent = (downloadProgress.transferred / downloadProgress.total) * 100
-      if (downloadProgress.transferred >= downloadProgress.total) {
-        downloadProgress.transferred = downloadProgress.total
-        downloadProgress.percent = 100
-        clearInterval(simulationInterval)
-        updateStatus.value = 'downloaded'
-        showToast({ text: 'Simulated Download Complete!', color: 'success' })
-      }
-    }, 300)
-    return
-  }
-
-  if (window.electronAPI && typeof window.electronAPI.downloadUpdate === 'function') {
-    updateStatus.value = 'downloading'
-    try {
-      const res = await window.electronAPI.downloadUpdate()
-      if (!res.success) {
-        updateStatus.value = 'error'
-        updateError.value = res.error || 'Failed to start downloading update.'
-      }
-    } catch (err) {
-      updateStatus.value = 'error'
-      updateError.value = err.message || err
-    }
-  }
+const triggerDownloadUpdates = () => {
+  downloadUpdates()
 }
 
-// Install updates function
-function installUpdates() {
-  if (updateSimulated.value) {
-    showToast({ text: 'Simulating restart and install...', color: 'success' })
-    setTimeout(() => {
-      // Simulate reload
-      window.location.reload()
-    }, 1500)
-    return
-  }
-
-  if (window.electronAPI && typeof window.electronAPI.installUpdate === 'function') {
-    window.electronAPI.installUpdate()
-  }
+const triggerInstallUpdates = () => {
+  installUpdates()
 }
 
 // Local Settings State
@@ -1898,72 +1817,6 @@ onMounted(async () => {
       appVersion.value = version
     })
   }
-
-  // Bind electronAPI updater event listeners
-  if (window.electronAPI) {
-    if (typeof window.electronAPI.onUpdateChecking === 'function') {
-      updateCleanups.push(window.electronAPI.onUpdateChecking(() => {
-        if (!updateSimulated.value) {
-          updateStatus.value = 'checking'
-        }
-      }))
-    }
-    if (typeof window.electronAPI.onUpdateAvailable === 'function') {
-      updateCleanups.push(window.electronAPI.onUpdateAvailable((info) => {
-        if (!updateSimulated.value) {
-          latestVersion.value = info.version || ''
-          releaseNotes.value = info.releaseNotes || ''
-          updateStatus.value = 'available'
-          showToast({ text: `Update available: v${info.version}`, color: 'info' })
-        }
-      }))
-    }
-    if (typeof window.electronAPI.onUpdateNotAvailable === 'function') {
-      updateCleanups.push(window.electronAPI.onUpdateNotAvailable((info) => {
-        if (!updateSimulated.value) {
-          latestVersion.value = info.version || ''
-          updateStatus.value = 'not-available'
-        }
-      }))
-    }
-    if (typeof window.electronAPI.onUpdateError === 'function') {
-      updateCleanups.push(window.electronAPI.onUpdateError((err) => {
-        if (!updateSimulated.value) {
-          updateStatus.value = 'error'
-          updateError.value = err || 'Unknown update error.'
-        }
-      }))
-    }
-    if (typeof window.electronAPI.onDownloadProgress === 'function') {
-      updateCleanups.push(window.electronAPI.onDownloadProgress((progress) => {
-        if (!updateSimulated.value) {
-          updateStatus.value = 'downloading'
-          downloadProgress.percent = progress.percent || 0
-          downloadProgress.bytesPerSecond = progress.bytesPerSecond || 0
-          downloadProgress.total = progress.total || 0
-          downloadProgress.transferred = progress.transferred || 0
-        }
-      }))
-    }
-    if (typeof window.electronAPI.onUpdateDownloaded === 'function') {
-      updateCleanups.push(window.electronAPI.onUpdateDownloaded((info) => {
-        if (!updateSimulated.value) {
-          updateStatus.value = 'downloaded'
-          showToast({ text: 'Update downloaded! Ready to install.', color: 'success' })
-        }
-      }))
-    }
-  }
-})
-
-onUnmounted(() => {
-  // Clear any simulation intervals
-  if (simulationInterval) {
-    clearInterval(simulationInterval)
-  }
-  // Call all cleanup functions to remove IPC listeners
-  updateCleanups.forEach(cleanup => cleanup())
-  updateCleanups = []
 })
 
 // Watch active tab to load data lazily (e.g. only get employee data when rendering the employee list)

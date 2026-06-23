@@ -3,7 +3,7 @@
  */
 
 /**
- * Calculate the store credit payout value for gold or platinum items.
+ * Calculate the credit payout value for gold or platinum items.
  * Formula: weight (g) * spotPrice ($/g) * metalPurityMultiplier * markupFactor
  * 
  * @param {number|string} weight - Weight in grams

@@ -37,17 +37,6 @@
       <span>{{ saveLabel }}</span>
     </v-btn>
 
-    <!-- Capture -->
-    <v-btn
-      v-if="showCapture"
-      class="btn-capture"
-      :disabled="disableCapture"
-      @click="$emit('capture')"
-    >
-      <v-icon class="mb-1">mdi-camera</v-icon>
-      <span>Capture</span>
-    </v-btn>
-
     <!-- Print -->
     <v-btn
       v-if="showPrint"
@@ -69,17 +58,21 @@
       <span>Preview</span>
     </v-btn>
 
-    <!-- Discard (New records) / Delete (Saved records) -->
+    <!-- Discard (Go Back) -->
     <v-btn
-      v-if="!showDelete"
       class="btn-discard"
       @click="$emit('discard')"
     >
       <v-icon class="mb-1">mdi-arrow-left</v-icon>
       <span>Discard</span>
     </v-btn>
+
+    <!-- Spacer to push Delete to the right -->
+    <v-spacer v-if="showDelete"></v-spacer>
+
+    <!-- Delete (Saved records) -->
     <v-btn
-      v-else
+      v-if="showDelete"
       class="btn-delete"
       @click="$emit('delete')"
     >
