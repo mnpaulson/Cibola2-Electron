@@ -3,7 +3,7 @@
     <!-- Header -->
     <v-card-item class="bg-primary text-white py-3">
       <v-card-title class="font-weight-bold text-subtitle-1 d-flex align-center">
-        <v-icon start class="mr-2">mdi-currency-usd</v-icon>
+        <v-icon start class="mr-2">mdi-credit-card-outline</v-icon>
         {{ credit.id ? `Edit Gold Credit #${credit.id}` : 'New Gold Credit Payout' }}
         <v-spacer></v-spacer>
         <span v-if="credit.created_at" class="text-caption font-weight-medium">
@@ -20,10 +20,12 @@
         <CustomerForm
           v-model="credit.customer_id"
           :clearable="!disabled"
-          :hide-notes="true"
+          :hide-notes="false"
           :clickable-name="true"
+          :lock-notes="true"
           @select="handleCustomerSelect"
           @click-name="navigateTo('customers', { selectedCustomerId: credit.customer_id })"
+          @dirty-state-change="isCustomerDirty = $event"
         />
       </div>
 
@@ -45,6 +47,7 @@
             ></v-select>
 
             <v-text-field
+              ref="dateInputRef"
               v-model="credit.creditDate"
               label="Transaction Date"
               type="date"
@@ -52,6 +55,9 @@
               variant="outlined"
               density="compact"
               :disabled="disabled"
+              @click:prepend-inner="showDatePicker"
+              @click="showDatePicker"
+              class="custom-date-field"
             ></v-text-field>
 
             <div class="d-flex align-center gap-4 mb-4">
@@ -260,11 +266,12 @@
       :show-preview="false"
       :save-label="!credit.id ? 'Save Credit' : 'Update Notes'"
       :save-icon="!credit.id ? 'mdi-content-save-all' : 'mdi-content-save'"
-      :disable-save="!credit.id ? !isFormValid : false"
+      :disable-save="(!credit.id ? !isFormValid : false) || isCustomerDirty"
       :show-print-close="!credit.id"
-      :disable-print-close="!isFormValid"
+      :disable-print-close="!isFormValid || isCustomerDirty"
       :disable-capture="disabled"
-      :disable-print="!credit.id"
+      :disable-print="!credit.id || isCustomerDirty"
+      :customer-dirty="isCustomerDirty"
       @discard="discardCredit"
       @delete="isDeleteOpen = true"
       @capture="attachedImagesRef?.openCamera()"
@@ -314,6 +321,16 @@ const attachedImagesRef = ref(null)
 const isDeleteOpen = ref(false)
 const customerObj = ref(null)
 const itemList = ref([])
+const isCustomerDirty = ref(false)
+const dateInputRef = ref(null)
+
+function showDatePicker() {
+  if (disabled.value) return
+  const input = dateInputRef.value?.$el.querySelector('input')
+  if (input && typeof input.showPicker === 'function') {
+    input.showPicker()
+  }
+}
 
 // Form models
 const credit = reactive({
@@ -606,6 +623,11 @@ function recalculateItem(item) {
 
 // Create/Update submission
 async function saveOrUpdateCredit(print = false, close = false) {
+  if (isCustomerDirty.value) {
+    showToast('Please save or discard customer note/profile changes first.', 'warning')
+    return
+  }
+
   // Validate
   if (formRef.value) {
     const validateRes = await formRef.value.validate()
@@ -686,6 +708,10 @@ async function saveOrUpdateCredit(print = false, close = false) {
 
 // Print handling
 async function printOnly() {
+  if (isCustomerDirty.value) {
+    showToast('Please save or discard customer note/profile changes first.', 'warning')
+    return
+  }
   if (!credit.id) {
     await saveOrUpdateCredit(true, false)
   } else {
@@ -795,5 +821,9 @@ async function submitDeleteCredit() {
 }
 .final-credit-input[type=number] {
   -moz-appearance: textfield;
+}
+.custom-date-field :deep(input[type="date"]::-webkit-calendar-picker-indicator) {
+  display: none;
+  -webkit-appearance: none;
 }
 </style>

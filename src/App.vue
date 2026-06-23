@@ -10,10 +10,15 @@
       elevation="2"
     >
       <v-list-item
-        prepend-avatar="https://cdn.vuetifyjs.com/images/logos/vuetify-logo-dark.png"
         title="Cibola2"
         :class="isRail ? 'px-2 py-4' : 'pa-4'"
-      ></v-list-item>
+      >
+        <template v-slot:prepend>
+          <v-avatar rounded="0" size="40" :class="isRail ? 'mr-0' : 'mr-3'">
+            <v-img src="/256x256.png" alt="Cibola2 Icon"></v-img>
+          </v-avatar>
+        </template>
+      </v-list-item>
 
       <v-divider></v-divider>
 
@@ -49,15 +54,26 @@
     <!-- App Bar -->
     <v-app-bar app elevation="1" border="none">
       
-      <!-- Back button visible when history stack is > 1 -->
+      <!-- Back button present on all views, disabled when no history -->
       <v-btn
-        v-if="sessionState.navigationHistory.length > 1"
         icon="mdi-arrow-left"
         class="mr-2"
         color="primary"
         variant="text"
         title="Go Back"
+        :disabled="sessionState.navigationHistory.length <= 1"
         @click="navigateBack"
+      ></v-btn>
+
+      <!-- Forward button present on all views, disabled when no forward history -->
+      <v-btn
+        icon="mdi-arrow-right"
+        class="mr-2"
+        color="primary"
+        variant="text"
+        title="Go Forward"
+        :disabled="!sessionState.forwardHistory || sessionState.forwardHistory.length === 0"
+        @click="navigateForward"
       ></v-btn>
 
       <v-app-bar-title class="font-weight-bold text-gradient">
@@ -68,6 +84,9 @@
 
       <v-btn icon>
         <v-icon>mdi-bell-outline</v-icon>
+      </v-btn>
+      <v-btn icon title="Submit Feedback" @click="isFeedbackOpen = true">
+        <v-icon>mdi-comment-text-outline</v-icon>
       </v-btn>
       <v-btn icon @click="toggleTheme">
         <v-icon>{{ isDark ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
@@ -81,15 +100,9 @@
         
         <!-- Dashboard / Overview -->
         <div v-if="activeTab === 'dashboard'">
-          <!-- Welcome Header -->
-          <div class="d-flex flex-column align-center justify-center py-8 text-center">
-            <h1 class="text-h3 font-weight-bold mb-3 text-gradient">Cibola 2</h1>
-          </div>
-
-          <v-row justify="center" class="mt-2">
+          <v-row justify="center" class="mt-4">
             <!-- Left Column: Search & Quick Actions -->
-            <v-col cols="12" md="6" lg="5" class="mb-6 mb-md-0">
-              <MetalPricesCard class="mb-6" />
+            <v-col cols="12" md="3" class="mb-6 mb-md-0">
 
               <div class="mb-6">
                 <!-- Direct flat customer search component -->
@@ -128,24 +141,53 @@
                 </v-text-field>
               </div>
 
-              <!-- New Job Quick Action Button (Minimalist Tonal style) -->
-              <div class="text-center">
+              <!-- Quick Action Buttons -->
+              <div class="d-flex flex-column">
                 <v-btn
                   color="primary"
                   size="large"
-                  prepend-icon="mdi-briefcase-clock"
+                  prepend-icon="mdi-briefcase-outline"
                   variant="tonal"
                   block
                   @click="startNewJobFromDashboard"
                 >
                   New Job
                 </v-btn>
+                <v-btn
+                  color="primary"
+                  size="large"
+                  prepend-icon="mdi-credit-card-outline"
+                  variant="tonal"
+                  block
+                  @click="startNewCreditFromDashboard"
+                  class="mt-3"
+                >
+                  New Credit
+                </v-btn>
+                <v-btn
+                  color="primary"
+                  size="large"
+                  prepend-icon="mdi-list-box-outline"
+                  variant="tonal"
+                  block
+                  @click="startNewCustomSheetFromDashboard"
+                  class="mt-3"
+                >
+                  New Sheet
+                </v-btn>
               </div>
+
+              <MetalPricesCard class="mb-6 mt-6" />
+
             </v-col>
 
-            <!-- Right Column: Recently Viewed & Recently Created Records -->
-            <v-col cols="12" md="6" lg="5">
-              <RecentlyViewed class="mb-6" />
+            <!-- Middle Column: Recently Viewed Records -->
+            <v-col cols="12" md="4" class="mb-6 mb-md-0">
+              <RecentlyViewed />
+            </v-col>
+
+            <!-- Right Column: Recently Created Records -->
+            <v-col cols="12" md="4">
               <RecentlyCreated />
             </v-col>
           </v-row>
@@ -212,14 +254,17 @@
         <v-btn variant="text" icon="mdi-close" @click="toastState.show = false"></v-btn>
       </template>
     </v-snackbar>
+
+    <!-- Feedback Modal Dialog -->
+    <FeedbackDialog v-model="isFeedbackOpen" />
   </v-app>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useTheme } from 'vuetify'
 import { settingsState, loadSettings } from './store/settings'
-import { sessionState, startHeartbeat, navigateTo, navigateBack } from './store/session'
+import { sessionState, startHeartbeat, navigateTo, navigateBack, navigateForward } from './store/session'
 import { metadataState, refreshMetadata } from './store/metadata'
 import { api } from './utils/api'
 import ConnectionBanner from './components/ConnectionBanner.vue'
@@ -234,8 +279,11 @@ import RecentlyViewed from './components/RecentlyViewed.vue'
 import RecentlyCreated from './components/RecentlyCreated.vue'
 import { loadRecentlyViewed } from './store/recentlyViewed'
 import { toastState, showToast } from './store/toast'
+import FeedbackDialog from './components/FeedbackDialog.vue'
 
 const theme = useTheme()
+
+let unsubscribeNavigation = null
 
 onMounted(async () => {
   await loadSettings()
@@ -243,11 +291,79 @@ onMounted(async () => {
     startHeartbeat(settingsState.serverURL)
   }
   loadRecentlyViewed()
+
+  let lastBackTime = 0
+  const throttleBack = () => {
+    const now = Date.now()
+    if (now - lastBackTime > 300) {
+      lastBackTime = now
+      navigateBack()
+    }
+  }
+
+  let lastForwardTime = 0
+  const throttleForward = () => {
+    const now = Date.now()
+    if (now - lastForwardTime > 300) {
+      lastForwardTime = now
+      navigateForward()
+    }
+  }
+
+  // Handle IPC navigate-back command from main process
+  const ipcBackUnsubscribe = window.electronAPI && typeof window.electronAPI.onAppNavigateBack === 'function'
+    ? window.electronAPI.onAppNavigateBack(() => {
+        if (sessionState.navigationHistory.length > 1) {
+          throttleBack()
+        }
+      })
+    : null
+
+  // Handle IPC navigate-forward command from main process
+  const ipcForwardUnsubscribe = window.electronAPI && typeof window.electronAPI.onAppNavigateForward === 'function'
+    ? window.electronAPI.onAppNavigateForward(() => {
+        if (sessionState.forwardHistory && sessionState.forwardHistory.length > 0) {
+          throttleForward()
+        }
+      })
+    : null
+
+  // Capture mouseup event globally (capturing phase) to catch mouse back/forward button clicks
+  const handleMouseUp = (e) => {
+    if (e.button === 3) {
+      if (sessionState.navigationHistory.length > 1) {
+        e.preventDefault()
+        throttleBack()
+      }
+    } else if (e.button === 4) {
+      if (sessionState.forwardHistory && sessionState.forwardHistory.length > 0) {
+        e.preventDefault()
+        throttleForward()
+      }
+    }
+  }
+  window.addEventListener('mouseup', handleMouseUp, true)
+
+  unsubscribeNavigation = () => {
+    window.removeEventListener('mouseup', handleMouseUp, true)
+    if (ipcBackUnsubscribe) {
+      ipcBackUnsubscribe()
+    }
+    if (ipcForwardUnsubscribe) {
+      ipcForwardUnsubscribe()
+    }
+  }
+})
+
+onUnmounted(() => {
+  if (unsubscribeNavigation) {
+    unsubscribeNavigation()
+  }
 })
 
 // Watch serverURL settings to restart heartbeat if URL changes
 watch(() => settingsState.serverURL, (newUrl) => {
-  if (newUrl) {
+  if (newUrl && settingsState.isLoaded) {
     startHeartbeat(newUrl)
   }
 })
@@ -280,6 +396,8 @@ const activeTab = computed({
   get: () => sessionState.activeTab,
   set: (val) => navigateTo(val)
 })
+
+const isFeedbackOpen = ref(false)
 
 // Job Number search state & handlers
 const jobNumberInput = ref('')
@@ -320,6 +438,14 @@ const startNewJobFromDashboard = () => {
   navigateTo('jobs', { activeJobId: 0, selectedCustomerId: null })
 }
 
+const startNewCreditFromDashboard = () => {
+  navigateTo('credits', { activeCreditId: 0, selectedCustomerId: null })
+}
+
+const startNewCustomSheetFromDashboard = () => {
+  navigateTo('custom', { activeSheetId: 0, selectedCustomerId: null })
+}
+
 const handleTabClick = (value) => {
   // Sidebar clicking navigates to the top-level list of that tab (resets parameters)
   navigateTo(value)
@@ -333,9 +459,9 @@ const toggleTheme = () => {
 
 const menuItems = [
   { title: 'Dashboard', icon: 'mdi-view-dashboard', value: 'dashboard' },
-  { title: 'Gold Credits', icon: 'mdi-currency-usd', value: 'credits' },
-  { title: 'Custom Sheets', icon: 'mdi-clock-outline', value: 'custom' },
-  { title: 'Jobs', icon: 'mdi-briefcase', value: 'jobs' },
+  { title: 'Jobs', icon: 'mdi-briefcase-outline', value: 'jobs' },
+  { title: 'Gold Credits', icon: 'mdi-credit-card-outline', value: 'credits' },
+  { title: 'Custom Sheets', icon: 'mdi-list-box-outline', value: 'custom' },
   { title: 'Customers', icon: 'mdi-account-group', value: 'customers' },
   { title: 'Configuration', icon: 'mdi-cog', value: 'config' }
 ]

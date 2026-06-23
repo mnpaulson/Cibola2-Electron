@@ -1,10 +1,21 @@
 <template>
-  <v-bottom-navigation
-    elevation="8"
-    grow
-    height="64"
-    class="form-bottom-nav px-4"
-  >
+  <div>
+    <v-slide-y-reverse-transition>
+      <div
+        v-if="customerDirty"
+        class="bottom-nav-warning-banner d-flex align-center justify-center py-2 px-4 text-caption font-weight-bold"
+      >
+        <v-icon start size="16" class="mr-1">mdi-alert-circle-outline</v-icon>
+        <span>Unsaved customer changes. Please <strong>Save Note</strong> or <strong>Discard</strong> in the customer card first.</span>
+      </div>
+    </v-slide-y-reverse-transition>
+
+    <v-bottom-navigation
+      elevation="8"
+      grow
+      height="64"
+      class="form-bottom-nav px-4"
+    >
     <!-- Print & Close -->
     <v-btn
       v-if="showPrintClose"
@@ -75,7 +86,8 @@
       <v-icon class="mb-1">mdi-delete</v-icon>
       <span>Delete</span>
     </v-btn>
-  </v-bottom-navigation>
+    </v-bottom-navigation>
+  </div>
 </template>
 
 <script setup>
@@ -121,6 +133,10 @@ defineProps({
     default: false
   },
   disablePrintClose: {
+    type: Boolean,
+    default: false
+  },
+  customerDirty: {
     type: Boolean,
     default: false
   }
@@ -185,5 +201,18 @@ defineEmits(['discard', 'delete', 'capture', 'print', 'preview', 'save', 'save-p
 /* Let the disabled states override the custom colors */
 .form-bottom-nav :deep(.v-btn:disabled) {
   color: rgba(var(--v-theme-on-surface), 0.26) !important;
+}
+
+.bottom-nav-warning-banner {
+  background-color: rgb(var(--v-theme-warning)) !important;
+  color: rgb(var(--v-theme-on-warning)) !important;
+  text-align: center;
+  position: fixed;
+  bottom: 64px;
+  left: 0;
+  right: 0;
+  z-index: 1003;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px) saturate(180%);
 }
 </style>

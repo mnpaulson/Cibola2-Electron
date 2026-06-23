@@ -15,6 +15,7 @@ export const sessionState = reactive({
       }
     }
   ],
+  forwardHistory: [], // stack of popped routes for forward navigation
   selectedCustomerId: null,
   activeJobId: null,
   activeCreditId: null,
@@ -58,6 +59,7 @@ export function navigateTo(tab, params = {}) {
 
   if (!isDuplicate) {
     sessionState.navigationHistory.push(route)
+    sessionState.forwardHistory = [] // Clear forward history on new navigation
   }
 
   isNavigatingHistory = true
@@ -78,7 +80,9 @@ export function navigateBack() {
   if (sessionState.navigationHistory.length > 1) {
     isNavigatingHistory = true
     try {
-      sessionState.navigationHistory.pop() // remove current tab
+      const poppedRoute = sessionState.navigationHistory.pop() // remove current tab
+      sessionState.forwardHistory.push(poppedRoute) // save for forward navigation
+      
       const prevRoute = sessionState.navigationHistory[sessionState.navigationHistory.length - 1]
       
       sessionState.activeTab = prevRoute.tab
@@ -88,6 +92,26 @@ export function navigateBack() {
       sessionState.activeSheetId = prevRoute.params.activeSheetId
       
       console.log(`[Navigation] Navigated back to:`, prevRoute, `History stack size:`, sessionState.navigationHistory.length)
+    } finally {
+      isNavigatingHistory = false
+    }
+  }
+}
+
+export function navigateForward() {
+  if (sessionState.forwardHistory.length > 0) {
+    isNavigatingHistory = true
+    try {
+      const nextRoute = sessionState.forwardHistory.pop()
+      sessionState.navigationHistory.push(nextRoute)
+      
+      sessionState.activeTab = nextRoute.tab
+      sessionState.selectedCustomerId = nextRoute.params.selectedCustomerId
+      sessionState.activeJobId = nextRoute.params.activeJobId
+      sessionState.activeCreditId = nextRoute.params.activeCreditId
+      sessionState.activeSheetId = nextRoute.params.activeSheetId
+      
+      console.log(`[Navigation] Navigated forward to:`, nextRoute, `History stack size:`, sessionState.navigationHistory.length)
     } finally {
       isNavigatingHistory = false
     }

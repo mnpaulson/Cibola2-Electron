@@ -2,38 +2,36 @@
   <v-card class="recently-created-card rounded-lg" elevation="2" border>
     <!-- Header -->
     <v-card-item class="bg-primary text-white py-3">
-      <v-row no-gutters align="center" justify="space-between">
-        <v-col class="text-subtitle-1 font-weight-bold d-flex align-center">
-          <v-icon start class="mr-2">mdi-plus-circle-outline</v-icon>
-          Recently Created Records
-        </v-col>
-        <v-col class="shrink">
-          <v-btn
-            color="white"
-            variant="text"
-            density="comfortable"
-            icon="mdi-refresh"
-            title="Refresh"
-            size="small"
-            :loading="loading"
-            @click="fetchRecords"
-          ></v-btn>
-        </v-col>
-      </v-row>
+      <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center">
+        <v-icon start class="mr-2">mdi-plus-circle-outline</v-icon>
+        Recently Created Records
+      </v-card-title>
+      <template v-slot:append>
+        <v-btn
+          color="white"
+          variant="text"
+          density="comfortable"
+          icon="mdi-refresh"
+          title="Refresh"
+          size="small"
+          :loading="loading"
+          @click="fetchRecords"
+        ></v-btn>
+      </template>
     </v-card-item>
 
     <v-divider></v-divider>
 
     <!-- Table of Records -->
     <v-card-text class="pa-0">
-      <v-table hover fixed-header class="recently-created-table" v-if="records.length > 0">
+      <v-table hover fixed-header class="recently-created-table" style="table-layout: fixed; width: 100%;" v-if="records.length > 0">
         <thead>
           <tr>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 64px;">Preview</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 130px;">Type</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 80px;">Record</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 55px;">Preview</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 90px;">Type</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 70px;">Record</th>
             <th class="text-left font-weight-bold text-caption py-2">Details</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 110px;">Created</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 90px;">Created</th>
           </tr>
         </thead>
         <tbody>
@@ -77,13 +75,13 @@
 
             <!-- Details Column -->
             <td class="py-2">
-              <div class="text-body-2 font-weight-medium text-truncate" style="max-width: 250px;">
+              <div class="text-body-2 font-weight-medium text-truncate" style="max-width: 120px;">
                 {{ item.details }}
               </div>
               <div
                 v-if="item.customerName && item.type !== 'customer'"
                 class="text-caption text-medium-emphasis text-truncate"
-                style="max-width: 250px;"
+                style="max-width: 120px;"
               >
                 <v-icon size="12" class="mr-0.5">mdi-account</v-icon>
                 {{ item.customerName }}
@@ -117,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { api } from '../utils/api'
 import { navigateTo, sessionState } from '../store/session'
 import { settingsState } from '../store/settings'
@@ -247,11 +245,11 @@ function getImageUrl(imgStr) {
 function getTypeIcon(type) {
   switch (type) {
     case 'job':
-      return 'mdi-briefcase'
+      return 'mdi-briefcase-outline'
     case 'credit':
-      return 'mdi-currency-usd'
+      return 'mdi-credit-card-outline'
     case 'sheet':
-      return 'mdi-file-document-outline'
+      return 'mdi-list-box-outline'
     case 'customer':
       return 'mdi-account'
     default:
@@ -291,8 +289,18 @@ function goToRecord(item) {
   }
 }
 
+// Watch connection status to auto-fetch once connected
+watch(
+  () => sessionState.connectionStatus,
+  (status) => {
+    if (status === 'connected') {
+      fetchRecords()
+    }
+  },
+  { immediate: true }
+)
+
 onMounted(() => {
-  fetchRecords()
   // Setup 5-minute auto-refresh
   intervalId = setInterval(fetchRecords, 5 * 60 * 1000)
 })

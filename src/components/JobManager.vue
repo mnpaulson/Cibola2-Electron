@@ -19,7 +19,7 @@
           <v-card-item class="bg-primary text-white py-3">
             <v-row no-gutters align="center" justify="space-between">
               <v-col class="text-h6 font-weight-bold d-flex align-center">
-                <v-icon start class="mr-2">mdi-briefcase-clock</v-icon>
+                <v-icon start class="mr-2">mdi-briefcase-outline</v-icon>
                 Jobs Directory
               </v-col>
               <v-col cols="12" sm="4" class="mt-2 mt-sm-0">

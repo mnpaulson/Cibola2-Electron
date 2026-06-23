@@ -19,24 +19,24 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
   const creditDate = credit.created_at ? formatLocalDate(credit.created_at, 'long') : formatLocalDate(new Date().toISOString(), 'long')
   const itemsTotal = `$${credit.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const finalPayout = `$${(credit.credit_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  
+
   // Format breakdown rows
   let itemsHTML = ''
   itemList.forEach(item => {
     const itemName = item.itemObj ? item.itemObj.name : 'Unknown Item'
     const unitText = item.itemObj?.value3 === 'Other' ? 'units' : 'g'
+    const formattedPrice = item.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const formattedValue = item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     itemsHTML += `
       <tr>
         <td>${itemName}</td>
         <td class="right">${item.weight} ${unitText}</td>
-        <td class="right">${item.multiplier}</td>
-        <td class="right">${item.markup}</td>
-        <td class="right">$${item.unitPrice.toFixed(2)}/${unitText}</td>
-        <td class="right font-weight-bold">$${item.value.toFixed(2)}</td>
+        <td class="right">$${formattedPrice}/${unitText}</td>
+        <td class="right font-weight-bold">$${formattedValue}</td>
       </tr>
     `
   })
-  
+
   // Format attached images
   let imagesHTML = ''
   if (credit.credit_images && Array.isArray(credit.credit_images)) {
@@ -52,16 +52,16 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
           fullUrl = `${base}${path}`
         }
       }
-      
+
       imagesHTML += `
         <div class="image-card">
           <img src="${fullUrl}" />
-          <p>${img.note || ''}</p>
+          ${img.note ? `<p>${img.note.trim()}</p>` : ''}
         </div>
       `
     })
   }
-  
+
   return `
 <!DOCTYPE html>
 <html>
@@ -98,7 +98,8 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
       margin-bottom: 20px;
     }
     .logo {
-      max-height: 1.2in;
+      max-height: 0.9in;
+      max-width: 100%;
       object-fit: contain;
     }
     .title {
@@ -144,7 +145,7 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
     .total-row {
       font-weight: bold;
       font-size: 1.2em;
-      background-color: #eee;
+      background-color: #dff1d0ff;
     }
     .warning-box {
       border: 2px solid red;
@@ -163,6 +164,7 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
       margin-bottom: 30px;
       font-size: 1em;
       background-color: #fafafa;
+      white-space: pre-wrap;
     }
     .images-grid {
       display: grid;
@@ -178,8 +180,9 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
     }
     .image-card img {
       width: 100%;
-      height: 1.2in;
-      object-fit: cover;
+      height: auto;
+      object-fit: contain;
+      display: block;
     }
     .image-card p {
       font-size: 0.8em;
@@ -208,8 +211,8 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
     <div>
       <table class="header-table">
         <tr>
-          <td><img class="logo" src="${logoBase64}" alt="Logo"></td>
-          <td class="title">Scrap Gold Credit Record</td>
+          <td style="width: 30%;"><img class="logo" src="${logoBase64}" alt="Logo"></td>
+          <td class="title" style="width: 70%;">Scrap Gold Credit Record</td>
         </tr>
       </table>
 
@@ -224,12 +227,6 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
           <td class="meta-label" style="padding-left:20px;">Employee:</td>
           <td class="meta-value">${employeeName}</td>
         </tr>
-        <tr>
-          <td class="meta-label">Type:</td>
-          <td class="meta-value" style="text-transform: capitalize;">${credit.credit_type}</td>
-          <td class="meta-label" style="padding-left:20px;">Cheque/Invoice:</td>
-          <td class="meta-value"></td>
-        </tr>
       </table>
 
       <div class="warning-box">
@@ -241,8 +238,6 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
           <tr>
             <th>Item / Karat</th>
             <th class="right">Weight (g) / Qty</th>
-            <th class="right">Multiplier</th>
-            <th class="right">Markup</th>
             <th class="right">Unit Price</th>
             <th class="right">Total Value</th>
           </tr>
@@ -250,11 +245,7 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
         <tbody>
           ${itemsHTML}
           <tr class="total-row">
-            <td colspan="5" class="right">Items Value Sum:</td>
-            <td class="right">${itemsTotal}</td>
-          </tr>
-          <tr class="total-row" style="background-color: #e2f0d9;">
-            <td colspan="5" class="right">Finalized Credit Amount:</td>
+            <td colspan="3" class="right">Grand Total:</td>
             <td class="right">${finalPayout}</td>
           </tr>
         </tbody>
@@ -262,7 +253,7 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
 
       ${credit.note ? `
       <div style="font-weight:bold; margin-bottom:5px;">Credit Notes:</div>
-      <div class="notes-box">${credit.note}</div>
+      <div class="notes-box">${credit.note.trim()}</div>
       ` : ''}
 
       ${imagesHTML ? `
@@ -273,7 +264,7 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
 
     <div class="signatures">
       <div class="sig-line">Customer Signature</div>
-      <div class="sig-line">Operator Signature</div>
+      <div class="sig-line">Cheque/Invoice #</div>
     </div>
   </div>
 </body>

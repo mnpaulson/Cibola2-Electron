@@ -3,7 +3,7 @@
     <!-- Header -->
     <v-card-item class="bg-primary text-white py-3">
       <v-card-title class="font-weight-bold text-subtitle-1 d-flex align-center">
-        <v-icon start class="mr-2">mdi-briefcase</v-icon>
+        <v-icon start class="mr-2">mdi-briefcase-outline</v-icon>
         {{ job.id ? `Edit Job #${job.id}` : 'Create New Job' }}
         <v-spacer></v-spacer>
         <span v-if="job.created_at" class="text-caption font-weight-medium">
@@ -21,10 +21,12 @@
           <CustomerForm
             v-model="job.customer_id"
             :clearable="true"
-            :hide-notes="true"
+            :hide-notes="false"
             :clickable-name="true"
+            :lock-notes="true"
             @select="handleCustomerSelect"
             @click-name="navigateTo('customers', { selectedCustomerId: job.customer_id })"
+            @dirty-state-change="isCustomerDirty = $event"
           />
         </div>
 
@@ -95,7 +97,7 @@
           <v-col cols="12" md="6" class="d-flex flex-column">
             <v-textarea
               v-model="job.est_note"
-              label="Estimate Details"
+              label="Estimate Details (Visible on customer slip)"
               variant="outlined"
               rows="3"
               no-resize
@@ -108,7 +110,7 @@
           <v-col cols="12">
             <v-textarea
               v-model="job.note"
-              label="Job Notes (Visible on receipt ticket)"
+              label="Job Notes"
               variant="outlined"
               rows="3"
               counter="230"
@@ -145,9 +147,11 @@
       :show-delete="!!job.id"
       :show-preview="true"
       :save-label="job.id ? 'Update Job' : 'Save Job'"
-      :disable-save="!isFormValid"
+      :disable-save="!isFormValid || isCustomerDirty"
       :show-print-close="true"
-      :disable-print-close="!isFormValid"
+      :disable-print-close="!isFormValid || isCustomerDirty"
+      :disable-print="isCustomerDirty"
+      :customer-dirty="isCustomerDirty"
       @discard="discardJob"
       @delete="isDeleteJobOpen = true"
       @capture="attachedImagesRef?.openCamera()"
@@ -195,6 +199,7 @@ const formRef = ref(null)
 const loading = ref(false)
 const isFormValid = ref(true)
 const attachedImagesRef = ref(null)
+const isCustomerDirty = ref(false)
 
 const isDeleteJobOpen = ref(false)
 
@@ -362,6 +367,11 @@ async function loadJob(id) {
 
 // Job Create/Update submission
 async function saveOrUpdateJob(print = false, close = false) {
+  if (isCustomerDirty.value) {
+    showToast('Please save or discard customer note/profile changes first.', 'warning')
+    return
+  }
+
   // Validate fields
   if (formRef.value) {
     const validateRes = await formRef.value.validate()
@@ -411,6 +421,10 @@ async function saveOrUpdateJob(print = false, close = false) {
 
 // Print and close / Print only
 async function printOnly() {
+  if (isCustomerDirty.value) {
+    showToast('Please save or discard customer note/profile changes first.', 'warning')
+    return
+  }
   if (!job.id) {
     // Save first to get an ID before printing
     await saveOrUpdateJob(true, false)

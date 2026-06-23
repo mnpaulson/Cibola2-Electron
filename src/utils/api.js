@@ -1,7 +1,25 @@
+import { watch } from 'vue'
 import { settingsState } from '../store/settings'
 import { setConnectionStatus } from '../store/session'
 
+async function waitUntilSettingsLoaded() {
+  if (settingsState.isLoaded) return
+  await new Promise((resolve) => {
+    const unwatch = watch(
+      () => settingsState.isLoaded,
+      (loaded) => {
+        if (loaded) {
+          unwatch()
+          resolve()
+        }
+      },
+      { immediate: true }
+    )
+  })
+}
+
 async function apiRequest(endpoint, options = {}) {
+  await waitUntilSettingsLoaded()
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
   // Clean serverURL trailing slash
   const baseUrl = settingsState.serverURL.replace(/\/$/, '')

@@ -31,58 +31,59 @@ export function generateCustomSheetPrintHTML({ sheet, customer }) {
   const customerEmail = customer?.email || ''
   const sheetDate = sheet.created_at ? formatLocalDate(sheet.created_at, 'long') : formatLocalDate(new Date().toISOString(), 'long')
 
-  // Generate Estimate Columns
+  // Generate Estimate Columns (Only print the primary estimate)
   let estimatesHTML = ''
-  if (sheet.estimates && Array.isArray(sheet.estimates)) {
-    sheet.estimates.forEach(est => {
-      let itemsHTML = ''
-      if (est.estValues && Array.isArray(est.estValues)) {
-        est.estValues.forEach(val => {
-          const amtVal = parseFloat(val.amt) || 0
-          const priceVal = calculatePricePer(val)
-          const totalVal = amtVal * priceVal
-          
-          itemsHTML += `
-            <tr>
-              <td class="item-name">${val.name || 'Unknown'}</td>
-              <td class="item-type">${val.type || ''}</td>
-              <td class="right">${amtVal.toFixed(2)}</td>
-              <td class="right">$${priceVal.toFixed(2)}</td>
-              <td class="right font-weight-bold">$${totalVal.toFixed(2)}</td>
-            </tr>
-          `
-        })
-      }
+  if (sheet.estimates && Array.isArray(sheet.estimates) && sheet.estimates.length > 0) {
+    // Find primary estimate, or fallback to the first one if none is marked as primary
+    const primaryEst = sheet.estimates.find(est => est.isPrimary) || sheet.estimates[0]
 
-      const estTotal = calculateEstimateTotal(est)
-      const primaryBadge = est.isPrimary ? '<span class="primary-badge">PRIMARY OPTION</span>' : ''
+    let itemsHTML = ''
+    if (primaryEst.estValues && Array.isArray(primaryEst.estValues)) {
+      primaryEst.estValues.forEach(val => {
+        const amtVal = parseFloat(val.amt) || 0
+        const priceVal = calculatePricePer(val)
+        const totalVal = amtVal * priceVal
 
-      estimatesHTML += `
-        <div class="estimate-section">
-          <div class="estimate-header">
-            <h3>${est.name} ${primaryBadge}</h3>
-            <p class="estimate-note">${est.note || ''}</p>
-          </div>
-          <table class="items-table">
-            <thead>
-              <tr>
-                <th style="width: 35%;">Item / Description</th>
-                <th style="width: 20%;">Category</th>
-                <th style="width: 15%;" class="right">Amt / Weight(g)</th>
-                <th style="width: 15%;" class="right">Price Per</th>
-                <th style="width: 15%;" class="right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHTML || '<tr><td colspan="5" class="center italic">No items configured</td></tr>'}
-            </tbody>
-          </table>
-          <div class="estimate-footer">
-            Total Estimate Payout Value: <span class="total-amount">$${estTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-          </div>
+        itemsHTML += `
+          <tr>
+            <td class="item-name">${val.name || 'Unknown'}</td>
+            <td class="item-type">${val.type || ''}</td>
+            <td class="right">${amtVal.toFixed(2)}</td>
+            <td class="right">$${priceVal.toFixed(2)}</td>
+            <td class="right font-weight-bold">$${totalVal.toFixed(2)}</td>
+          </tr>
+        `
+      })
+    }
+
+    const estTotal = calculateEstimateTotal(primaryEst)
+    const primaryBadge = primaryEst.isPrimary ? '<span class="primary-badge">PRIMARY OPTION</span>' : ''
+
+    estimatesHTML = `
+      <div class="estimate-section">
+        <div class="estimate-header">
+          <h3>${primaryEst.name} ${primaryBadge}</h3>
+          <p class="estimate-note">${primaryEst.note || ''}</p>
         </div>
-      `
-    })
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th style="width: 35%;">Item / Description</th>
+              <th style="width: 20%;">Category</th>
+              <th style="width: 15%;" class="right">Amt / Weight(g)</th>
+              <th style="width: 15%;" class="right">Price Per</th>
+              <th style="width: 15%;" class="right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHTML || '<tr><td colspan="5" class="center italic">No items configured</td></tr>'}
+          </tbody>
+        </table>
+        <div class="estimate-footer">
+          Estimate Total: <span class="total-amount">$${estTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+        </div>
+      </div>
+    `
   }
 
   // Format attached images
@@ -102,7 +103,7 @@ export function generateCustomSheetPrintHTML({ sheet, customer }) {
       imagesHTML += `
         <div class="image-card">
           <img src="${fullUrl}" />
-          <p>${img.note || ''}</p>
+          ${img.note ? `<p>${img.note.trim()}</p>` : ''}
         </div>
       `
     })
@@ -130,10 +131,14 @@ export function generateCustomSheetPrintHTML({ sheet, customer }) {
       border-collapse: collapse;
       margin-bottom: 20px;
       border-bottom: 2px solid #333;
-      padding-bottom: 10px;
+    }
+    .header-table td {
+      vertical-align: bottom;
+      padding-bottom: 5px;
     }
     .store-logo {
       height: 60px;
+      display: block;
     }
     .store-info {
       text-align: right;
@@ -189,6 +194,7 @@ export function generateCustomSheetPrintHTML({ sheet, customer }) {
       margin: 0;
       font-size: 12px;
       color: #666;
+      white-space: pre-wrap;
     }
     .items-table {
       width: 100%;
@@ -207,7 +213,7 @@ export function generateCustomSheetPrintHTML({ sheet, customer }) {
       font-size: 12px;
       border-bottom: 1px solid #eee;
     }
-    .right {
+    .right, .items-table th.right, .items-table td.right {
       text-align: right;
     }
     .center {
@@ -245,8 +251,9 @@ export function generateCustomSheetPrintHTML({ sheet, customer }) {
     }
     .image-card img {
       width: 100%;
-      height: 1.2in;
-      object-fit: cover;
+      height: auto;
+      object-fit: contain;
+      display: block;
     }
     .image-card p {
       font-size: 0.8em;
@@ -285,9 +292,8 @@ export function generateCustomSheetPrintHTML({ sheet, customer }) {
         <img src="${logoBase64}" class="store-logo" />
       </td>
       <td class="store-info">
-        <strong>Cibola II Admin Terminal</strong><br/>
-        Jewelry Custom Design & Estimates<br/>
-        Phone: (123) 456-7890 | Email: support@cibola.com
+        Phone: 403-320-0846<br/>
+        Email: info@thegoldworks.com
       </td>
     </tr>
   </table>
@@ -322,15 +328,15 @@ export function generateCustomSheetPrintHTML({ sheet, customer }) {
 
   <div class="signature-container">
     <div class="signature-box" style="margin-top: 30px;">
-      Consultant Signature
+      Customer Signature
     </div>
     <div class="signature-box" style="margin-top: 30px;">
-      Customer Authorization
+      Date
     </div>
   </div>
 
   <div class="footer">
-    <p>This document is a design estimation sheet. Final jewelry purchase and processing prices may vary based on market changes. Thank you for your business!</p>
+    <p>Prices are based on the daily gold price per ounze. Gold price for your item may change and the price will be adjusted accordingly. The final cost of a custom job will change if the customer deviates from the specifications listed on this document, Please sign the form above if you agree to this estimate.</p>
   </div>
 </body>
 </html>

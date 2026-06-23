@@ -1,6 +1,8 @@
-# Printing Guidelines for Cibola2-Electron
+# Printing Guidelines and Architectural Standards for Cibola2-Electron
 
-Future agents working on print templates or print buttons in this application MUST adhere to these architectural standards.
+Future agents working on this application MUST adhere to these architectural standards and guidelines.
+
+---
 
 ## 1. IPC Printing Protocol (No Deprecated `@electron/remote`)
 Never use the deprecated `@electron/remote` module or `remote.getCurrentWindow()` to invoke printing directly from renderer code. Instead, always use the secure Electron Context Isolation IPC protocol:
@@ -32,12 +34,15 @@ POS thermal printers and ticket printers are highly sensitive to print margins a
 * `printBackground: true` (Ensure colors, borders, and barcodes render).
 * `deviceName: printerName` (Target the configured system printer).
 * `margins: { marginType: 'none' }` (Prevents text clipping and excessive paper rolling).
+* **Validation**: Validate that a target printer is selected in the local settings before triggering print. Provide user feedback (via SnackBar toasts) if printing fails to enqueue, instead of failing silently.
 
 ---
 
-## 4. Selection & Offline Validation
-* Validate that a target printer is selected in the local settings before triggering print.
-* Provide user feedback (via SnackBar toasts) if printing fails to enqueue, instead of failing silently.
+## 4. Base64 Asset Embedding in Headless Print Windows
+For static assets (such as `logo.png`) that need to render inside the headless print BrowserWindow:
+* **Avoid Local File Paths**: Do not use local paths (`file://...`) or relative paths (such as `/logo.png`) in the HTML `src` attributes. Because the print layout is loaded via a sandboxed `data:text/html` URL, the Chromium engine blocks local resource loading due to same-origin policies.
+* **Inline Base64 Encoding**: Convert static print assets into base64 Data URLs and export them from dedicated utility modules (such as [logo.js](file:///c:/dev/Cibola2-Electron/src/utils/logo.js)). Import them into form components and embed them directly inside the print HTML string as inline image data.
+* **Print Template Separation**: Keep component files clean and modular by moving print HTML templates and associated styling into separate utility modules under `src/utils/` (e.g., [jobPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/jobPrintTemplate.js), [creditPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/creditPrintTemplate.js), and [customSheetPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/customSheetPrintTemplate.js)). The template function should accept plain parameters (`job`, `customer`, `activeEmployees`) to avoid directly accessing Vue reactive state/refs, and handle base64 assets and server URLs internally.
 
 ---
 
@@ -61,16 +66,29 @@ To keep the application lightweight and simple for a small-scale single terminal
 
 ---
 
-## 8. Camera Capture & Jewelry Photography
-* For taking photos of jewelry items (e.g., in Jobs or Customer details), do not write direct camera streaming or WebRTC logic in the views.
-* Use the reusable dialog component [CameraCapture.vue](file:///c:/dev/Cibola2-Electron/src/components/CameraCapture.vue) which supports webcam permissions, multi-device video input selection (to support external USB macro/inspection scopes), center layout alignment masks, and base64 JPEG export.
-* **Default Camera**: The operator can configure a default camera in the System Settings (Local Settings tab). `CameraCapture.vue` will automatically load and prioritize this camera device upon launch. When selected on the settings screen, the system runs a brief capture probe to automatically populate and suggest the device's physical maximum resolution values.
-* **Resolution Auto-detection**: The camera stream automatically starts by requesting constraints closest to the camera's maximum resolution (up to 4K / 4096x2160) for optimal capture quality. The active resolution is detected and displayed dynamically in the capture window header.
-* **Image Quality**: Photos captured from the webcam must be saved at the highest possible quality (using `canvas.toDataURL('image/jpeg', 1.0)`) rather than downscaling/compressing the quality to save space.
+## 8. Date and Timezone Handling
+To ensure consistent dates across various timezone configurations:
+* **Centralized Utility**: Always use formatting functions in [dates.js](file:///c:/dev/Cibola2-Electron/src/utils/dates.js) (e.g., `formatLocalDate(dateStr, formatType)`) to format dates for display, rather than writing custom parsing/formatting helpers in individual components.
+* **Date-only values**: Fields representing calendar dates (e.g., `due_date`) are stored as `YYYY-MM-DD` strings in the SQLite database. When parsing or displaying these values, format them using local component extraction (e.g., splitting by `-` and constructing a date via `new Date(year, monthIndex, day)`) instead of using raw `new Date('YYYY-MM-DD')` which implicitly parses as UTC and causes off-by-one calendar day offsets in negative timezone offsets.
+* **HTML5 Date Inputs**: Standard `<v-text-field type="date">` inputs strictly expect the value format `YYYY-MM-DD`. Ensure all values loaded into these inputs from the database are normalized to strip time suffixes (e.g., splitting by space or `'T'`). To align with UI consistency, hide Chrome's native right-aligned calendar picker indicator via CSS (setting `display: none` on `::-webkit-calendar-picker-indicator`), style the text field with `prepend-inner-icon="mdi-calendar"`, and use programmatic `showPicker()` on the underlying `<input>` element when clicking the prepend icon or the text field to trigger the native calendar popup.
+* **Timestamp values**: Database created/updated timestamps are saved as UTC string format `YYYY-MM-DD HH:mm:ss`. Normalize them to ISO format (replacing space with `'T'` and appending `'Z'`) before using the Javascript `Date` constructor to guarantee they convert correctly to the client's local timezone.
 
 ---
 
-## 9. Customer Lookup & Two-Pronged Search
+## 9. Global Tab-Navigation History (Back Button)
+The application handles view routing via tab states instead of Vue Router to avoid file loading protocol constraints inside Electron:
+* **Navigation Stack**: Store current and past active route states (objects with `tab` and `params`) in `sessionState.navigationHistory`.
+* **Utility helpers**: Use `navigateTo(tab, params)` to transition to a tab with optional parameter values (e.g. `activeJobId`, `selectedCustomerId`). Use `navigateBack()` to pop the top route state and restore previous active properties.
+* **Avoid Direct State Mutation**: Never mutate global parameters (such as `sessionState.selectedCustomerId = id`) directly for user-initiated transitions. Always invoke `navigateTo(tab, params)`. Directly mutating state without navigating causes the history syncing watcher to overwrite the parameters of the active parent route (e.g., directory lists) in-place.
+* **Hoisting Watcher Helper Functions**: In components, when utilizing immediate watchers (`{ immediate: true }`) that depend on setup functions (like `fetchAssociatedHistory` or `fetchDirectory`), those functions **must** be defined above the watcher block in the `<script setup>` tag to prevent Temporal Dead Zone `ReferenceErrors`.
+* **Global Back and Forward Buttons**: Arrow-left and arrow-right icons in `App.vue`'s app-bar bind to `navigateBack()` and `navigateForward()` respectively. They are present on all views (including the Dashboard) to maintain layout alignment and prevent title shifting, but are disabled when no history is available.
+* **Parameter Syncing**: A reactive watcher in [session.js](file:///c:/dev/Cibola2-Electron/src/store/session.js) automatically synchronizes parameter mutations (such as selecting/saving an entity) into the current history entry.
+* **Persistent Directory State**: Directory search queries and pagination page numbers (e.g. `customerSearchQuery`, `jobCurrentPage`) are cached in `sessionState` so lists retain their scroll context when navigating back and forth across different sections.
+* **Mouse Back/Forward Button Support**: The main process listens to Electron's `'app-command'` events (`browser-backward` and `browser-forward`) and forwards them via IPC. `App.vue` subscribes to these and calls `navigateBack()` / `navigateForward()`. A DOM `mouseup` listener (capturing phase) is used as a fallback for browser/development environments. Both listeners are active, and the actions are throttled (300ms) to prevent duplicate triggers from firing twice for a single click.
+
+---
+
+## 10. Customer Lookup & Two-Pronged Search
 To avoid sending the entire customer list to the client while keeping search spelling-tolerant:
 * **Backend Prefix Search**: `GET /customers?q=...` tokenizes the query and performs prefix & substring queries in SQLite (returning up to 100 candidate records).
 * **Frontend Fuzzy Ranking**: The client uses `fuse.js` to fuzzy filter and rank this candidate list as the operator types.
@@ -78,145 +96,7 @@ To avoid sending the entire customer list to the client while keeping search spe
 
 ---
 
-## 10. Global Tab-Navigation History (Back Button)
-The application handles view routing via tab states instead of Vue Router to avoid file loading protocol constraints inside Electron:
-* **Navigation Stack**: Store current and past active route states (objects with `tab` and `params`) in `sessionState.navigationHistory`.
-* **Utility helpers**: Use `navigateTo(tab, params)` to transition to a tab with optional parameter values (e.g. `activeJobId`, `selectedCustomerId`). Use `navigateBack()` to pop the top route state and restore previous active properties.
-* **Avoid Direct State Mutation**: Never mutate global parameters (such as `sessionState.selectedCustomerId = id`) directly for user-initiated transitions. Always invoke `navigateTo(tab, params)`. Directly mutating state without navigating causes the history syncing watcher to overwrite the parameters of the active parent route (e.g., directory lists) in-place.
-* **Hoisting Watcher Helper Functions**: In components, when utilizing immediate watchers (`{ immediate: true }`) that depend on setup functions (like `fetchAssociatedHistory` or `fetchDirectory`), those functions **must** be defined above the watcher block in the `<script setup>` tag to prevent Temporal Dead Zone `ReferenceErrors`.
-* **Global Back Button**: An arrow-left icon in `App.vue`'s app-bar binds to `navigateBack()` and renders only when `sessionState.navigationHistory.length > 1`.
-* **Parameter Syncing**: A reactive watcher in [session.js](file:///c:/dev/Cibola2-Electron/src/store/session.js) automatically synchronizes parameter mutations (such as selecting/saving an entity) into the current history entry.
-* **Persistent Directory State**: Directory search queries and pagination page numbers (e.g. `customerSearchQuery`, `jobCurrentPage`) are cached in `sessionState` so lists retain their scroll context when navigating back and forth across different sections.
----
-
-## 11. Date and Timezone Handling
-To ensure consistent dates across various timezone configurations:
-* **Centralized Utility**: Always use formatting functions in [dates.js](file:///c:/dev/Cibola2-Electron/src/utils/dates.js) (e.g., `formatLocalDate(dateStr, formatType)`) to format dates for display, rather than writing custom parsing/formatting helpers in individual components.
-* **Date-only values**: Fields representing calendar dates (e.g., `due_date`) are stored as `YYYY-MM-DD` strings in the SQLite database. When parsing or displaying these values, format them using local component extraction (e.g., splitting by `-` and constructing a date via `new Date(year, monthIndex, day)`) instead of using raw `new Date('YYYY-MM-DD')` which implicitly parses as UTC and causes off-by-one calendar day offsets in negative timezone offsets.
-* **HTML5 Date Inputs**: Standard `<v-text-field type="date">` inputs strictly expect the value format `YYYY-MM-DD`. Ensure all values loaded into these inputs from the database are normalized to strip time suffixes (e.g., splitting by space or `'T'`).
-* **Timestamp values**: Database created/updated timestamps are saved as UTC string format `YYYY-MM-DD HH:mm:ss`. Normalize them to ISO format (replacing space with `'T'` and appending `'Z'`) before using the Javascript `Date` constructor to guarantee they convert correctly to the client's local timezone.
-
----
-
-## 12. Drag and Drop Image Uploads
-For uploading jewelry or transaction images:
-* **Reusable Component**: Always use [ImageDropzone.vue](file:///C:/dev/Cibola2-Electron/src/components/ImageDropzone.vue) for file input and drag-and-drop targets rather than writing custom file drop listeners.
-* **Layout Modes**: The component supports two layout modes via props:
-  * `:compact="true"`: Renders as a compact square tile, designed to be embedded directly inside a `v-row` grid as the first slot to add more items.
-  * `:compact="false"` (default): Renders as a full-width dropzone card, designed to fill empty states.
-* **Output Format**: Listen to the `@upload` event, which fires with the base64 JPEG/PNG/WEBP Data URL string representing the loaded image. Use this in exactly the same way as the `@capture` event from the camera component.
-
----
-
-## 13. Reusable Attached Image Gallery Component
-When implementing forms that require uploading or photographing jewelry items (such as credits or custom jobs):
-* **Reusable Component**: Always use [AttachedImages.vue](file:///C:/dev/Cibola2-Electron/src/components/AttachedImages.vue) instead of writing inline image grids, lightbox dialogs, delete confirmation overlays, or camera capture triggers.
-* **Component Usage**:
-  ```html
-  <AttachedImages
-    ref="attachedImagesRef"
-    v-model="job.job_images"
-    delete-endpoint="/jobs/images"
-    title="Attached Jewelry Photos"
-  />
-  ```
-* **Camera Capture Integration**: If you need to trigger webcam capturing from a button in a parent component (like a footer actions toolbar), define a ref on `<AttachedImages>` and call its exposed `openCamera()` method:
-  ```javascript
-  attachedImagesRef.value.openCamera()
-  ```
-* **Props**:
-  * `v-model` (`modelValue`): Array of images `{ id: number | null, image: string, note: string }`.
-  * `delete-endpoint`: Base API endpoint for database image deletion (e.g. `/jobs/images`).
-  * `title`: Optional custom heading text (defaults to `'Attached Jewelry Photos'`).
-
----
-
-## 14. Reusable Directory Pagination
-* **Reusable Component**: Always use [DirectoryPagination.vue](file:///C:/dev/Cibola2-Electron/src/components/DirectoryPagination.vue) to render pagination bars at the bottom of data directories or listings.
-* **Component Usage**:
-  ```html
-  <DirectoryPagination
-    v-model="currentPage"
-    :total-items="filteredJobs.length"
-    :items-per-page="itemsPerPage"
-  />
-  ```
-* **Performance Check**: Use pagination whenever rendering long listing tables (like Customer Directory or Jobs Directory) to avoid performance lag when data volumes grow.
-
----
-
-## 15. Generic Delete Confirmation Dialogue
-* **Reusable Component**: Always use [DeleteConfirmationDialog.vue](file:///C:/dev/Cibola2-Electron/src/components/DeleteConfirmationDialog.vue) when executing permanent or cascading record deletions.
-* **Features**:
-  * **Input Matching**: Pass `confirm-text-key` to force the operator to type a validation string (like the customer's last name) to enable the delete button.
-  * **Checkbox Validation**: Pass `checkbox-label` to require checking a safety acknowledgement checkbox.
-* **Component Usage**:
-  ```html
-  <DeleteConfirmationDialog
-    v-model="deleteDialog"
-    title="Confirm Deletion"
-    warning-message="Are you sure you want to delete this record? This is permanent."
-    :confirm-text-key="customer.lname"
-    confirm-text-placeholder="Type customer's Last Name to confirm"
-    checkbox-label="I understand this cannot be undone"
-    :loading="loading"
-    @confirm="submitDelete"
-  ```
-
----
-
-## 16. Base64 Asset Embedding in Headless Print Windows
-For static assets (such as `logo.png`) that need to render inside the headless print BrowserWindow:
-* **Avoid Local File Paths**: Do not use local paths (`file://...`) or relative paths (such as `/logo.png`) in the HTML `src` attributes. Because the print layout is loaded via a sandboxed `data:text/html` URL, the Chromium engine blocks local resource loading due to same-origin policies.
-* **Inline Base64 Encoding**: Convert static print assets into base64 Data URLs and export them from dedicated utility modules (such as [logo.js](file:///c:/dev/Cibola2-Electron/src/utils/logo.js)). Import them into form components and embed them directly inside the print HTML string as inline image data.
-* **Print Template Separation**: Keep component files clean and modular by moving print HTML templates and associated styling into separate utility modules under `src/utils/` (e.g., [jobPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/jobPrintTemplate.js), [creditPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/creditPrintTemplate.js), and [customSheetPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/customSheetPrintTemplate.js)). The template function should accept plain parameters (`job`, `customer`, `activeEmployees`) to avoid directly accessing Vue reactive state/refs, and handle base64 assets and server URLs internally.
-
----
-
-## 17. Reusable Metal Spot Prices Card
-For displaying and updating market metal prices (Gold, Platinum, Silver):
-* **Reusable Component**: Always use [MetalPricesCard.vue](file:///c:/dev/Cibola2-Electron/src/components/MetalPricesCard.vue) rather than duplicating spot price listings or sync trigger buttons.
-* **Display Modes**:
-  * **Large Mode (Default)**: A complete, self-contained dashboard/settings card that displays side-by-side spot prices for Gold/Platinum and an expandable row for Silver. Supports manual editing and auto-syncs every 15 minutes.
-  * **Small Mode (`small` prop)**: A compact layout designed for embedding inside transactional forms (e.g. `CreditForm.vue`). Uses double data bindings (`v-model:gold`, `v-model:platinum`, `v-model:date`), checks for price staleness (>24 hours), and updates parent values reactively when syncs complete.
-* **Sync and Edit protocols**:
-  * Syncing calls the backend `/values/sync` route to pull live spot prices from the market.
-  * Manual editing is done inline, validating for positive decimal inputs.
-  * Both actions trigger `refreshMetadata()` to synchronize the global metadata cache. Upon a successful update or sync, the last updated timestamp text flashes green as feedback instead of showing a success toast (error cases still display toast notifications).
-  * On mount in Large Mode, the component automatically checks if the prices are more than 15 minutes old (or missing) and triggers a sync if online. Small mode bypasses this automatic sync to avoid overriding existing saved transaction prices.
-* **Transactional Form Integration**:
-  * Always bind the `:disabled` prop (e.g., `:disabled="disabled"` where `disabled` is true for already saved records) to prevent syncing or editing historical transaction prices.
-  * The transactional form should watch `metadataState.metalPrices` to reactively update default spot prices and dates for *new* records if they haven't been manually edited.
-  * The form must watch the transaction's spot price fields and trigger a recalculation of all line item values and grand totals when the spot prices change (due to sync, manual overrides, or metadata updates).
-* **Offline Handling**: The component monitors `sessionState.connectionStatus` and automatically disables sync and save buttons if the server is offline, displaying a visual alert context warning.
-
----
-
-## 18. Global Toast Notification System (Unified Snackbar)
-To keep user feedback notifications consistent and avoid cluttering views with duplicate snackbar structures:
-* **Centralized Store**: The application uses a single global `<v-snackbar>` in `App.vue` that binds to the reactive `toastState` and `showToast` helper from [toast.js](file:///c:/dev/Cibola2-Electron/src/store/toast.js).
-* **Usage**:
-  * Import `showToast` from `../store/toast` (or the appropriate relative path to the store).
-  * Call `showToast('Message text', 'success' | 'error' | 'warning' | 'info')` to trigger a non-blocking toast.
-* **No Local Snackbars or Alerts**:
-  * Do not define local `<v-snackbar>` markup or local reactive notification variables in individual form or listing components.
-  * Avoid native `alert()` popups for user validation warnings or API failures. Route them through `showToast` instead.
-
----
-
-## 19. Reusable Custom Sheets Page Guidelines
-* **Routing Identifier**: The custom sheets tab is registered under `'custom'`. All customer-linked shortcuts should call `navigateTo('custom', { activeSheetId: id, selectedCustomerId: customerId })`.
-* **Centralized Estimate Calculations**: Line item price calculations must call `calculateRepairJobEstimate(formulaName, basePrice, weight, spotPrice)` from [pricing.js](file:///c:/dev/Cibola2-Electron/src/utils/pricing.js).
-* **Estimate Values Pricing Schema**: The database stores estimate items (`est_values`) using pricing columns: `basePrice` (metal spot price or base labor/stone rate), `priceModifier` (karat purity multiplier or 1.0 for non-metal), and `markup` (multiplier factor). The client calculates the final unit price per item (Price Per) as: `basePrice * priceModifier * markup`. The `discount` field is unused on the frontend and set to `0`. The legacy `pricePer` field is deprecated and not supported by the backend.
-* **Metal Spot Prices Integration**: Integrate `MetalPricesCard` in `small` mode. To preserve historical pricing, do not watch local spot prices to automatically trigger calculations on existing items. Instead, expose an explicit update button (`Update Estimates to Newest Spot Prices`) that updates local spot variables from cached metadata and calls `recalculateItem()` on all metal price items, resetting any manual overrides. Inform the operator that the displayed spot prices are historical creation values.
-* **Payload Sanitation**: Always strip client-side temporary identifiers (like `clientId-X` strings) from estimate IDs and estimate values before posting/putting payloads to SQLite.
-* **Custom Sheet Image Attachments**: Custom design sheets support attaching design jewelry photos or drawings. Use `<AttachedImages>` component inside the custom sheet form, binding to `sheet.custom_images` with `delete-endpoint="/customsheets/images"`. Trigger camera captures via `attachedImagesRef.value.openCamera()`.
-* **Custom Sheet Printing**: Printing custom sheet estimates uses a dedicated Custom Sheet Printer configured in local settings (`settingsState.printers.custom`), falling back to a headless window layout with base64 embedded assets. If the custom sheet has attached images, they will render in a grid layout (`.images-grid`) at the bottom of the printed page.
-* **Inactive Categories and Options Filtering**: To prevent cluttering the form, categories explicitly marked inactive (`active !== 1`) and individual options marked inactive (`active === 0`) must be filtered out from option selection and list headers on the form. However, if a loaded custom sheet estimate already uses an inactive category or option, it must be merged back into the visible form options to ensure the saved data displays correctly.
-
----
-
-## 20. Directory Column Sorting Guidelines
+## 11. Directory Column Sorting Guidelines
 For manager directories (Jobs, Credits, Custom Sheets, Customers):
 * **Default Sort**: Always default to sorting by record creation date descending (`created_at` descending, i.e., `sortBy = 'created_at'`, `sortDesc = true`) to surface the newest records first.
 * **Sortable Columns**: Enable sorting by clicking headers for **Customer Name** (and **Record Created Date** or **Last Active** / **Name**).
@@ -225,116 +105,45 @@ For manager directories (Jobs, Credits, Custom Sheets, Customers):
 
 ---
 
-## 21. Custom Values Configuration (Admin.vue)
-Custom configurations are stored in the global `values` database table and categorized using `type_id` values:
-* `type_id = 1`: Gold Credits
-* `type_id = 2`: Metal Spot Prices
-* `type_id = 3`: Custom Sheet values (displays Name, Category combobox, Base Price, Metal Type, Markup, and Default Quantity; Formula and Order columns are hidden).
-* `type_id = 4`: Custom Sheet Categories (displays Category Name and display Order, and provides up/down arrow buttons to easily reorder categories and automatically update order values on the backend).
-
-* **Auto-Save Protocol**: Manual save buttons are removed. Changes are automatically saved to the database:
-  - On the `@blur` event for text fields.
-  - On selection/change for comboboxes.
-  - Reactive `@update:model-value` toggles for the active switches.
-* **Save Status Indicator**: A cloud status icon is shown next to the Delete button:
-  - `pending` (Amber / `mdi-cloud-upload-outline`): Changes made but not yet saved (blur to commit).
-  - `saving` (Blue / `mdi-cloud-sync-outline`): Actively saving.
-  - `saved` (Green / `mdi-check-circle-outline`): Save succeeded (held for exactly 3 seconds to avoid rapid blinking before resetting).
-  - `synced` (Grey / `mdi-cloud-check-outline`): Standard resting state (no pending edits).
-* **Dedicated Active Columns**: The active/inactive `v-switch` is located in a dedicated "Active" column header to the left of "Actions". The "Actions" column contains only the status indicator and the full outlined "Delete" button.
-* **Inactive Record Filtering & Deactivation Visibility**: Inactive employees, custom sheet values, and custom sheet categories can be dynamically hidden in the lists using local "Hide Inactive" checkboxes. To prevent disorientation when an active item is toggled to inactive, a temporary visibility flag (`justDeactivated`) keeps the record visible until the tab is switched, the component is refreshed, or the checkbox is cycled off and on. This is handled via computed lists (`filteredEmployees`, `filteredCustomSheets`, and `filteredCustomSheetCategories`).
-* **Category Reordering Under Filters**: When reordering categories with `moveCategory(item, direction)` while inactive categories are hidden, the swap operation finds the adjacent visible item from the filtered list, swaps their positions in the main categories list, and updates order numbers sequentially.
-* **Performance Optimization (No Tab Animations)**: To avoid interface lag and maintain fast view switching when loading values tables, all sliding and opacity transition animations on `<v-window-item>` elements are disabled. Always include `:transition="false"` and `:reverse-transition="false"` props on configuration windows, and do not introduce custom CSS transitions that slow down DOM updates.
-
-Always trigger `await refreshMetadata()` in the store after any values updates, creates, or deletions to synchronize the UI's reactive cache.
+## 12. Global Toast Notification System (Unified Snackbar)
+To keep user feedback notifications consistent and avoid cluttering views with duplicate snackbar structures:
+* **Centralized Store**: The application uses a single global `<v-snackbar>` in `App.vue` that binds to the reactive `toastState` and `showToast` helper from [toast.js](file:///c:/dev/Cibola2-Electron/src/store/toast.js).
+* **Usage**: Import `showToast` from the store and call `showToast('Message text', 'success' | 'error' | 'warning' | 'info')`.
+* **No Local Snackbars or Alerts**: Do not define local `<v-snackbar>` markup or use native `alert()` popups.
 
 ---
 
-## 22. Collapsible Navigation Sidebar (Rail Mode)
-* **Collapse Mechanism**: The navigation sidebar behaves as a collapsible rail. Instead of fully hiding the sidebar, it shrinks to show only the navigation icons and allow for direct navigation.
-* **State Control**: The sidebar's state is managed using the reactive reference `isRail` in `App.vue`, which is bound to the `v-model:rail` property of the `v-navigation-drawer`. The drawer has the `permanent` prop so that it is never fully hidden.
-* **Toggle Buttons**:
-  1. A chevron toggle button is located at the bottom of the navigation drawer (defined in the `append` slot of `v-navigation-drawer`). To align the divider above this button with the top of the `FormBottomNavigation` component, the append container (`.drawer-append`) is set to `64px` in height with the `v-divider` at the top and the collapse list vertically centered via flex utilities.
-  2. The app-bar menu icon (`v-app-bar-nav-icon`) also toggles the `isRail` state.
-* **Layout Adjustments**:
-  * The top logo list item uses a dynamic class `:class="isRail ? 'px-2 py-4' : 'pa-4'"` to align the avatar nicely in both expanded and collapsed (rail) states.
+## 13. Reusable UI Components
+Always reuse these core components rather than rebuilding their functionality:
+
+* **[CameraCapture.vue](file:///c:/dev/Cibola2-Electron/src/components/CameraCapture.vue)**: Handles webcam permissions, multi-device selection, alignment masks, exports base64 JPEG at maximum resolution (`canvas.toDataURL('image/jpeg', 1.0)`), and defaults the camera light/torch to ON with an interactive UI toggle and fallback constraints for compatibility with older camera hardware.
+* **[ImageDropzone.vue](file:///C:/dev/Cibola2-Electron/src/components/ImageDropzone.vue)**: Supports drag-and-drop or file input uploads, emitting the base64 data URL. Supports `:compact` mode for grid embedding.
+* **[AttachedImages.vue](file:///C:/dev/Cibola2-Electron/src/components/AttachedImages.vue)**: Embedded image gallery with lightboxes, description note inputs, camera/upload triggers, and database delete capabilities.
+* **[DirectoryPagination.vue](file:///C:/dev/Cibola2-Electron/src/components/DirectoryPagination.vue)**: Handles paginating tabular views and search pages.
+* **[DeleteConfirmationDialog.vue](file:///C:/dev/Cibola2-Electron/src/components/DeleteConfirmationDialog.vue)**: Confirmation dialog requiring match validation keys (e.g. typing customer last name) and checkbox acknowledgement.
+* **[MetalPricesCard.vue](file:///c:/dev/Cibola2-Electron/src/components/MetalPricesCard.vue)**: Used in Large mode (dashboard) or `small` mode (transactional forms). Handles spot syncs, manual overrides, price staleness, and database metadata updates. Disable state must be bound on historical items.
+* **[FormBottomNavigation.vue](file:///c:/dev/Cibola2-Electron/src/components/FormBottomNavigation.vue)**: Shared bottom bar action layout for all forms. Always add `pb-20` class (80px bottom padding) to the parent form wrapper to avoid content coverage.
 
 ---
 
-## 23. Reusable Form Bottom Actions Layout
-For transactional form pages (JobForm, CreditForm, CustomSheetForm):
-* **Bottom Bar Navigation Component**: Do not implement individual, scroll-bound bottom card action buttons (Discard, Save, Print, Delete, Capture). Instead, always use the reusable `<FormBottomNavigation>` component.
-* **Component Usage**:
-  ```html
-  <FormBottomNavigation
-    :show-delete="!!job.id"
-    :show-preview="true"
-    :save-label="job.id ? 'Update Job' : 'Save Job'"
-    :disable-save="!isFormValid"
-    :show-print-close="true"
-    :disable-print-close="!isFormValid"
-    @discard="discardJob"
-    @delete="isDeleteJobOpen = true"
-    @capture="attachedImagesRef?.openCamera()"
-    @print="printOnly"
-    @preview="downloadPrintPreview"
-    @save="saveOrUpdateJob(false, false)"
-    @save-print-close="saveOrUpdateJob(true, true)"
-  />
-  ```
-* **Combined Discard / Delete**: The Discard and Delete actions are combined into a single action slot at the far right. It displays a grey 'Discard' button if the record is unsaved (`show-delete` is false) and a red 'Delete' button if the record is saved (`show-delete` is true).
-* **Form Padding**: When using the fixed bottom navigation layout, add the `pb-20` class (adds 80px bottom padding) to the wrapping `<v-card>` element to prevent the bottom actions bar from covering form fields or image gallery sections.
----
-
-## 24. Unified Customer History and Records List
-When rendering related historical records (Jobs, Store Credits, and Custom Sheets) under a selected customer profile (e.g., in `CustomerManager.vue`):
-* **No Tab Navigation**: Do not separate historical records into individual tabs or views. Combine them all into a single unified list.
-* **Column Setup & Order**: The table columns must be in this order:
-  1. **Id**: prefixed with `#` (header label `Id`).
-  2. **Record Type**: displays `Job`, `Store Credit`, or `Custom Sheet` (header label `Record Type`).
-  3. **Details**: custom rendered details for each item based on its type (header label `Details`).
-  4. **Created**: last column, displaying the formatted local creation date (header label `Created`).
-* **Column Sorting**: All columns must be sortable using the interactive `.sortable-header` class with sorting chevrons. The default sorting must be by record creation date descending (`created_at` descending).
-* **Details Column Formatting**:
-  - **Jobs**: Display only the estimate. If the estimate is 0 or missing, display `'No Estimate'`. Do not display the job's due date in this list.
-  - **Store Credits**: Display the payout amount. If the credit value is 0 or missing, display `'No Final Credit'`.
-  - **Custom Sheets**: Display the custom design sheet's name.
+## 14. Single-Instance Application Lock
+To prevent multiple instances of the application from running simultaneously (which could result in database lock or session sync issues):
+* **Single Instance Check**: The main process executes `app.requestSingleInstanceLock()`.
+* **Early Exit**: If a second instance attempts to run, `app.quit()` is invoked immediately.
+* **Focus Existing Instance**: The `second-instance` event is registered to restore and focus the primary application window (`win`) whenever a second instance launch is attempted.
 
 ---
 
-## 25. Recently Viewed Records Dashboard Component
-To track and display recently viewed records on the Dashboard:
-* **Reactive Store**: The global recently viewed records state and tracking are managed in [recentlyViewed.js](file:///c:/dev/Cibola2-Electron/src/store/recentlyViewed.js).
-* **Automatic Tracking**: The store contains a reactive watcher that monitors `sessionState` parameter changes (`activeTab`, `selectedCustomerId`, `activeJobId`, `activeCreditId`, `activeSheetId`). Whenever a valid, saved record is opened (ID > 0) in its respective tab, the store automatically fetches the record's details (using `api.get`) and adds or moves it to the top of the history list.
-* **LocalStorage Persistence**: The history is automatically saved to and loaded from `localStorage` under the key `recently_viewed_records` so it persists across reloads/restarts.
-* **Details and Formats**: The cached recently viewed records match the fields and logic of `CustomerManager.vue` related records list:
-  - `id`: Record ID.
-  - `type`: `'job' | 'credit' | 'sheet' | 'customer'`.
-  - `typeName`: Display name of the type.
-  - `details`:
-    - Jobs: `Estimate: $XX.XX` (or `'No Estimate'`).
-    - Store Credits: `Payout: $XX.XX` (or `'No Final Credit'`).
-    - Custom Sheets: Custom sheet name.
-    - Customers: Customer's full name.
-  - `customerName`: Customer's full name (for jobs, credits, sheets).
-  - `thumbnail`: For jobs, a path to the first attached image (or `null` if none) to render a 36x36 thumbnail.
-  - `created_at`: The creation date of the record.
-* **Component Rendering**: Render the `<RecentlyViewed />` widget from [RecentlyViewed.vue](file:///c:/dev/Cibola2-Electron/src/components/RecentlyViewed.vue) on the dashboard. The table columns must be in this order:
-  1. **Preview**: 36x36 cover image of the job thumbnail, or a type-colored avatar displaying the type-specific icon if no thumbnail image exists.
-  2. **Type**: Displays the type name text (e.g. Job, Store Credit, Customer, Custom Sheet).
-  3. **Record**: Displays the record ID (prefixed with `#`).
-  4. **Details**: Custom rendered details for each item.
-  5. **Created**: Displays the formatted local creation date.
-  - Whenever a record is saved or updated, call `refreshRecentRecord(type, id)` to fetch the latest details and update the history cache.
+## 15. Customer Note Alerts & Unsaved Safeguards
+* **Active Notes Alert Banner**: If a customer has a note stored in the database, `CustomerForm.vue` displays a pulsing warning banner (`pulsing-alert` class) above the customer info to highlight critical instructions.
+* **Explicit Save/Discard Buttons**: When editing notes, auto-save on blur is disabled. A sub-toolbar with **Save Note** and **Discard** buttons is rendered directly under the textarea when modifications are made.
+* **Parent Save Prevention Block**: `CustomerForm.vue` emits `@dirty-state-change` when the customer note has unsaved changes or if the customer profile is in edit mode. Parent form components (e.g., `JobForm.vue`, `CreditForm.vue`, `CustomSheetForm.vue`) must listen to this event, disable their save and print actions in `FormBottomNavigation`, and throw warning toasts if save attempts occur while customer information is dirty.
 
 ---
 
-## 26. Recently Created Records Dashboard Component
-To display recently created records in the database on the Dashboard:
-* **Component File**: [RecentlyCreated.vue](file:///c:/dev/Cibola2-Electron/src/components/RecentlyCreated.vue)
-* **API Invocations**: Fetches the newest records from the backend (`GET /jobs`, `GET /goldcredits`, `GET /customsheets`, `GET /customers`), normalizes them into a unified format, combines them, sorts by `created_at` descending, and slices the top 10.
-* **Thumbnail Loading**: For any `job` in the top 10, a nested request is sent to `GET /jobs/:id` to pull full details and populate `thumbnail` with the first attached image (if any).
-* **Auto-Refresh**: Automatically refreshes its database records list every 5 minutes on mount. The interval is cleared on unmount.
-* **Manual Refresh**: Includes a refresh icon button in the header that triggers `fetchRecords` on click and displays a loading spinner.
+## 16. Server Address Initialization & Startup Request Guarding
+* **Guarding Requests Until Settings Load**: To prevent sending network requests (e.g., fetching metadata) to the default port (`localhost:8000`) before settings are retrieved from Electron IPC, all API client calls must wait for settings initialization.
+* **API Client Delay**: The client wrapper in [api.js](file:///c:/dev/Cibola2-Electron/src/utils/api.js) automatically awaits `settingsState.isLoaded = true` using a Vue reactive watcher before resolving request URLs.
+* **Heartbeat Watcher Guard**: Any watchers on `settingsState.serverURL` in `App.vue` that trigger `startHeartbeat` must be guarded with `settingsState.isLoaded` to avoid triggering connection attempts or preflight checks against default ports on startup.
 
 

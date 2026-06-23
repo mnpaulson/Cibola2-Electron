@@ -2,37 +2,35 @@
   <v-card class="recently-viewed-card rounded-lg" elevation="2" border>
     <!-- Header -->
     <v-card-item class="bg-primary text-white py-3">
-      <v-row no-gutters align="center" justify="space-between">
-        <v-col class="text-subtitle-1 font-weight-bold d-flex align-center">
-          <v-icon start class="mr-2">mdi-history</v-icon>
-          Recently Viewed Records
-        </v-col>
-        <v-col class="shrink" v-if="records.length > 0">
-          <v-btn
-            color="white"
-            variant="text"
-            density="comfortable"
-            icon="mdi-broom"
-            title="Clear History"
-            size="small"
-            @click="clearHistory"
-          ></v-btn>
-        </v-col>
-      </v-row>
+      <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center">
+        <v-icon start class="mr-2">mdi-history</v-icon>
+        Recently Viewed Records
+      </v-card-title>
+      <template v-slot:append v-if="records.length > 0">
+        <v-btn
+          color="white"
+          variant="text"
+          density="comfortable"
+          icon="mdi-broom"
+          title="Clear History"
+          size="small"
+          @click="clearHistory"
+        ></v-btn>
+      </template>
     </v-card-item>
 
     <v-divider></v-divider>
 
     <!-- Table of Records -->
     <v-card-text class="pa-0">
-      <v-table hover fixed-header class="recently-viewed-table" v-if="records.length > 0">
+      <v-table hover fixed-header class="recently-viewed-table" style="table-layout: fixed; width: 100%;" v-if="records.length > 0">
         <thead>
           <tr>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 64px;">Preview</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 130px;">Type</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 80px;">Record</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 55px;">Preview</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 90px;">Type</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 70px;">Record</th>
             <th class="text-left font-weight-bold text-caption py-2">Details</th>
-            <th class="text-left font-weight-bold text-caption py-2" style="width: 110px;">Created</th>
+            <th class="text-left font-weight-bold text-caption py-2" style="width: 90px;">Created</th>
           </tr>
         </thead>
         <tbody>
@@ -76,13 +74,13 @@
 
             <!-- Details Column -->
             <td class="py-2">
-              <div class="text-body-2 font-weight-medium text-truncate" style="max-width: 250px;">
+              <div class="text-body-2 font-weight-medium text-truncate" style="max-width: 120px;">
                 {{ item.details }}
               </div>
               <div
                 v-if="item.customerName && item.type !== 'customer'"
                 class="text-caption text-medium-emphasis text-truncate"
-                style="max-width: 250px;"
+                style="max-width: 120px;"
               >
                 <v-icon size="12" class="mr-0.5">mdi-account</v-icon>
                 {{ item.customerName }}
@@ -136,11 +134,11 @@ function getImageUrl(imgStr) {
 function getTypeIcon(type) {
   switch (type) {
     case 'job':
-      return 'mdi-briefcase'
+      return 'mdi-briefcase-outline'
     case 'credit':
-      return 'mdi-currency-usd'
+      return 'mdi-credit-card-outline'
     case 'sheet':
-      return 'mdi-file-document-outline'
+      return 'mdi-list-box-outline'
     case 'customer':
       return 'mdi-account'
     default:

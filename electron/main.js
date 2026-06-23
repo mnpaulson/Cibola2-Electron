@@ -2,6 +2,51 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
+import { autoUpdater } from 'electron-updater'
+
+// Configure autoUpdater
+autoUpdater.autoDownload = false
+autoUpdater.autoInstallOnAppQuit = true
+autoUpdater.logger = console
+
+function setupAutoUpdater() {
+  autoUpdater.on('checking-for-update', () => {
+    win?.webContents.send('update-checking')
+  })
+
+  autoUpdater.on('update-available', (info) => {
+    win?.webContents.send('update-available', {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      releaseNotes: info.releaseNotes
+    })
+  })
+
+  autoUpdater.on('update-not-available', (info) => {
+    win?.webContents.send('update-not-available', {
+      version: info.version
+    })
+  })
+
+  autoUpdater.on('error', (err) => {
+    win?.webContents.send('update-error', err == null ? 'unknown' : (err.message || err).toString())
+  })
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    win?.webContents.send('update-download-progress', {
+      percent: progressObj.percent,
+      bytesPerSecond: progressObj.bytesPerSecond,
+      total: progressObj.total,
+      transferred: progressObj.transferred
+    })
+  })
+
+  autoUpdater.on('update-downloaded', (info) => {
+    win?.webContents.send('update-downloaded', {
+      version: info.version
+    })
+  })
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const settingsPath = path.join(app.getPath('userData'), 'settings.json')
@@ -47,7 +92,7 @@ let win = null
 
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'favicon.ico'),
+    icon: path.join(process.env.VITE_PUBLIC, '256x256.png'),
     width: 1280,
     height: 800,
     webPreferences: {
@@ -60,6 +105,15 @@ function createWindow() {
   // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date()).toLocaleString())
+  })
+
+  // Handle system app-command events like mouse back/forward buttons
+  win.on('app-command', (e, cmd) => {
+    if (cmd === 'browser-backward') {
+      win?.webContents.send('app-navigate-back')
+    } else if (cmd === 'browser-forward') {
+      win?.webContents.send('app-navigate-forward')
+    }
   })
 
   if (VITE_DEV_SERVER_URL) {
@@ -138,18 +192,65 @@ ipcMain.handle('print-document', async (event, { printerName, htmlContent }) => 
   }
 })
 
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion()
+})
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-    win = null
+ipcMain.handle('check-for-update', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates()
+    return { success: true, result }
+  } catch (err) {
+    console.error('Error checking for updates:', err)
+    return { success: false, error: err.message }
   }
 })
 
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
+ipcMain.handle('download-update', async () => {
+  try {
+    const result = await autoUpdater.downloadUpdate()
+    return { success: true, result }
+  } catch (err) {
+    console.error('Error downloading update:', err)
+    return { success: false, error: err.message }
+  }
+})
+
+ipcMain.handle('install-update', () => {
+  autoUpdater.quitAndInstall()
+  return { success: true }
+})
+
+
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
+    }
+  })
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit()
+      win = null
+    }
+  })
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+    }
+  })
+
+  app.whenReady().then(() => {
+    setupAutoUpdater()
     createWindow()
-  }
-})
+  })
+}
 
-app.whenReady().then(createWindow)

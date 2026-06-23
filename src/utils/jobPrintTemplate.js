@@ -41,7 +41,7 @@ function getImageUrl(imgStr) {
 }
 
 /**
- * Generates the complete print HTML layout for a Job.
+ * Generates the complete print HTML layout for a Job in an A4 4-quadrant layout.
  * 
  * @param {Object} params
  * @param {Object} params.job - The job reactive/plain object
@@ -54,35 +54,66 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
   const empName = emp ? emp.name : 'Unassigned'
   const estVal = parseFloat(String(job.estimate).replace(/,/g, '')) || 0
   const depVal = parseFloat(String(job.deposit).replace(/,/g, '')) || 0
-  
+
   const createdDateStr = formatPrintDate(job.created_at || new Date().toISOString())
   const dueDateStr = job.due_date ? formatPrintDate(job.due_date) : ''
-  
+
   const d = new Date()
   const year = d.getFullYear()
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   const todayDateStr = formatPrintDate(`${year}-${month}-${day}`)
 
-  // Process images
-  let imagesHTML = ''
-  let customerImagesHTML = ''
+  // Get first 6 images
+  const jobImages = job.job_images && Array.isArray(job.job_images) ? job.job_images.slice(0, 6) : []
 
-  if (job.job_images && Array.isArray(job.job_images)) {
-    job.job_images.forEach(img => {
-      const fullUrl = getImageUrl(img.image)
-      imagesHTML += `
-        <div class="cb-print-element cb-print-image-cont">
-          <img src="${fullUrl}" class="cb-print-image cb-print-element" />
-          <div class="cb-print-element cb-print-image-note">${img.note || ''}</div>
+  let q1ImagesHTML = ''
+  let q2ImagesHTML = ''
+
+  for (let i = 0; i < jobImages.length; i++) {
+    const img = jobImages[i]
+    const imgUrl = getImageUrl(img.image)
+    const imgNote = (img.note || '').trim()
+
+    const isQ1 = (i < 3)
+    const rowClass = isQ1 ? 'q1-row' : 'q2-row'
+
+    const rowHTML = `
+      <div class="image-row ${rowClass}">
+        <div class="img-cell">
+          <img src="${imgUrl}" />
         </div>
-      `
-      customerImagesHTML += `
-        <div class="cb-print-element cb-print-cus-img-cont">
-          <img src="${fullUrl}" class="cb-print-cust-img cb-print-element" />
+        <div class="note-cell ${imgNote ? '' : 'ruled-lines'}">
+          ${imgNote ? `<div class="note-text">${imgNote}</div>` : ''}
         </div>
-      `
-    })
+      </div>
+    `
+
+    if (isQ1) {
+      q1ImagesHTML += rowHTML
+    } else {
+      q2ImagesHTML += rowHTML
+    }
+  }
+
+  // Bottom Customer Copy (up to 4 images split across Q3 and Q4, 1 per row)
+  let q3ImagesHTML = ''
+  let q4ImagesHTML = ''
+
+  for (let i = 0; i < jobImages.length; i++) {
+    const img = jobImages[i]
+    if (i >= 4) break // cap customer copy images at 4 total
+    const fullUrl = getImageUrl(img.image)
+    const imgHTML = `
+      <div class="cust-image-row">
+        <img src="${fullUrl}" />
+      </div>
+    `
+    if (i < 2) {
+      q3ImagesHTML += imgHTML
+    } else {
+      q4ImagesHTML += imgHTML
+    }
   }
 
   return `
@@ -93,6 +124,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
     * {
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      box-sizing: border-box;
     }
     @font-face {
       font-family: 'Material Icons';
@@ -117,332 +149,574 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       text-rendering: optimizeLegibility;
     }
     body {
-      height: 11in;
-      width: 8.5in;
       margin: 0;
       padding: 0;
-      font-family: Arial, sans-serif;
+      width: 210mm;
+      height: 297mm;
       overflow: hidden;
       background: white;
       color: black;
+      font-family: Arial, sans-serif;
     }
     @page {
+      size: A4;
       margin: 0mm;
     }
-    .cb-print {
-      position: absolute !important;        
-      top: 0px;
-      left: 0px;
-      width: 8in;
-      height: 10.5in;
-      margin: 0.2in;
-      margin-left: 0.2325in;        
-    }
-    .cb-print-element {
-      position: absolute !important;
-      overflow: hidden;
-    }
-    .cb-print-nowrap {
-      white-space: nowrap;
-    }
-    .cb-print-blanks {
-      height: 0.45in;
-      width: 3.95in;
-      left: 0;
-    }
-    .cb-print-top-box {
-      display: inline-block;
-      height: 100%;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
-    }
-    .cb-print-top-text {
+    .page-container {
+      width: 210mm;
+      height: 297mm;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 166.5mm 130.5mm;
       position: relative;
-      bottom: -0.275in;
-      font-size: 0.75em;
-      color: grey;
+      overflow: hidden;
+      box-sizing: border-box;
     }
-    .cb-print-top-flags {
-      width: 1.34in;
+    .quadrant {
+      width: 105mm;
+      height: 100%;
+      padding: 4.5mm 3mm;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-sizing: border-box;
+      background: white;
     }
-    .cb-print-top-deposit {
-      width: 0.75in;
+    
+    /* Folding/Tearing boundaries */
+    .q-top-left {
+      border-right: 1px dashed #bbb;
+      border-bottom: 1px dashed #bbb;
+      justify-content: flex-start !important;
     }
-    .cb-print-deposit-value {
+    .q-top-right {
+      border-bottom: 1px dashed #bbb;
+      justify-content: flex-start !important;
+    }
+    .q-bottom-left {
+      border-right: 1px dashed #bbb;
+    }
+    .q-bottom-right {
+    }
+
+    /* Fixed Height Blocks styling */
+    .block {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .text-details {
+      height: 75mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 100%;
+      margin-bottom: 0mm;
+    }
+    .q1-combined-row {
+      display: flex;
+      width: 100%;
+      height: 15mm;
+      gap: 0.5mm;
+      box-sizing: border-box;
+    }
+    .q1-combined-row .info-block {
+      flex: 1;
+      height: 100%;
+    }
+    .blanks-block {
+      display: flex;
+      width: 100%;
+      height: 10mm;
+      border: 1px solid #000;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .blank-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 1px 3px;
+      position: relative;
+      border-right: 1px solid #000;
+    }
+    .blank-box:last-child {
+      border-right: none;
+    }
+    .blank-box.col-flags {
+      flex: 1.3;
+    }
+    .blank-box.col-deposit {
+      flex: 0.9;
+    }
+    .blank-box.col-credit {
+      flex: 0.9;
+    }
+    .blank-box.col-total {
+      flex: 0.9;
+    }
+    .blank-label {
+      font-size: 10px;
+      color: #333;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+    .deposit-val {
       position: absolute;
-      left: 1.38in;
-      top: 0.05in;
-      font-size: 1.4em;
+      top: 1px;
+      left: 3px;
+      font-size: 20px;
+      font-weight: bold;
     }
-    .cb-print-top-gold-credit {
-      width: 0.75in;
+    
+    .meta-row {
+      display: flex;
+      width: 100%;
+      height: 7mm;
+      gap: 0.5mm;
     }
-    .cb-print-total {
-      width: 0.986in;
+    .meta-item {
+      border: 1px solid #000;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      padding: 0 6px;
+      font-size: 10px;
     }
-    .cb-print-customer-info {
-      height: 0.85in;
-      top: 0.5in;
-      left: 0;
-      width: 2.45in;        
-      font-size: 1.3em;
-      padding-left: 30px;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
+    .job-id-box {
+      flex: 1;
+      font-size: 25px;
+      font-weight: bold;
+      justify-content: center;
+      background-color: #f5f5f5;
+    }
+    .employee-box {
+      flex: 1.5;
+      font-weight: bold;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .info-block {
+      border: 1px solid #000;
+      border-radius: 4px;
+      width: 100%;
+      height: 13mm;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      justify-content: center;
+    }
+    .block-content {
+      padding: 2px 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      height: 100%;
+    }
+    .info-line {
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .info-icon {
+      font-size: 11px !important;
+      margin-right: 5px;
+      color: #6e6e6e;
+    }
+
+    .dates-block {
+      height: 8mm;
+      justify-content: center;
+    }
+    .row-content {
+      flex-direction: row !important;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .date-col {
+      display: flex;
+      align-items: center;
+      width: 48%;
+    }
+    .date-icon {
+      font-size: 20px !important;
+      margin-right: 6px;
+      color: #6e6e6e;
+    }
+    .date-val {
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .date-urgent {
+      color: red;
+    }
+
+    .estimate-block {
+      height: 13mm;
+    }
+    .est-amount {
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .est-note {
+      font-size: 10.5px;
+      color: #333;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      white-space: pre-wrap;
+    }
+
+    .notes-block {
+      height: 32mm;
+      margin-bottom: 2px;
+    }
+    .notes-content {
+      font-size: 13px;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      white-space: pre-wrap;
+    }
+
+    /* Ruled Writing Lines Background */
+    .ruled-lines {
+      background-image: linear-gradient(#ccc 1px, transparent 1px);
+      background-size: 100% 5mm; /* 5mm line spacing */
+      line-height: 5mm;
+      padding-top: 1px !important;
+      box-sizing: border-box;
+    }
+
+    /* Q1 & Q2: Image Rows (One per Row Layout) */
+    .image-row {
+      display: flex;
+      gap: 0.5mm;
+      width: 100%;
+      align-items: stretch;
+      box-sizing: border-box;
+    }
+    .q-top-left .image-row + .image-row, .q-top-right .image-row + .image-row {
+      margin-top: 0.5mm;
+    }
+    .q1-row {
+      max-height: 30mm;
+    }
+    .q2-row {
+      max-height: 30mm;
+    }
+    .img-cell {
+      border: none;
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f9f9f9;
+      box-sizing: border-box;
+    }
+    .q1-row .img-cell {
+        width: 48mm;
+        height: auto;
+        max-height: 28mm;
+    }
+    .q2-row .img-cell {
+      width: 48mm;
+      height: auto;
+      max-height: 30mm;
+    }
+    .img-cell img {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+    .note-cell {
+      flex: 1;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 3px 5px;
+      box-sizing: border-box;
+      background: #fff;
       overflow: hidden;
     }
-    .cb-print-customer-icon {
-      left: 0px;
-    }
-    .cb-print-note {
-      top: 2in;
-      left: 0;
-      height: 0.99in;
-      width: 3.95in;        
-      padding: 5px;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
-    }
-    .cb-print-job-num {
-      top: 1.4in;
-      width: 1.05in;
-      height: 0.55in;
-      left: 1.4in;
-      font-size: 1.75em;
-      line-height: 2.25em;
-      text-align: center;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
-    }
-    .cb-employee {
-      top: 0.5in;
-      width: 1.45in;
-      height: 0.4in;
-      left: 2.5in;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
-      padding: 3px;
-      line-height: 1.5em;
-      font-size: 1.5em;
-      text-align: center;
-    }
-    .cb-print-estimate {
-      height: 1in;
-      top: 0.95in;
-      left: 2.5in;
-      width: 1.45in;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
-      padding: 3px;
-      line-height: 1.1em;
-    }
-    .cb-print-est-amt {
-      font-size: 1.2em;
-      font-weight: bold;
-      text-align: center;
-      margin-top: 3px;
-    }
-    .cb-print-est-note {
-      font-size: 0.9em;
-      line-height: 0.9em;
-    }
-    .cb-print-due {
-      top: 1.4in;
-      left: 0;
-      width: 1.35in;
-      height: 0.55in;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
-      font-size: 1.25em;
-    }
-    .cb-print-jobicon {
-      padding-right: 5px;
-    }
-    .cb-print-dates {
-      padding-left: 0.3in;
-    }
-    .cbPrintRed {
-      color: red !important;        
-    }
-    .cb-print-images {
-      top: 0in;
-      left: 0;
-      width: 100%;
-      height: 6in;
-      column-count: 2;
-      column-fill: auto;
-      column-gap: 0.1in;
-    }
-    .cb-print-image-spacer {
-      height: 3in;
-      position: static !important;
-    }
-    .cb-print-image-cont {
-      position: static !important;
-      height: 0.99in;
-      margin-bottom: 0.01in;
-      width: 100%;
-      padding: 1px;
-    }
-    .cb-print-image {
-      position: static !important;
-      float: left;
-      height: 100%;
-      border-top-left-radius: 3%;
-      border-bottom-left-radius: 3%;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
-    }
-    .cb-print-image-note {
-      position: static !important;
-      height: 0.97in;
-      max-height: 0.97in;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
+    .note-text {
+      font-size: 9px;
+      color: #000;
+      line-height: 1.3;
       overflow: hidden;
-      padding-left: 5px;
-      padding-right: 5px;
-      padding-top: 3px;
-      line-height: 1.1em;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      white-space: pre-wrap;
     }
-    .cb-print-logo {
-      width: 3.4in;
-      top: 6.2in;
-      left: 0.25in;
+    .q1-row .note-text {
+      -webkit-line-clamp: 4;
     }
-    .cb-print-customer-name {
-      top: 7.4in;
-      font-weight: bold;
-      margin-left: 0.25in;
+    .q2-row .note-text {
+      -webkit-line-clamp: 9;
     }
-    .cb-print-cus-images {
-      top: 7.6in;
-      left: 0;
+
+    /* Bottom-Left Quadrant (Q3) */
+    .q-logo-section {
       width: 100%;
-      height: 3in;
-      column-count: 2;
-      column-fill: auto;
-      column-gap: 0.1in;
-      text-align: center;
-      line-height: 0em;
+      height: 15mm;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
-    .cb-print-cus-img-cont {
-      position: static !important;
-      height: 1.49in;
-      padding: 1px;
-      display: inline-block;
+    .store-logo {
+      max-height: 100%;
+      object-fit: contain;
     }
-    .cb-print-cust-img {
-      position: static !important;
-      height: 100%;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
+    .cust-name-row {
+      font-size: 15px;
+      border-bottom: 1px solid #000;
+      padding-bottom: 2px;
+      margin-top: 4mm;
     }
-    .cb-print-cus-job-info {
-      left: 4.05in;
-      width: 2.45in;
-      height: 1.3in;
-      top: 6.25in;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);        
+    .q3-image-area, .q4-image-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5mm;
+      width: 100%;
+      margin-top: 2mm;
+      box-sizing: border-box;
+      overflow: hidden;
     }
-    .cb-print-cus-estimate {
-      top: 6.25in;
-      width: 1.45in;
-      height: 1.3in;
-      box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
-      left: 6.55in;       
+    .cust-image-row {
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #f9f9f9;
+      border-radius: 4px;
+      overflow: hidden;
+      box-sizing: border-box;
     }
-    .cb-print-cus-warning {
-      top: 10in;
-      font-size: 1.25em;
-      left: 4.25in;
+    .cust-image-row img {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* Bottom-Right Quadrant (Q4) */
+    .q4-combined-row {
+      display: flex;
+      width: 100%;
+      height: 25mm;
+      gap: 0.5mm;
+      box-sizing: border-box;
+    }
+    .q4-col {
+      flex: 1;
+      border: 1px solid #000;
+      border-radius: 4px;
+      padding: 4px 6px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 1.2mm;
+      box-sizing: border-box;
+    }
+    .q4-title {
+      font-size: 8px;
       font-weight: bold;
-      -webkit-text-stroke: 1px white;
+      text-transform: uppercase;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 2px;
+      margin-bottom: 0px;
+      color: #555;
+    }
+    .warning-container {
+      position: absolute;
+      bottom: 6mm;
+      left: 4mm;
+      right: 4mm;
       text-align: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .warning-text {
+      font-size: 14px;
+      width: 95mm;
+      font-weight: bold;
+      color: #000;
+      text-transform: uppercase;
+      line-height: 1.2;
+      text-shadow: 
+        -1.5px -1.5px 0 #fff,  
+         1.5px -1.5px 0 #fff,
+        -1.5px  1.5px 0 #fff,
+         1.5px  1.5px 0 #fff,
+        -1px -1px 0 #fff,  
+         1px -1px 0 #fff,
+        -1px  1px 0 #fff,
+         1px  1px 0 #fff;
     }
   </style>
 </head>
 <body>
-  <div class="cb-print">
-    <!-- Blanks Box -->
-    <div class="cb-print-element cb-print-blanks">
-      <div class="cb-print-top-box cb-print-top-flags"><span class="cb-print-top-text">EMR NA LM Check</span></div>
-      <div class="cb-print-top-box cb-print-top-deposit"><span class="cb-print-top-text">Deposit</span></div>
-      <div class="cb-print-top-box cb-print-top-gold-credit"><span class="cb-print-top-text">Gold Credit</span></div>
-      <div class="cb-print-top-box cb-print-total"><span class="cb-print-top-text">Total</span></div>
-    </div>
-    
-    <!-- Deposit Value -->
-    <div class="cb-print-element cb-print-deposit-value">
-      ${depVal > 0 ? '$' + depVal.toFixed(2) : ''}
-    </div>
+  <div class="page-container">
+    <!-- Quadrant 1 (Top Left): Office/Store Copy -->
+    <div class="quadrant q-top-left">
+      <div class="text-details">
+        <!-- Blanks Box -->
+        <div class="block blanks-block">
+          <div class="blank-box col-flags">
+            <span class="blank-label">EM R NA LM Check</span>
+          </div>
+          <div class="blank-box col-deposit">
+            <span class="deposit-val">${depVal > 0 ? '$' + depVal.toFixed(2) : ''}</span>
+            <span class="blank-label">Deposit</span>
+          </div>
+          <div class="blank-box col-credit">
+            <span class="blank-label">Gold Credit</span>
+          </div>
+          <div class="blank-box col-total">
+            <span class="blank-label">Total</span>
+          </div>
+        </div>
+        
+        <!-- Meta Row -->
+        <div class="block meta-row">
+          <div class="meta-item job-id-box"># ${job.id || ''}</div>
+          <div class="meta-item employee-box">${empName}</div>
+        </div>
 
-    <!-- Customer info -->
-    <div class="cb-print-element cb-print-customer-info">
-      <span class="material-icons cb-print-element cb-print-customer-icon">person</span><span class="cb-print-element cb-print-nowrap">${customer?.fname || ''} ${customer?.lname || ''}</span><br>
-      <span class="material-icons cb-print-element cb-print-customer-icon">phone</span><span class="cb-print-element cb-print-nowrap">${customer?.phone || ''}</span> <br>
-      <span class="material-icons cb-print-element cb-print-customer-icon">email</span><span class="cb-print-element cb-print-nowrap">${customer?.email || ''}</span>
-    </div>
+        <!-- Combined Customer Info & Estimate details row -->
+        <div class="block q1-combined-row">
+          <!-- Customer info -->
+          <div class="info-block customer-block">
+            <div class="block-content">
+              <div class="info-line">
+                <span class="material-icons info-icon">person</span>
+                <strong>${customer?.fname || ''} ${customer?.lname || ''}</strong>
+              </div>
+              <div class="info-line">
+                <span class="material-icons info-icon">phone</span>
+                <span>${customer?.phone || '—'}</span>
+              </div>
+              <div class="info-line">
+                <span class="material-icons info-icon">email</span>
+                <span>${customer?.email || '—'}</span>
+              </div>
+            </div>
+          </div>
 
-    <!-- Job Notes -->
-    <div class="cb-print-element cb-print-note">
-      ${job.note || ''}
-    </div>
+          <!-- Estimate Details -->
+          <div class="info-block estimate-block">
+            <div class="block-content">
+              <div class="est-amount">
+                ${estVal > 0 ? `Est: $${estVal.toLocaleString(undefined, { minimumFractionDigits: 2 })} + GST` : 'Estimate: —'}
+              </div>
+              <div class="est-note">${(job.est_note || '—').trim()}</div>
+            </div>
+          </div>
+        </div>
 
-    <!-- Job ID -->
-    <div class="cb-print-element cb-print-job-num">
-      # ${job.id || ''}
-    </div>
+        <!-- Dates Box -->
+        <div class="block info-block dates-block">
+          <div class="block-content row-content">
+            <div class="date-col">
+              <span class="material-icons date-icon">today</span>
+              <span class="date-val">${createdDateStr}</span>
+            </div>
+            <div class="date-col">
+              <span class="material-icons date-icon">event_available</span>
+              <span class="date-val date-urgent">${dueDateStr}</span>
+            </div>
+          </div>
+        </div>
 
-    <!-- Employee -->
-    <div class="cb-print-element cb-employee">
-      ${empName}
-    </div>
+        <!-- Job Notes -->
+        <div class="block info-block notes-block">
+          <div class="block-content notes-content">${(job.note || '—').trim()}</div>
 
-    <!-- Estimate Details -->
-    <div class="cb-print-element cb-print-estimate">
-      <div class="cb-print-est-amt">
-        ${estVal > 0 ? `Est: $${estVal.toLocaleString(undefined, {minimumFractionDigits: 2})} + GST` : ''}
+          </div>
       </div>
-      <div class="cb-print-est-note">${job.est_note || ''}</div>
+
+      <!-- Q1 Images Section -->
+      ${q1ImagesHTML}
     </div>
 
-    <!-- Due Dates -->
-    <div class="cb-print-element cb-print-due">
-      <span class="material-icons cb-print-element cb-print-jobicon">today</span>
-      <span class="cb-print-element cb-print-dates">${createdDateStr}</span><br />
-      <span class="material-icons cb-print-element cb-print-jobicon">event_available</span>
-      <span class="cb-print-element cb-print-dates ${job.vital_date ? 'cbPrintRed' : ''}">${dueDateStr}</span>
+    <!-- Quadrant 2 (Top Right): Job Images / Sketches -->
+    <div class="quadrant q-top-right">
+      ${q2ImagesHTML}
     </div>
 
-    <!-- Top Images section -->
-    <div class="cb-print-element cb-print-images">
-      <div class="cb-print-element cb-print-image-spacer"></div>
-      ${imagesHTML}
-    </div>
-
-    <!-- Bottom Customer Section Logo -->
-    <img class="cb-print-logo cb-print-element" src="${logoBase64}" alt="">
-
-    <!-- Bottom Customer Name -->
-    <div class="cb-print-element cb-print-customer-name">
-      Name: ${customer?.fname || ''} ${customer?.lname || ''}
-    </div>
-
-    <!-- Bottom Customer Images -->
-    <div class="cb-print-element cb-print-cus-images">
-      ${customerImagesHTML}
-    </div>
-
-    <!-- Bottom Store Contact info -->
-    <div class="cb-print-element cb-print-cus-job-info">
-      Date: ${todayDateStr}<br>
-      Employee: ${empName}<br>
-      Phone: 403-320-0846<br>
-      E-mail: info@thegoldworks.com<br>
-    </div>
-
-    <!-- Bottom Customer Estimate -->
-    <div class="cb-print-element cb-print-cus-estimate">
-      <div class="cb-print-est-amt">
-        ${estVal > 0 ? `Estimate: $${estVal.toLocaleString(undefined, {minimumFractionDigits: 2})} + GST` : ''}
+    <!-- Quadrant 3 (Bottom Left): Customer Receipt Copy -->
+    <div class="quadrant q-bottom-left">
+      <div>
+        <div class="q-logo-section">
+          <img class="store-logo" src="${logoBase64}" alt="Logo">
+        </div>
+        <div class="cust-name-row">
+          <strong>Customer:</strong> ${customer?.fname || ''} ${customer?.lname || ''}
+        </div>
       </div>
-      <div class="cb-print-est-note">${job.est_note || ''}</div>
+      
+      <div class="q3-image-area">
+        ${q3ImagesHTML}
+      </div>
     </div>
 
-    <!-- Bottom Warning -->
-    <div class="cb-print-element cb-print-cus-warning">
-      The Goldworks is not responsible for any items held for over 90 days.
+    <!-- Quadrant 4 (Bottom Right): Contact & Estimate -->
+    <div class="quadrant q-bottom-right">
+      <!-- Combined Contact & Estimate info Row -->
+      <div class="block q4-combined-row">
+        <!-- Store Contact info -->
+        <div class="q4-col q4-contact">
+          <div class="q4-title">The Goldworks</div>
+          <div class="info-line"><strong>Date:</strong> ${todayDateStr}</div>
+          <div class="info-line"><strong>Employee:</strong> ${empName}</div>
+          <div class="info-line"><strong>Phone:</strong> 403-320-0846</div>
+          <div class="info-line"><strong>Email:</strong> info@thegoldworks.com</div>
+        </div>
+
+        <!-- Customer Estimate -->
+        <div class="q4-col q4-estimate">
+          <div class="q4-title">Customer Estimate</div>
+          <div class="est-amount">
+            ${estVal > 0 ? `Est: $${estVal.toLocaleString(undefined, { minimumFractionDigits: 2 })} + GST` : 'Estimate: —'}
+          </div>
+          <div class="est-note">${(job.est_note || '—').trim()}</div>
+        </div>
+      </div>
+
+      <!-- Q4 Images Area -->
+      <div class="q4-image-area">
+        ${q4ImagesHTML}
+      </div>
+
+      <!-- Warning -->
+      <div class="block warning-container">
+        <div class="warning-text">
+          The Goldworks is not responsible for any items held for over 90 days.
+        </div>
+      </div>
     </div>
   </div>
 </body>

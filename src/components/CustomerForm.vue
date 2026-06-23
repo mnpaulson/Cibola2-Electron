@@ -49,11 +49,6 @@
                   <span v-if="item.raw.phone" v-html="highlightText(item.raw.phone, searchQuery)"></span>
                   <span v-else class="text-medium-emphasis">No phone number</span>
                 </template>
-                <template v-slot:prepend>
-                  <v-avatar color="primary" variant="tonal" size="32" class="mr-2">
-                    <v-icon size="16">mdi-account</v-icon>
-                  </v-avatar>
-                </template>
               </v-list-item>
             </template>
             <template v-slot:no-data>
@@ -73,10 +68,7 @@
         <div v-if="currentState === 'info'" class="customer-info-container">
           <v-row>
             <v-col cols="12" md="6" class="py-1">
-              <div class="d-flex align-center mb-2">
-                <v-avatar color="primary" variant="tonal" size="48" class="mr-3">
-                  <v-icon size="24">mdi-account</v-icon>
-                </v-avatar>
+              <div class="mb-2">
                 <div>
                   <h3
                     class="text-h6 font-weight-bold mb-0"
@@ -122,17 +114,66 @@
 
             <!-- Customer Notes -->
             <v-col cols="12" md="6" v-if="!hideNotes">
+              <!-- Pulsing Warning Alert when a customer note exists (only above the note field itself) -->
+              <v-alert
+                v-if="customer.note"
+                type="warning"
+                variant="tonal"
+                density="comfortable"
+                icon="mdi-alert-decagram"
+                class="pulsing-alert mb-2"
+              >
+                <strong>Customer Note Present</strong>
+              </v-alert>
+              <div class="d-flex align-center justify-space-between mb-1">
+                <span class="text-caption text-medium-emphasis">Customer Notes</span>
+                <v-btn
+                  v-if="lockNotes && isNotesLocked"
+                  variant="text"
+                  color="primary"
+                  density="comfortable"
+                  size="small"
+                  prepend-icon="mdi-pencil"
+                  class="text-none px-1"
+                  @click="isNotesLocked = false"
+                >
+                  Edit Note
+                </v-btn>
+              </div>
               <v-textarea
                 v-model="customer.note"
-                label="Customer Notes"
+                :readonly="isNotesLocked"
+                :class="{ 'locked-textarea': isNotesLocked }"
                 variant="outlined"
                 rows="4"
                 no-resize
                 density="comfortable"
                 placeholder="Add private customer notes here..."
-                @blur="saveNotesOnly"
                 :messages="noteSavingStatus ? [noteSavingStatus] : []"
+                hide-details="auto"
               ></v-textarea>
+              <v-expand-transition>
+                <div v-if="isNoteDirty" class="d-flex justify-end gap-2 mt-2 mb-2">
+                  <v-btn
+                    color="grey-darken-1"
+                    variant="text"
+                    size="small"
+                    @click="discardNotesOnly"
+                  >
+                    Discard
+                  </v-btn>
+                  <v-btn
+                    color="success"
+                    variant="flat"
+                    size="small"
+                    prepend-icon="mdi-content-save"
+                    :loading="savingNote"
+                    @click="saveNotesOnly"
+                  >
+                    Save Note
+                  </v-btn>
+                </div>
+              </v-expand-transition>
             </v-col>
           </v-row>
         </div>
@@ -323,10 +364,14 @@ const props = defineProps({
   clickableName: {
     type: Boolean,
     default: false
+  },
+  lockNotes: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'select', 'newCustomer', 'cancel', 'click-name'])
+const emit = defineEmits(['update:modelValue', 'select', 'newCustomer', 'cancel', 'click-name', 'dirty-state-change'])
 
 // State Variables
 const currentState = ref('search') // 'search', 'info', 'form'
@@ -339,6 +384,13 @@ const isFormValid = ref(true)
 const formRef = ref(null)
 const startingNote = ref('')
 const noteSavingStatus = ref('')
+const isNotesLocked = ref(false)
+const savingNote = ref(false)
+
+// Sync notes locked state when lockNotes prop is passed or changed
+watch(() => props.lockNotes, (newVal) => {
+  isNotesLocked.value = newVal
+}, { immediate: true })
 
 const customer = reactive({
   id: null,
@@ -525,6 +577,7 @@ async function loadCustomer(id) {
       Object.assign(customer, data)
       startingNote.value = data.note || ''
       currentState.value = 'info'
+      isNotesLocked.value = props.lockNotes
       emit('update:modelValue', data.id)
       emit('select', data)
     }
@@ -604,6 +657,7 @@ function resetFormFields() {
   customer.note = ''
   startingNote.value = ''
   noteSavingStatus.value = ''
+  isNotesLocked.value = props.lockNotes
 }
 
 function resetState() {
@@ -660,10 +714,32 @@ async function saveCustomer() {
   }
 }
 
-// Separate Note Auto-Save on Blur
+
+const isNoteDirty = computed(() => {
+  const current = customer.note || ''
+  const starting = startingNote.value || ''
+  return !!customer.id && current !== starting
+})
+
+const isProfileEditing = computed(() => {
+  return currentState.value === 'form'
+})
+
+const hasUnsavedChanges = computed(() => {
+  return isNoteDirty.value || isProfileEditing.value
+})
+
+// Watch hasUnsavedChanges and emit 'dirty-state-change'
+watch(hasUnsavedChanges, (newVal) => {
+  emit('dirty-state-change', newVal)
+}, { immediate: true })
+
 async function saveNotesOnly() {
-  if (!customer.id || customer.note === startingNote.value) return
+  const current = customer.note || ''
+  const starting = startingNote.value || ''
+  if (!customer.id || current === starting) return
   
+  savingNote.value = true
   noteSavingStatus.value = 'Saving...'
   try {
     const data = await api.put(`/customers/${customer.id}`, {
@@ -673,14 +749,22 @@ async function saveNotesOnly() {
     if (data) {
       startingNote.value = data.note || ''
       noteSavingStatus.value = 'Saved!'
+      isNotesLocked.value = props.lockNotes // relock
       setTimeout(() => {
         noteSavingStatus.value = ''
       }, 2000)
     }
   } catch (err) {
-    console.error('Failed to auto-save notes:', err)
+    console.error('Failed to save notes:', err)
     noteSavingStatus.value = 'Error!'
+  } finally {
+    savingNote.value = false
   }
+}
+
+function discardNotesOnly() {
+  customer.note = startingNote.value
+  isNotesLocked.value = props.lockNotes // relock
 }
 
 const handleEnterKey = () => {
@@ -739,5 +823,33 @@ onMounted(() => {
 }
 .clickable-title:hover {
   text-decoration: underline;
+}
+
+@keyframes pulse-border {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-warning), 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(var(--v-theme-warning), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-warning), 0);
+  }
+}
+.pulsing-alert {
+  border-left: 6px solid rgb(var(--v-theme-warning)) !important;
+  animation: pulse-border 2s infinite;
+}
+
+.locked-textarea :deep(.v-field__outline) {
+  display: none !important;
+}
+.locked-textarea :deep(textarea) {
+  cursor: default !important;
+  opacity: 0.8;
+}
+.locked-textarea :deep(.v-field) {
+  background-color: rgba(var(--v-theme-on-surface), 0.03) !important;
+  border-radius: 8px !important;
 }
 </style>

@@ -21,20 +21,40 @@
 
         <!-- Camera select & settings -->
         <div class="d-flex w-100 justify-space-between align-center mb-4 gap-4 flex-wrap">
-          <v-select
-            v-model="selectedDeviceId"
-            :items="videoDevices"
-            item-title="label"
-            item-value="deviceId"
-            label="Select Camera Device"
-            prepend-inner-icon="mdi-webcam"
-            variant="outlined"
-            density="compact"
-            hide-details
-            class="camera-select-dropdown"
-            @update:model-value="initStream"
-          ></v-select>
-          <div class="text-caption text-medium-emphasis" v-if="isStreaming">
+          <div class="d-flex align-center gap-2 flex-grow-1" style="max-width: 450px;">
+            <v-select
+              v-model="selectedDeviceId"
+              :items="videoDevices"
+              item-title="label"
+              item-value="deviceId"
+              label="Select Camera Device"
+              prepend-inner-icon="mdi-webcam"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="camera-select-dropdown"
+              @update:model-value="initStream"
+            ></v-select>
+
+            <!-- Camera Light/Torch Toggle -->
+            <v-btn
+              v-if="isStreaming"
+              :color="isTorchOn ? 'warning' : 'grey-darken-1'"
+              variant="outlined"
+              icon
+              density="comfortable"
+              :title="isTorchOn ? 'Turn Camera Light Off' : 'Turn Camera Light On'"
+              @click="toggleTorch"
+            >
+              <v-icon>{{ isTorchOn ? 'mdi-flash' : 'mdi-flash-off' }}</v-icon>
+            </v-btn>
+          </div>
+
+          <div class="text-caption text-medium-emphasis d-flex align-center" v-if="isStreaming">
+            <span v-if="!isTorchSupported" class="mr-3 text-warning d-flex align-center" title="The camera driver did not report light support, but standard/legacy light commands were attempted anyway.">
+              <v-icon size="small" class="mr-1">mdi-help-circle-outline</v-icon>
+              Light status unconfirmed
+            </span>
             Resolution: {{ currentWidth }} x {{ currentHeight }}
           </div>
         </div>
@@ -105,6 +125,8 @@ const videoDevices = ref([])
 const showFlash = ref(false)
 const currentWidth = ref(0)
 const currentHeight = ref(0)
+const isTorchOn = ref(true)
+const isTorchSupported = ref(false)
 
 let localStream = null
 
@@ -150,6 +172,7 @@ const initStream = async () => {
   stopStream()
   isInitializing.value = true
   errorMsg.value = ''
+  isTorchOn.value = true // Default camera light to on
 
   // Request permission first to populate device labels if empty
   try {
@@ -193,6 +216,11 @@ const initStream = async () => {
         const settings = track.getSettings()
         currentWidth.value = settings.width || 0
         currentHeight.value = settings.height || 0
+
+        // Wait briefly for the track to be fully active before applying torch
+        setTimeout(() => {
+          applyTorchState()
+        }, 150)
       }
     }
   } catch (err) {
@@ -201,6 +229,55 @@ const initStream = async () => {
   } finally {
     isInitializing.value = false
   }
+}
+
+const applyTorchState = async () => {
+  if (!localStream) return
+  const track = localStream.getVideoTracks()[0]
+  if (!track) return
+
+  try {
+    const capabilities = typeof track.getCapabilities === 'function' ? track.getCapabilities() : {}
+    isTorchSupported.value = !!capabilities.torch
+  } catch (capabilitiesErr) {
+    console.warn('Failed to get track capabilities:', capabilitiesErr)
+    isTorchSupported.value = false
+  }
+
+  try {
+    // Attempt standard torch constraint
+    await track.applyConstraints({
+      advanced: [{ torch: isTorchOn.value }]
+    })
+    console.log(`Successfully applied torch constraint: ${isTorchOn.value}`)
+  } catch (err) {
+    console.warn('Failed to apply standard torch constraint:', err)
+
+    // Fallback 1: Try direct constraint property
+    try {
+      await track.applyConstraints({
+        torch: isTorchOn.value
+      })
+      console.log(`Successfully applied direct torch constraint: ${isTorchOn.value}`)
+    } catch (directErr) {
+      console.warn('Failed to apply direct torch constraint:', directErr)
+
+      // Fallback 2: Try fillLightMode constraint
+      try {
+        await track.applyConstraints({
+          advanced: [{ fillLightMode: isTorchOn.value ? 'torch' : 'off' }]
+        })
+        console.log(`Successfully applied fillLightMode: ${isTorchOn.value ? 'torch' : 'off'}`)
+      } catch (fillLightErr) {
+        console.warn('Failed to apply fillLightMode constraint:', fillLightErr)
+      }
+    }
+  }
+}
+
+const toggleTorch = async () => {
+  isTorchOn.value = !isTorchOn.value
+  await applyTorchState()
 }
 
 const captureImage = () => {

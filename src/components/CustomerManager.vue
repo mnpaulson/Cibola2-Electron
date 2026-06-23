@@ -44,7 +44,7 @@
                 <v-btn
                   color="primary"
                   variant="elevated"
-                  prepend-icon="mdi-briefcase-clock"
+                  prepend-icon="mdi-briefcase-outline"
                   size="small"
                   @click="createNewRecord('jobs')"
                 >

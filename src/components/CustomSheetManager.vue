@@ -19,7 +19,7 @@
           <v-card-item class="bg-primary text-white py-3">
             <v-row no-gutters align="center" justify="space-between">
               <v-col class="text-h6 font-weight-bold d-flex align-center">
-                <v-icon start class="mr-2">mdi-clock-outline</v-icon>
+                <v-icon start class="mr-2">mdi-list-box-outline</v-icon>
                 Custom Sheets Directory
               </v-col>
               <v-col cols="12" sm="4" class="mt-2 mt-sm-0">

@@ -3,7 +3,7 @@
     <!-- Header -->
     <v-card-item class="bg-primary text-white py-3">
       <v-card-title class="font-weight-bold text-subtitle-1 d-flex align-center">
-        <v-icon start class="mr-2">mdi-clock-outline</v-icon>
+        <v-icon start class="mr-2">mdi-list-box-outline</v-icon>
         {{ sheet.id ? `Edit Custom Sheet #${sheet.id}` : 'New Custom Sheet' }}
         <v-spacer></v-spacer>
         <span v-if="sheet.created_at" class="text-caption font-weight-medium">
@@ -20,17 +20,19 @@
         <CustomerForm
           v-model="sheet.customer_id"
           :clearable="!disabled"
-          :hide-notes="true"
+          :hide-notes="false"
           :clickable-name="true"
+          :lock-notes="true"
           @select="handleCustomerSelect"
           @click-name="navigateTo('customers', { selectedCustomerId: sheet.customer_id })"
+          @dirty-state-change="isCustomerDirty = $event"
         />
       </div>
 
       <v-form ref="formRef" v-model="isFormValid" lazy-validation>
         <!-- Sheet metadata and spot prices -->
         <v-row>
-          <v-col cols="12" md="6">
+          <v-col cols="12" md="6" class="d-flex flex-column justify-space-between">
             <v-text-field
               v-model="sheet.name"
               label="Custom Sheet Name *"
@@ -50,17 +52,54 @@
               no-resize
               density="compact"
               prepend-inner-icon="mdi-note-text-outline"
+              class="mb-0"
+              hide-details
             ></v-textarea>
           </v-col>
 
-          <v-col cols="12" md="6">
+          <v-col cols="12" md="6" class="d-flex flex-column justify-space-between">
             <!-- Spot Prices Info & Manual Update -->
+            <div class="d-flex gap-2 mb-2">
+              <v-btn
+                color="primary"
+                variant="outlined"
+                prepend-icon="mdi-plus"
+                size="small"
+                class="flex-grow-1"
+                @click="addEmptyEstimate"
+              >
+                Add Estimate
+              </v-btn>
+              <v-btn
+                color="secondary"
+                variant="outlined"
+                prepend-icon="mdi-content-copy"
+                size="small"
+                class="flex-grow-1"
+                :disabled="sheet.estimates.length === 0"
+                @click="copyActiveEstimate"
+              >
+                Copy Active
+              </v-btn>
+              <v-btn
+                color="warning"
+                variant="outlined"
+                size="small"
+                class="flex-grow-1"
+                prepend-icon="mdi-cached"
+                @click="updateAllMetalPricesToNewest"
+              >
+                Update Prices
+              </v-btn>
+            </div>
             <MetalPricesCard
               small
               :disabled="disabled"
               v-model:gold="localGoldSpot"
               v-model:platinum="localPlatSpot"
               v-model:date="localSpotDate"
+              class="mb-0"
+              style="margin-bottom: 0 !important;"
             />
           </v-col>
         </v-row>
@@ -71,40 +110,9 @@
             <v-icon start color="primary" class="mr-1">mdi-file-document-multiple-outline</v-icon>
             Estimates Configured
           </div>
-          <div class="d-flex gap-2">
-
-            <v-btn
-              color="primary"
-              variant="outlined"
-              prepend-icon="mdi-plus"
-              size="small"
-              @click="addEmptyEstimate"
-            >
-              Add Estimate
-            </v-btn>
-            <v-btn
-              color="secondary"
-              variant="outlined"
-              prepend-icon="mdi-content-copy"
-              size="small"
-              :disabled="sheet.estimates.length === 0"
-              @click="copyActiveEstimate"
-            >
-              Copy Active
-            </v-btn>
-            <v-btn
-              color="warning"
-              variant="outlined"
-              size="small"
-              prepend-icon="mdi-cached"
-              @click="updateAllMetalPricesToNewest"
-            >
-              Update Estimates Metal Prices
-            </v-btn>
-          </div>
         </div>
 
-        <v-row class="flex-nowrap overflow-x-auto pb-4 px-1 gap-4 select-estimate-row">
+        <v-row class="flex-nowrap overflow-x-auto pb-4 px-0 mx-0 mt-1 gap-4 select-estimate-row">
           <v-col
             v-for="(est, idx) in sheet.estimates"
             :key="est.id || idx"
@@ -114,31 +122,37 @@
             <v-card
               elevation="1"
               :class="[
-                'estimate-tab-card rounded-lg pa-3 pb-2 d-flex flex-column justify-space-between',
+                'estimate-tab-card rounded-lg d-flex flex-column justify-space-between',
                 { 'active-estimate-card': idx === activeEstIndex }
               ]"
               @click="activeEstIndex = idx"
             >
-              <div>
-                <div class="d-flex align-center justify-space-between mb-1">
-                  <div class="text-subtitle-2 font-weight-bold text-truncate pr-2" style="max-width: 140px;">
-                    {{ est.name || `Estimate ${idx + 1}` }}
-                  </div>
-                  <v-btn
-                    icon="mdi-close"
-                    variant="text"
-                    color="grey-darken-1"
-                    size="x-small"
-                    class="close-est-btn"
-                    @click.stop="confirmDeleteEstimate(est)"
-                  ></v-btn>
+              <!-- Title Card Spot (Header) -->
+              <div class="estimate-card-header px-3 d-flex align-center justify-space-between">
+                <div class="text-subtitle-2 font-weight-bold text-truncate pr-2" style="max-width: 140px;">
+                  {{ est.name || `Estimate ${idx + 1}` }}
                 </div>
-                <div class="text-caption text-medium-emphasis text-truncate mb-2" style="max-width: 170px;">
+                <v-btn
+                  icon="mdi-close"
+                  variant="text"
+                  color="grey-darken-1"
+                  size="x-small"
+                  class="close-est-btn"
+                  @click.stop="confirmDeleteEstimate(est)"
+                ></v-btn>
+              </div>
+
+              <!-- Card Body -->
+              <div class="estimate-card-body px-3 py-2 flex-grow-1 d-flex align-center">
+                <div class="text-caption text-medium-emphasis text-truncate" style="max-width: 196px;">
                   {{ est.note || 'No notes' }}
                 </div>
               </div>
-              <v-divider class="my-2"></v-divider>
-              <div class="d-flex align-center justify-space-between mt-auto">
+
+              <v-divider></v-divider>
+
+              <!-- Card Footer -->
+              <div class="estimate-card-footer px-3 py-1 d-flex align-center justify-space-between mt-auto">
                 <div class="text-subtitle-2 font-weight-bold text-success">
                   ${{ (calculateEstimateTotal(est) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                 </div>
@@ -392,9 +406,10 @@
       :show-delete="!!sheet.id"
       :show-preview="true"
       :save-label="sheet.id ? 'Update Sheet' : 'Save Sheet'"
-      :disable-save="!isFormValid"
+      :disable-save="!isFormValid || isCustomerDirty"
       :show-print-close="false"
-      :disable-print="!sheet.id"
+      :disable-print="!sheet.id || isCustomerDirty"
+      :customer-dirty="isCustomerDirty"
       @discard="discardSheet"
       @delete="isDeleteSheetOpen = true"
       @capture="attachedImagesRef?.openCamera()"
@@ -441,6 +456,7 @@ const formRef = ref(null)
 const loading = ref(false)
 const isFormValid = ref(true)
 const attachedImagesRef = ref(null)
+const isCustomerDirty = ref(false)
 
 // Modals
 const isDeleteSheetOpen = ref(false)
@@ -991,6 +1007,11 @@ function preparePayload() {
 
 // Save or Update submission
 async function saveOrUpdateSheet(print = false, close = false) {
+  if (isCustomerDirty.value) {
+    showToast('Please save or discard customer note/profile changes first.', 'warning')
+    return
+  }
+
   if (formRef.value) {
     const validateRes = await formRef.value.validate()
     if (!validateRes.valid) return
@@ -1040,6 +1061,10 @@ async function saveOrUpdateSheet(print = false, close = false) {
 
 // Headless printing engine
 async function printOnly() {
+  if (isCustomerDirty.value) {
+    showToast('Please save or discard customer note/profile changes first.', 'warning')
+    return
+  }
   if (!sheet.id) {
     await saveOrUpdateSheet(true, false)
   } else {
@@ -1150,6 +1175,7 @@ onMounted(() => {
   position: relative;
   width: 220px;
   height: 120px;
+  overflow: hidden;
 }
 .estimate-tab-card:hover {
   transform: translateY(-2px);
@@ -1159,19 +1185,17 @@ onMounted(() => {
   border-color: rgb(var(--v-theme-primary)) !important;
   background-color: rgba(var(--v-theme-primary), 0.03) !important;
 }
-.active-estimate-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(45deg, rgb(var(--v-theme-primary)), rgb(var(--v-theme-secondary)));
+.estimate-card-header {
+  background-color: rgba(var(--v-theme-surface-variant), 0.08);
+  border-bottom: 1px solid rgba(var(--v-border-color), 0.08);
+  position: relative;
+  height: 34px;
+}
+.active-estimate-card .estimate-card-header {
+  background-color: rgba(var(--v-theme-primary), 0.08);
+  border-bottom-color: rgba(var(--v-theme-primary), 0.15);
 }
 .close-est-btn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
   opacity: 0.7;
 }
 .close-est-btn:hover {
