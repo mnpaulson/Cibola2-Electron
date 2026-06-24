@@ -82,6 +82,7 @@
               :disabled="disabled"
               v-model:gold="credit.gold_cad"
               v-model:platinum="credit.plat_cad"
+              v-model:silver="credit.silver_cad"
               v-model:date="credit.metalPriceDate"
             />
           </v-col>
@@ -94,35 +95,6 @@
                 <div class="text-caption text-medium-emphasis mb-1">Sum Item(s) Value</div>
                 <div class="text-h4 font-weight-bold text-grey-darken-1">
                   ${{ credit.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
-                </div>
-              </div>
-
-              <!-- Swap/Copy Button -->
-              <div class="d-flex align-center justify-center px-1">
-                <v-btn
-                  icon="mdi-swap-horizontal"
-                  variant="tonal"
-                  color="primary"
-                  density="comfortable"
-                  title="Copy Sum to Final Amount"
-                  :disabled="disabled"
-                  @click="copySumValue"
-                ></v-btn>
-              </div>
-
-              <!-- Final Credit Amount -->
-              <div class="d-flex flex-column align-center justify-center flex-grow-1" style="width: 42%;">
-                <div class="text-caption text-medium-emphasis mb-1">Final Credit Amount</div>
-                <div class="d-flex align-center">
-                  <span class="text-h4 font-weight-bold text-success">$</span>
-                  <input
-                    v-model="credit.credit_value"
-                    type="number"
-                    step="0.01"
-                    class="final-credit-input text-h4 font-weight-bold text-success"
-                    placeholder="0.00"
-                    :disabled="disabled"
-                  />
                 </div>
               </div>
             </v-sheet>
@@ -341,13 +313,13 @@ const credit = reactive({
   employee_id: 1, // Default 'Unassigned'
   gold_cad: 0,
   plat_cad: 0,
+  silver_cad: 0,
   metalPriceDate: '',
   creditDate: '',
   created_at: '',
   used: false,
   note: '',
   credit_type: 'cash',
-  credit_value: 0,
   total: 0,
   credit_images: []
 })
@@ -390,10 +362,12 @@ const todayString = computed(() => {
 function loadDefaultSpotPrices() {
   const goldVal = metadataState.metalPrices.find(v => v.name === 'GoldCAD' || v.name === 'Gold')
   const platVal = metadataState.metalPrices.find(v => v.name === 'PlatCAD' || v.name === 'Platinum')
+  const silverVal = metadataState.metalPrices.find(v => v.name === 'SilverCAD' || v.name === 'Silver')
   
   credit.gold_cad = goldVal ? parseFloat(goldVal.value1) || 0 : 0
   credit.plat_cad = platVal ? parseFloat(platVal.value1) || 0 : 0
-  credit.metalPriceDate = goldVal?.updated_at || platVal?.updated_at || ''
+  credit.silver_cad = silverVal ? parseFloat(silverVal.value1) || 0 : 0
+  credit.metalPriceDate = goldVal?.updated_at || platVal?.updated_at || silverVal?.updated_at || ''
 }
 
 function resetCreditFields() {
@@ -402,13 +376,13 @@ function resetCreditFields() {
   credit.employee_id = 1
   credit.gold_cad = 0
   credit.plat_cad = 0
+  credit.silver_cad = 0
   credit.metalPriceDate = ''
   credit.creditDate = todayString.value
   credit.created_at = ''
   credit.used = false
   credit.note = ''
   credit.credit_type = 'cash'
-  credit.credit_value = 0
   credit.total = 0
   credit.credit_images = []
   itemList.value = []
@@ -444,13 +418,15 @@ async function loadCredit(id) {
       credit.employee_id = data.employee_id
       credit.gold_cad = data.gold_cad || 0
       credit.plat_cad = data.plat_cad || 0
+      // Fallback for silver spot since it's not stored in goldcredits table
+      const silverVal = metadataState.metalPrices.find(v => v.name === 'SilverCAD' || v.name === 'Silver')
+      credit.silver_cad = silverVal ? parseFloat(silverVal.value1) || 0 : 0
       credit.metalPriceDate = data.gold_date || ''
       credit.creditDate = data.created_at ? data.created_at.split(' ')[0] : ''
       credit.created_at = data.created_at || ''
       credit.used = !!data.used
       credit.note = data.note || ''
       credit.credit_type = data.credit_type || 'credit'
-      credit.credit_value = data.credit_value || 0
       credit.credit_images = data.credit_images || []
       
       // Load and map items
@@ -545,11 +521,13 @@ watch(
       
       const oldGold = oldVal ? getVal(oldVal, 'GoldCAD') : 0
       const oldPlat = oldVal ? getVal(oldVal, 'PlatCAD') : 0
+      const oldSilver = oldVal ? getVal(oldVal, 'SilverCAD') : 0
       
       // If parent values are 0 or still match the old metadata defaults, update them
       if (
         (credit.gold_cad === 0 || credit.gold_cad === oldGold) &&
-        (credit.plat_cad === 0 || credit.plat_cad === oldPlat)
+        (credit.plat_cad === 0 || credit.plat_cad === oldPlat) &&
+        (credit.silver_cad === 0 || credit.silver_cad === oldSilver)
       ) {
         loadDefaultSpotPrices()
       }
@@ -560,7 +538,7 @@ watch(
 
 // Watch spot prices to recalculate all items instantly when prices change
 watch(
-  () => [credit.gold_cad, credit.plat_cad],
+  () => [credit.gold_cad, credit.plat_cad, credit.silver_cad],
   () => {
     if (!disabled.value) {
       itemList.value.forEach(item => {
@@ -570,20 +548,6 @@ watch(
     }
   }
 )
-
-
-
-
-
-const copySumValue = () => {
-  credit.credit_value = credit.total
-}
-
-
-
-
-
-
 
 function removeItem(index) {
   itemList.value.splice(index, 1)
@@ -620,6 +584,8 @@ function recalculateItem(item) {
     spot = parseFloat(credit.gold_cad) || 0
   } else if (item.itemObj.value3 === 'Platinum') {
     spot = parseFloat(credit.plat_cad) || 0
+  } else if (item.itemObj.value3 === 'Silver') {
+    spot = parseFloat(credit.silver_cad) || 0
   }
   
   item.value = calculateGoldCreditValue(w, item.multiplier, item.markup, spot)
@@ -648,10 +614,6 @@ async function saveOrUpdateCredit(print = false, close = false) {
     return
   }
 
-  if ((parseFloat(credit.credit_value) || 0) === 0) {
-    credit.credit_value = credit.total
-  }
-  
   loading.value = true
   try {
     let savedCredit
@@ -662,7 +624,6 @@ async function saveOrUpdateCredit(print = false, close = false) {
         note: credit.note,
         used: credit.used ? 1 : 0,
         credit_type: credit.credit_type,
-        credit_value: credit.credit_value
       })
     } else {
       // Create
@@ -675,7 +636,6 @@ async function saveOrUpdateCredit(print = false, close = false) {
         note: credit.note,
         used: credit.used ? 1 : 0,
         credit_type: credit.credit_type,
-        credit_value: credit.credit_value,
         credit_items: itemList.value.map(item => ({
           item: item.itemId,
           markup: item.markup,

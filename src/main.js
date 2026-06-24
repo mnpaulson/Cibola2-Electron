@@ -34,7 +34,7 @@ const vuetify = createVuetify({
           info: '#2196F3',
           success: '#4CAF50',
           warning: '#FFC107',
-          accent1: '#0c74e9', // Vibrant blue for light headers
+          accent1: '#dbe7f5', // Vibrant blue for light headers
           // Core Record Types (Jewel / Mineral Tones)
           customer: '#7B1FA2', // Deeper Amethyst Purple
           job: '#1565C0',      // Deeper Cobalt Blue

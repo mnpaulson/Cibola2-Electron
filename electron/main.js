@@ -63,7 +63,8 @@ function readSettings() {
   return {
     serverURL: 'http://localhost:8000',
     camera: { width: '1280', height: '1024' },
-    printers: { job: '', credit: '', custom: '' }
+    printers: { job: '', credit: '', custom: '' },
+    isDark: true
   }
 }
 
@@ -122,6 +123,7 @@ function createWindow() {
     win.webContents.openDevTools()
   } else {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
+    win.removeMenu()
   }
 }
 

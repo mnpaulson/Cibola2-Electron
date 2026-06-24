@@ -108,6 +108,7 @@
               :disabled="disabled"
               v-model:gold="localGoldSpot"
               v-model:platinum="localPlatSpot"
+              v-model:silver="localSilverSpot"
               v-model:date="localSpotDate"
               class="mb-0"
               style="margin-bottom: 0 !important;"

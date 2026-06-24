@@ -16,7 +16,7 @@
       <v-col cols="12">
         <v-card elevation="2" class="directory-card rounded-lg">
           <!-- Directory Header -->
-          <v-card-item class="bg-accent1 text-white py-3">
+          <v-card-item class="bg-accent1 py-3" :class="headerTextClass">
             <v-row no-gutters align="center" justify="space-between">
               <v-col class="text-h6 font-weight-bold d-flex align-center">
                 <v-icon start class="mr-2">mdi-list-box-outline</v-icon>
@@ -31,8 +31,8 @@
                   density="compact"
                   hide-details
                   flat
-                  bg-color="rgba(255, 255, 255, 0.15)"
-                  class="search-bar-input text-white"
+                  :bg-color="searchBgColor"
+                  class="search-bar-input"
                   @update:model-value="currentPage = 1"
                 ></v-text-field>
               </v-col>
@@ -139,12 +139,15 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useDirectoryTheme } from '../composables/useDirectoryTheme'
 import { api } from '../utils/api'
 import { sessionState, navigateTo } from '../store/session'
 import { formatLocalDate } from '../utils/dates'
 import CustomSheetForm from './CustomSheetForm.vue'
 import DirectoryPagination from './DirectoryPagination.vue'
 
+// Theme & styling control
+const { isDark, headerTextClass, searchBgColor } = useDirectoryTheme()
 // Local State
 const sheetsList = ref([])
 const loading = ref(false)
@@ -295,59 +298,7 @@ watch(isWorkspaceActive, (active) => {
   gap: 8px;
 }
 
-.directory-card {
-  border: 1px solid rgba(var(--v-border-color), 0.12);
-  overflow: hidden;
-}
-
-.directory-table :deep(th) {
-  background-color: rgba(var(--v-theme-surface-variant), 0.04) !important;
-}
-
-.cursor-pointer {
-  cursor: pointer;
-}
-
-.transition-row {
-  transition: background-color 0.2s ease, transform 0.2s ease;
-}
-
-.transition-row:hover {
-  background-color: rgba(var(--v-theme-primary), 0.05) !important;
-}
-
-.hover-shadow {
-  transition: box-shadow 0.2s ease;
-}
-
-.hover-shadow:hover {
-  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-}
-
-.search-bar-input {
-  border-radius: 4px;
-}
-
-.search-bar-input :deep(.v-field) {
-  box-shadow: none !important;
-  color: white !important;
-}
-
-.search-bar-input :deep(.v-field__input) {
-  color: white !important;
-}
-
 .bg-light-surface {
   background-color: rgba(var(--v-theme-surface-variant), 0.05);
-}
-
-.sortable-header {
-  cursor: pointer;
-  user-select: none;
-  transition: background-color 0.2s ease;
-}
-
-.sortable-header:hover {
-  background-color: rgba(var(--v-theme-primary), 0.08) !important;
 }
 </style>

@@ -640,9 +640,8 @@ watch(() => settingsState.isLoaded, (loaded) => {
 
 <style scoped>
 .border-light {
-  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(var(--v-border-color), 0.12) !important;
   border-radius: 12px !important;
-  background: rgba(255, 255, 255, 0.02) !important;
 }
 
 .gap-2 {

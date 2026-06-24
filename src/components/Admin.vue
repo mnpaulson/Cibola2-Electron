@@ -8,8 +8,7 @@
             <v-icon size="24">mdi-cog</v-icon>
           </v-avatar>
           <div>
-            <h2 class="text-h5 font-weight-bold text-white">System Settings & Defaults</h2>
-            <p class="text-caption text-medium-emphasis mb-0">Configure local parameters, manage employees, and customize metal value formulas.</p>
+            <h2 class="text-h5 font-weight-bold">System Settings & Defaults</h2>
           </div>
         </div>
       </v-card-item>
@@ -122,19 +121,16 @@ const activeSection = computed({
 .admin-main-card {
   border-radius: 16px !important;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(30, 30, 35, 0.6) !important;
-  backdrop-filter: blur(10px);
+  border: 1px solid rgba(var(--v-border-color), 0.12);
 }
 
 .admin-header {
-  background: linear-gradient(135deg, rgba(24, 103, 192, 0.15) 0%, rgba(92, 187, 246, 0.05) 100%);
+  background: linear-gradient(135deg, rgba(24, 103, 192, 0.08) 0%, rgba(92, 187, 246, 0.03) 100%);
 }
 
 .admin-sidebar {
   width: 250px;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.01) !important;
   overflow-x: hidden !important;
 }
 
@@ -143,7 +139,7 @@ const activeSection = computed({
 }
 
 .border-r {
-  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-right: 1px solid rgba(var(--v-border-color), 0.12) !important;
 }
 
 .menu-item-transition {

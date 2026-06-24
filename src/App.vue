@@ -15,7 +15,7 @@
       >
         <template v-slot:prepend>
           <v-avatar rounded="0" size="40" :class="isRail ? 'mr-0' : 'mr-3'">
-            <v-img src="/256x256.png" alt="Cibola2 Icon"></v-img>
+            <v-img src="256x256.png" alt="Cibola2 Icon"></v-img>
           </v-avatar>
         </template>
       </v-list-item>
@@ -305,7 +305,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useTheme } from 'vuetify'
-import { settingsState, loadSettings } from './store/settings'
+import { settingsState, loadSettings, saveSettings } from './store/settings'
 import { sessionState, startHeartbeat, navigateTo, navigateBack, navigateForward } from './store/session'
 import { metadataState, refreshMetadata } from './store/metadata'
 import { api } from './utils/api'
@@ -336,6 +336,9 @@ let unsubscribeNavigation = null
 
 onMounted(async () => {
   await loadSettings()
+  // Apply the persisted theme preference immediately after settings load
+  theme.global.name.value = settingsState.isDark ? 'dark' : 'light'
+  isDark.value = settingsState.isDark
   if (settingsState.serverURL) {
     startHeartbeat(settingsState.serverURL)
   }
@@ -527,9 +530,21 @@ const handleTabClick = (value) => {
 }
 const isDark = ref(true)
 
-const toggleTheme = () => {
+const toggleTheme = async () => {
   isDark.value = !isDark.value
   theme.global.name.value = isDark.value ? 'dark' : 'light'
+  // Persist the new preference immediately alongside other local settings
+  settingsState.isDark = isDark.value
+  try {
+    await saveSettings({
+      serverURL: settingsState.serverURL,
+      camera: { ...settingsState.camera },
+      printers: { ...settingsState.printers },
+      isDark: settingsState.isDark
+    })
+  } catch (err) {
+    console.error('Failed to persist theme preference:', err)
+  }
 }
 
 const getMenuItemColor = (value) => {
@@ -589,7 +604,7 @@ const currentMenuIcon = computed(() => {
 .stat-card {
   transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease;
   border-radius: 12px !important;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(var(--v-border-color), 0.12);
 }
 .stat-card:hover {
   transform: translateY(-4px);
@@ -597,7 +612,7 @@ const currentMenuIcon = computed(() => {
 }
 
 .activity-item {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(var(--v-border-color), 0.12);
 }
 .activity-item:last-child {
   border-bottom: none;
@@ -651,5 +666,65 @@ const currentMenuIcon = computed(() => {
 .v-theme--dark .bg-accent1 .v-icon,
 .v-theme--dark .bg-accent1 .v-btn {
   color: rgba(255, 255, 255, 0.82) !important;
+}
+
+/* ── Directory / Manager shared styles ───────────────────────────────────── */
+
+.directory-card,
+.history-card {
+  border: 1px solid rgba(var(--v-border-color), 0.12);
+  overflow: hidden;
+}
+
+.directory-table th {
+  background-color: rgba(var(--v-theme-surface-variant), 0.04) !important;
+}
+
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+.sortable-header:hover {
+  background-color: rgba(var(--v-theme-primary), 0.08) !important;
+}
+
+.cursor-pointer { cursor: pointer; }
+
+.transition-row {
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+.transition-row:hover {
+  background-color: rgba(var(--v-theme-primary), 0.05) !important;
+}
+
+.hover-shadow { transition: box-shadow 0.2s ease; }
+.hover-shadow:hover { box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05); }
+
+/* ── Frosted-glass search bar (embedded in accent1 headers) ──────────────── */
+
+.search-bar-input {
+  border-radius: 4px;
+}
+
+/* Dark mode: white text on dark slate header */
+.v-theme--dark .search-bar-input .v-field,
+.v-theme--dark .search-bar-input .v-field__input {
+  color: white !important;
+}
+.v-theme--dark .search-bar-input .v-field {
+  box-shadow: none !important;
+}
+
+/* Light mode: dark text on pale blue header */
+.v-theme--light .search-bar-input .v-field,
+.v-theme--light .search-bar-input .v-field__input {
+  color: rgba(0, 0, 0, 0.87) !important;
+}
+.v-theme--light .search-bar-input .v-field {
+  box-shadow: none !important;
+}
+.v-theme--light .search-bar-input .v-field__prepend-inner .v-icon {
+  color: rgba(0, 0, 0, 0.54) !important;
 }
 </style>

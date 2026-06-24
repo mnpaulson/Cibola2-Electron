@@ -1,14 +1,14 @@
 <template>
   <v-card class="recently-viewed-card rounded-lg" elevation="2" border>
     <!-- Header -->
-    <v-card-item class="bg-accent1 text-white py-3">
+    <v-card-item class="bg-accent1 py-3" :class="headerTextClass">
       <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center">
         <v-icon start class="mr-2">mdi-history</v-icon>
         Recently Viewed Records
       </v-card-title>
       <template v-slot:append v-if="records.length > 0">
         <v-btn
-          color="white"
+          :color="headerIconColor"
           variant="text"
           density="comfortable"
           icon="mdi-broom"
@@ -35,8 +35,11 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useDirectoryTheme } from '../composables/useDirectoryTheme'
 import { recentlyViewedState, clearRecentlyViewed } from '../store/recentlyViewed'
 import UnifiedRecordTable from './UnifiedRecordTable.vue'
+
+const { isDark, headerTextClass, headerIconColor } = useDirectoryTheme()
 
 // Computed records list
 const records = computed(() => recentlyViewedState.records || [])

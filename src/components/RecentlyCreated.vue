@@ -1,14 +1,14 @@
 <template>
   <v-card class="recently-created-card rounded-lg" elevation="2" border>
     <!-- Header -->
-    <v-card-item class="bg-accent1 text-white py-3">
+    <v-card-item class="bg-accent1 py-3" :class="headerTextClass">
       <v-card-title class="text-subtitle-1 font-weight-bold d-flex align-center">
         <v-icon start class="mr-2">mdi-plus-circle-outline</v-icon>
         Recently Created Records
       </v-card-title>
       <template v-slot:append>
         <v-btn
-          color="white"
+          :color="headerIconColor"
           variant="text"
           density="comfortable"
           icon="mdi-refresh"
@@ -37,10 +37,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useDirectoryTheme } from '../composables/useDirectoryTheme'
 import { api } from '../utils/api'
 import { sessionState } from '../store/session'
 import UnifiedRecordTable from './UnifiedRecordTable.vue'
+
+const { isDark, headerTextClass, headerIconColor } = useDirectoryTheme()
 
 const records = ref([])
 const loading = ref(false)
@@ -80,8 +83,8 @@ async function fetchRecords() {
       id: credit.id,
       type: 'credit',
       typeName: 'Credit',
-      details: credit.credit_value && Number(credit.credit_value) !== 0
-        ? `Payout: $${Number(credit.credit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      details: credit.total && Number(credit.total) !== 0
+        ? `Payout: $${Number(credit.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         : 'No Final Credit',
       customerId: credit.customer_id,
       customerName: credit.customer ? `${credit.customer.fname} ${credit.customer.lname}`.trim() : (customerMap.get(credit.customer_id) || ''),

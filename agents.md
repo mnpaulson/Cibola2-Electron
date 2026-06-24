@@ -34,6 +34,7 @@ POS thermal printers and ticket printers are highly sensitive to print margins a
 * `printBackground: true` (Ensure colors, borders, and barcodes render).
 * `deviceName: printerName` (Target the configured system printer).
 * `margins: { marginType: 'none' }` (Prevents text clipping and excessive paper rolling).
+* **Template Margins**: When designing print templates (especially quadrant/split-page A4 layouts like [jobPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/jobPrintTemplate.js)), use a minimum padding/margin of `5mm` on outer edges in CSS to prevent hardware/physical printer margins from clipping elements when using `marginType: 'none'`.
 * **Validation**: Validate that a target printer is selected in the local settings before triggering print. Provide user feedback (via SnackBar toasts) if printing fails to enqueue, instead of failing silently.
 
 ---
@@ -205,6 +206,38 @@ To update the version of the application:
 
 > [!NOTE]
 > The renderer fallback version in [LocalSettingsAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/LocalSettingsAdmin.vue) and the update simulation logic in [notifications.js](file:///c:/dev/Cibola2-Electron/src/store/notifications.js) import and resolve client version parameters dynamically from `package.json` at build time. No manual changes are required in those components.
+
+---
+
+## 22. Auto-Updater Artifact Naming Convention
+To prevent auto-update 404 errors (due to spaces in the installer filename mismatching with the dash-separated filename written to `latest.yml`), always explicitly configure `artifactName` under the `"win"` target block in [package.json](file:///c:/dev/Cibola2-Electron/package.json):
+```json
+    "win": {
+      "icon": "public/256x256.png",
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    }
+```
+This forces `electron-builder` to output `Cibola2-Setup-X.Y.Z.exe` (using dashes rather than spaces) matching the target path/URL generated in the `latest.yml` release file.
+
+---
+
+## 23. Changelog Maintenance Protocol (Diligence & Versioning)
+To maintain project history and communicate patches clearly to users, all agents making code modifications MUST update [CHANGELOG.md](file:///c:/dev/Cibola2-Electron/CHANGELOG.md) at the project root before completing their task:
+* **Logging Changes**: Document every bug fix, feature, optimization, or UI adjustment under the `## [Unreleased]` section.
+* **Categorization**: Group changes using Keep a Changelog subheadings:
+  * `### Added` for new features/assets.
+  * `### Changed` for logical or layout changes.
+  * `### Fixed` for bug fixes or alignment corrections.
+  * `### Removed` for deprecated features/components.
+* **Descriptive Entries**: Identify the files modified and explain the business logic or technical reason for the change (e.g. "Adjusted layout in `src/utils/jobPrintTemplate.js` to shift bottom quadrants up 10mm").
+* **Bumping Versions**: When a task explicitly requests an application version bump (e.g., updating the `"version"` field in `package.json`):
+  1. Increment the version in [package.json](file:///c:/dev/Cibola2-Electron/package.json) and [package-lock.json](file:///c:/dev/Cibola2-Electron/package-lock.json).
+  2. Rename the `## [Unreleased]` header to the new version and release date: `## [X.Y.Z] - YYYY-MM-DD` (using current local date).
+  3. Insert a new, empty `## [Unreleased]` block and standard headers (`### Added`, `### Changed`, etc.) above the new release block to keep the log ready for the next patch cycles.
+
 
 
 

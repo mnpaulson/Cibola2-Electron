@@ -166,10 +166,10 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
     }
     .page-container {
       width: 210mm;
-      height: 297mm;
+      height: 287mm;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      grid-template-rows: 166.5mm 130.5mm;
+      grid-template-rows: 156.5mm 130.5mm;
       position: relative;
       overflow: hidden;
       box-sizing: border-box;
@@ -177,7 +177,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
     .quadrant {
       width: 105mm;
       height: 100%;
-      padding: 4.5mm 3mm;
+      padding: 4.5mm 5mm;
       position: relative;
       overflow: hidden;
       display: flex;
@@ -192,15 +192,19 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       border-right: 1px solid #FFF;
       border-bottom: 1px solid #FFF;
       justify-content: flex-start !important;
+      padding-right: 2.5mm;
     }
     .q-top-right {
       border-bottom: 1px solid #FFF;
       justify-content: flex-start !important;
+      padding-left: 2.5mm;
     }
     .q-bottom-left {
       border-right: 1px solid #FFF;
+      padding-right: 2.5mm;
     }
     .q-bottom-right {
+      padding-left: 2.5mm;
     }
 
     /* Fixed Height Blocks styling */
@@ -422,6 +426,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       background: #fff;
       box-sizing: border-box;
       width: 100%;
+      border: 1px dashed #bbb;
     }
     .q1-grid .image-card, .q2-grid .image-card {
       height: 30mm;
@@ -550,15 +555,15 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
     .warning-container {
       position: absolute;
       bottom: 6mm;
-      left: 4mm;
-      right: 4mm;
+      left: 5mm;
+      right: 5mm;
       text-align: center;
       pointer-events: none;
       z-index: 10;
     }
     .warning-text {
       font-size: 14px;
-      width: 95mm;
+      width: 100%;
       font-weight: bold;
       color: #000;
       text-transform: uppercase;

@@ -12,6 +12,7 @@ export const settingsState = reactive({
     credit: '',
     custom: ''
   },
+  isDark: true,
   isLoaded: false
 })
 
@@ -31,6 +32,8 @@ export async function loadSettings() {
           if (settings.printers.credit) settingsState.printers.credit = settings.printers.credit
           if (settings.printers.custom) settingsState.printers.custom = settings.printers.custom
         }
+        // Restore theme preference (default to dark if not previously saved)
+        if (typeof settings.isDark === 'boolean') settingsState.isDark = settings.isDark
       }
     } catch (err) {
       console.error('Failed to load settings from electron IPC:', err)
@@ -65,7 +68,8 @@ export async function saveSettings(newSettings) {
           job: settingsState.printers.job,
           credit: settingsState.printers.credit,
           custom: settingsState.printers.custom
-        }
+        },
+        isDark: settingsState.isDark
       })
     } catch (err) {
       console.error('Failed to save settings via electron IPC:', err)

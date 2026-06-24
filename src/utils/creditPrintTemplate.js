@@ -17,8 +17,7 @@ export function generateCreditPrintHTML({ credit, customer, itemList = [], activ
   const employeeName = emp ? emp.name : 'Unassigned'
   const customerName = customer ? `${customer.fname} ${customer.lname}` : '—'
   const creditDate = credit.created_at ? formatLocalDate(credit.created_at, 'long') : formatLocalDate(new Date().toISOString(), 'long')
-  const itemsTotal = `$${credit.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  const finalPayout = `$${(credit.credit_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const finalPayout = `$${(credit.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   // Format breakdown rows
   let itemsHTML = ''

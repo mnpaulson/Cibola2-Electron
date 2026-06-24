@@ -33,7 +33,7 @@
       Spot Metal Prices (CAD/g)
     </div>
     <v-row dense>
-      <v-col cols="6">
+      <v-col cols="4">
         <v-text-field
           v-model="localGold"
           label="Gold Spot"
@@ -48,7 +48,7 @@
           @input="onGoldInput"
         ></v-text-field>
       </v-col>
-      <v-col cols="6">
+      <v-col cols="4">
         <v-text-field
           v-model="localPlat"
           label="Platinum Spot"
@@ -61,6 +61,21 @@
           step="0.01"
           :disabled="disabled"
           @input="onPlatInput"
+        ></v-text-field>
+      </v-col>
+      <v-col cols="4">
+        <v-text-field
+          v-model="localSilver"
+          label="Silver Spot"
+          prefix="$"
+          suffix="/g"
+          variant="outlined"
+          density="compact"
+          hide-details
+          type="number"
+          step="0.01"
+          :disabled="disabled"
+          @input="onSilverInput"
         ></v-text-field>
       </v-col>
     </v-row>
@@ -274,16 +289,21 @@ const props = defineProps({
     type: Number,
     default: null
   },
+  silver: {
+    type: Number,
+    default: null
+  },
   date: {
     type: String,
     default: ''
   }
 })
 
-const emit = defineEmits(['update:gold', 'update:platinum', 'update:date'])
+const emit = defineEmits(['update:gold', 'update:platinum', 'update:silver', 'update:date'])
 
 const localGold = ref('')
 const localPlat = ref('')
+const localSilver = ref('')
 const isManuallyEdited = ref(false)
 
 watch(() => props.gold, (newVal) => {
@@ -300,6 +320,13 @@ watch(() => props.platinum, (newVal) => {
   }
 }, { immediate: true })
 
+watch(() => props.silver, (newVal) => {
+  if (newVal !== parseFloat(localSilver.value)) {
+    localSilver.value = newVal !== null && newVal !== undefined ? String(newVal) : '0'
+    isManuallyEdited.value = false
+  }
+}, { immediate: true })
+
 function onGoldInput() {
   isManuallyEdited.value = true
   emit('update:gold', parseFloat(localGold.value) || 0)
@@ -310,11 +337,17 @@ function onPlatInput() {
   emit('update:platinum', parseFloat(localPlat.value) || 0)
 }
 
+function onSilverInput() {
+  isManuallyEdited.value = true
+  emit('update:silver', parseFloat(localSilver.value) || 0)
+}
+
 const isModified = computed(() => {
   if (!isManuallyEdited.value) return false
   const g = parseFloat(localGold.value) || 0
   const p = parseFloat(localPlat.value) || 0
-  return g !== goldPrice.value || p !== platPrice.value
+  const s = parseFloat(localSilver.value) || 0
+  return g !== goldPrice.value || p !== platPrice.value || s !== silverPrice.value
 })
 
 const saveSmallPrices = async () => {
@@ -325,7 +358,8 @@ const saveSmallPrices = async () => {
 
   const g = parseFloat(localGold.value)
   const p = parseFloat(localPlat.value)
-  if (isNaN(g) || g < 0 || isNaN(p) || p < 0) {
+  const s = parseFloat(localSilver.value)
+  if (isNaN(g) || g < 0 || isNaN(p) || p < 0 || isNaN(s) || s < 0) {
     showToast('Please enter valid price values', 'warning')
     return
   }
@@ -350,6 +384,14 @@ const saveSmallPrices = async () => {
         })
       )
     }
+    if (silverRecord.value) {
+      updates.push(
+        api.put(`/values/${silverRecord.value.id}`, {
+          ...silverRecord.value,
+          value1: String(s)
+        })
+      )
+    }
 
     await Promise.all(updates)
     await refreshMetadata()
@@ -358,6 +400,7 @@ const saveSmallPrices = async () => {
     
     emit('update:gold', g)
     emit('update:platinum', p)
+    emit('update:silver', s)
     emit('update:date', lastUpdatedRaw.value)
   } catch (err) {
     console.error('Failed to update metal prices:', err)
@@ -559,6 +602,7 @@ const syncPrices = async () => {
     if (props.small) {
       emit('update:gold', goldPrice.value)
       emit('update:platinum', platPrice.value)
+      emit('update:silver', silverPrice.value)
       emit('update:date', lastUpdatedRaw.value)
     }
   } catch (err) {
@@ -621,9 +665,7 @@ onMounted(async () => {
 <style scoped>
 .metal-prices-card {
   border-radius: 12px !important;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(30, 30, 35, 0.6) !important;
-  backdrop-filter: blur(10px);
+  border: 1px solid rgba(var(--v-border-color), 0.12);
 }
 
 .position-relative {
@@ -640,11 +682,11 @@ onMounted(async () => {
 }
 
 .border-r {
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-right: 1px solid rgba(var(--v-border-color), 0.12);
 }
 
 .border-t {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(var(--v-border-color), 0.12);
 }
 
 .gap-1 {

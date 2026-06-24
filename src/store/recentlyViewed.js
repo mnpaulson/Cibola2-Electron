@@ -113,9 +113,9 @@ export async function refreshRecentRecord(type, id) {
     } else if (type === 'credit') {
       const credit = await api.get(`/goldcredits/${id}`)
       if (credit && credit.id) {
-        const hasCredit = credit.credit_value && Number(credit.credit_value) !== 0
+        const hasCredit = credit.total && Number(credit.total) !== 0
         const details = hasCredit
-          ? `Payout: $${Number(credit.credit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          ? `Payout: $${Number(credit.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : 'No Final Credit'
         const customerName = await resolveCustomerName(credit.customer_id, credit.customer)
 

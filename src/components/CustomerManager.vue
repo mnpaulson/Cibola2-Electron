@@ -21,7 +21,7 @@
         <v-col cols="12" md="8">
           <v-card elevation="3" class="history-card rounded-lg">
             <!-- Toolbar with Quick Actions -->
-            <v-card-item class="bg-accent1 text-white py-3">
+            <v-card-item class="bg-accent1 py-3" :class="headerTextClass">
               <v-row no-gutters align="center" justify="space-between">
                 <v-col class="text-subtitle-1 font-weight-bold">
                   Activity & Records: {{ customerName }}
@@ -102,7 +102,7 @@
     <v-row v-else>
       <v-col cols="12">
         <v-card elevation="2" class="directory-card rounded-lg">
-          <v-card-item class="bg-accent1 text-white py-3">
+          <v-card-item class="bg-accent1 py-3" :class="headerTextClass">
             <v-row no-gutters align="center" justify="space-between">
               <v-col class="text-h6 font-weight-bold">
                 <v-icon start class="mr-2">mdi-account-box-multiple</v-icon>
@@ -117,8 +117,8 @@
                   density="compact"
                   hide-details
                   flat
-                  bg-color="rgba(255, 255, 255, 0.15)"
-                  class="search-bar-input text-white"
+                  :bg-color="searchBgColor"
+                  class="search-bar-input"
                 ></v-text-field>
               </v-col>
               <v-col class="shrink ml-3">
@@ -254,6 +254,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useDirectoryTheme } from '../composables/useDirectoryTheme'
 import { api } from '../utils/api'
 import { sessionState, navigateTo, setSelectedCustomerId } from '../store/session'
 import { formatLocalDate, formatCityProv } from '../utils/dates'
@@ -262,6 +263,9 @@ import DirectoryPagination from './DirectoryPagination.vue'
 import DeleteConfirmationDialog from './DeleteConfirmationDialog.vue'
 import { removeRecentRecord } from '../store/recentlyViewed'
 import UnifiedRecordTable from './UnifiedRecordTable.vue'
+
+// Theme & styling control
+const { isDark, headerTextClass, searchBgColor } = useDirectoryTheme()
 
 // Local State
 
@@ -310,9 +314,9 @@ const combinedHistory = computed(() => {
   })
   
   credits.value.forEach(credit => {
-    const hasCredit = credit.credit_value && Number(credit.credit_value) !== 0
+    const hasCredit = credit.total && Number(credit.total) !== 0
     const detailsText = hasCredit
-      ? `Payout: $${Number(credit.credit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ? `Payout: $${Number(credit.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : 'No Final Credit'
     list.push({
       id: credit.id,
@@ -579,63 +583,11 @@ onMounted(() => {
   gap: 8px;
 }
 
-.history-card, .directory-card {
-  border: 1px solid rgba(var(--v-border-color), 0.12);
-  overflow: hidden;
-}
-
-.directory-table :deep(th) {
-  background-color: rgba(var(--v-theme-surface-variant), 0.04) !important;
-}
-
-.cursor-pointer {
-  cursor: pointer;
-}
-
-.transition-row {
-  transition: background-color 0.2s ease, transform 0.2s ease;
-}
-
-.transition-row:hover {
-  background-color: rgba(var(--v-theme-primary), 0.05) !important;
-}
-
-.hover-shadow {
-  transition: box-shadow 0.2s ease;
-}
-
-.hover-shadow:hover {
-  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-}
-
-.search-bar-input {
-  border-radius: 4px;
-}
-
-.search-bar-input :deep(.v-field) {
-  box-shadow: none !important;
-  color: white !important;
-}
-
-.search-bar-input :deep(.v-field__input) {
-  color: white !important;
-}
-
 .border-error {
   border: 1px solid rgba(var(--v-theme-error), 0.3) !important;
 }
 
 .bg-light-surface {
   background-color: rgba(var(--v-theme-surface-variant), 0.05);
-}
-
-.sortable-header {
-  cursor: pointer;
-  user-select: none;
-  transition: background-color 0.2s ease;
-}
-
-.sortable-header:hover {
-  background-color: rgba(var(--v-theme-primary), 0.08) !important;
 }
 </style>
