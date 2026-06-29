@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [1.9.4]
+
+### Fixed
+- Fixed Quick Extra items not rendering on Custom Sheets.
+- Increased font size on Job Notes print field.
+- Update notification now persists until update is applied.
+
+
+## [1.9.3] - 2026-06-24
+
+### Fixed
+
 ### Added
 - **UI**: Dark/light mode preference is now persisted in `settings.json` and restored on next launch.
 

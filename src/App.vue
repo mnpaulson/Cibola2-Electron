@@ -94,7 +94,12 @@
         <v-list width="350" class="pa-0 rounded-lg elevation-4">
           <v-list-subheader class="bg-primary text-white py-3 px-4 font-weight-bold d-flex justify-space-between align-center">
             <span class="text-subtitle-1">Notifications</span>
-            <v-btn variant="text" density="compact" size="small" color="white" class="text-none font-weight-medium" @click.stop="clearAllNotifications">
+            <v-btn
+              v-if="notificationsState.list.some(n => !n.persistent)"
+              variant="text" density="compact" size="small" color="white"
+              class="text-none font-weight-medium"
+              @click.stop="clearAllNotifications"
+            >
               Clear All
             </v-btn>
           </v-list-subheader>
@@ -114,6 +119,7 @@
             </template>
             <template v-slot:append>
               <v-btn
+                v-if="!notif.persistent"
                 icon="mdi-close"
                 variant="text"
                 density="comfortable"
@@ -518,7 +524,9 @@ const handleNotificationClick = (notif) => {
   if (notif.id === 'new-version' || notif.id === 'new-version-downloaded') {
     navigateTo('config')
   }
-  removeNotification(notif.id)
+  if (!notif.persistent) {
+    removeNotification(notif.id)
+  }
 }
 
 const handleTabClick = (value) => {

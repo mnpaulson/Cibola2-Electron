@@ -105,6 +105,7 @@
               counter="230"
               maxlength="230"
               density="compact"
+              class="job-notes-textarea"
             ></v-textarea>
           </v-col>
         </v-row>
@@ -580,6 +581,9 @@ async function executeHeadlessPrint() {
   .custom-est-textarea :deep(textarea) {
     height: 100% !important;
   }
+}
+.job-notes-textarea :deep(textarea) {
+  min-height: 140px;
 }
 .custom-date-field :deep(input[type="date"]::-webkit-calendar-picker-indicator) {
   display: none;

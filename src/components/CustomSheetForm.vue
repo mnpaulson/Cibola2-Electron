@@ -383,6 +383,119 @@
               </div>
             </template>
 
+            <!-- Extras line items (type === 'Extra') -->
+            <div v-if="getItemsForCategory(activeEstimate, 'Extra').length > 0" class="mb-6">
+              <div class="d-flex align-center justify-space-between mb-3">
+                <div class="text-subtitle-2 font-weight-bold text-primary d-flex align-center">
+                  <v-icon size="18" class="mr-1">mdi-chevron-right</v-icon>
+                  Extras
+                </div>
+              </div>
+
+              <div
+                v-for="val in getItemsForCategory(activeEstimate, 'Extra')"
+                :key="val.id"
+                class="mb-3 line-item-container"
+              >
+                <v-row align="center" class="line-item-row my-1">
+                  <!-- Name (read-only label since it was selected from the extras menu) -->
+                  <v-col cols="12" sm="5" md="5" class="py-1">
+                    <v-text-field
+                      v-model="val.name"
+                      placeholder="Extra item"
+                      variant="underlined"
+                      density="compact"
+                      hide-details
+                      readonly
+                    ></v-text-field>
+                  </v-col>
+
+                  <!-- Amt/Weight -->
+                  <v-col cols="3" sm="1" md="1" class="py-1">
+                    <v-text-field
+                      v-model="val.amt"
+                      placeholder="0.00"
+                      type="number"
+                      step="0.01"
+                      variant="underlined"
+                      density="compact"
+                      hide-details
+                      suffix="×"
+                      @input="recalculateItem(val)"
+                    ></v-text-field>
+                  </v-col>
+
+                  <!-- Price Per (basePrice) -->
+                  <v-col cols="3" sm="1" md="1" class="py-1">
+                    <v-text-field
+                      v-model="val.basePrice"
+                      placeholder="0.00"
+                      type="number"
+                      step="0.01"
+                      variant="underlined"
+                      density="compact"
+                      hide-details
+                      prefix="$"
+                      suffix="×"
+                      @input="onBasePriceManualChange(val)"
+                    ></v-text-field>
+                  </v-col>
+
+                  <!-- Modifier (priceModifier) -->
+                  <v-col cols="3" sm="1" md="1" class="py-1">
+                    <v-text-field
+                      v-model="val.priceModifier"
+                      placeholder="1.00"
+                      type="number"
+                      step="0.01"
+                      variant="underlined"
+                      density="compact"
+                      hide-details
+                      suffix="×"
+                      @input="onModifierChange(val)"
+                    ></v-text-field>
+                  </v-col>
+
+                  <!-- Markup -->
+                  <v-col cols="3" sm="1" md="1" class="py-1">
+                    <v-text-field
+                      v-model="val.markup"
+                      placeholder="1.00"
+                      type="number"
+                      step="0.01"
+                      variant="underlined"
+                      density="compact"
+                      hide-details
+                      suffix="="
+                      @input="onModifierChange(val)"
+                    ></v-text-field>
+                  </v-col>
+
+                  <!-- Total display -->
+                  <v-col cols="12" sm="1" md="1" class="py-1 d-flex flex-sm-column align-center align-sm-start justify-space-between">
+                    <span class="text-caption text-medium-emphasis d-sm-none">Total</span>
+                    <span class="text-subtitle-2 font-weight-bold text-success">
+                      ${{ (calculateItemTotal(val) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                    </span>
+                  </v-col>
+
+                  <!-- Delete Action -->
+                  <v-col cols="12" sm="2" md="2" class="py-1 d-flex justify-end align-center">
+                    <v-btn
+                      color="error"
+                      variant="outlined"
+                      size="x-small"
+                      prepend-icon="mdi-trash-can-outline"
+                      class="text-none font-weight-medium rounded-pill"
+                      @click="deleteItem(activeEstimate, val.id)"
+                    >
+                      Delete
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </div>
+            </div>
+
             <!-- Extras buttons -->
             <div v-if="extras.length > 0" class="mb-4">
               <div class="text-subtitle-2 font-weight-bold text-primary mb-3">

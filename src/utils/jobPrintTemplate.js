@@ -223,9 +223,11 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
     .q1-combined-row {
       display: flex;
       width: 100%;
-      height: 15mm;
+      min-height: 15mm;
+      height: auto;
       gap: 0.5mm;
       box-sizing: border-box;
+      align-items: stretch;
     }
     .q1-combined-row .info-block {
       flex: 1;
@@ -366,22 +368,20 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
     }
 
     .estimate-block {
-      height: 13mm;
+      min-height: 13mm;
+      height: auto;
     }
     .est-amount {
       font-size: 12px;
       font-weight: bold;
     }
     .est-note {
-      font-size: 10.5px;
+      font-size: 11.5px;
       color: #333;
-      line-height: 1.2;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
+      line-height: 1.3;
       white-space: pre-wrap;
+      word-break: break-word;
+      overflow: hidden;
     }
 
     .notes-block {
@@ -389,7 +389,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       margin-bottom: 2px;
     }
     .notes-content {
-      font-size: 13px;
+      font-size: 16px;
       line-height: 1.2;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -634,7 +634,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
               <div class="est-amount">
                 ${estVal > 0 ? `Est: $${estVal.toLocaleString(undefined, { minimumFractionDigits: 2 })} + GST` : 'Estimate: —'}
               </div>
-              <div class="est-note">${(job.est_note || '—').trim()}</div>
+              <div class="est-note">${(job.est_note || '—').trim().replace(/\n/g, '<br>')}</div>
             </div>
           </div>
         </div>
@@ -708,7 +708,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
           <div class="est-amount">
             ${estVal > 0 ? `Est: $${estVal.toLocaleString(undefined, { minimumFractionDigits: 2 })} + GST` : 'Estimate: —'}
           </div>
-          <div class="est-note">${(job.est_note || '—').trim()}</div>
+          <div class="est-note">${(job.est_note || '—').trim().replace(/\n/g, '<br>')}</div>
         </div>
       </div>
 

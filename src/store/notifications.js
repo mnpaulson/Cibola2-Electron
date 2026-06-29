@@ -90,7 +90,8 @@ export function initUpdaterListeners() {
           title: 'New Version Available',
           message: `Version ${info.version} is available for download.`,
           color: 'info',
-          icon: 'mdi-cloud-download-outline'
+          icon: 'mdi-cloud-download-outline',
+          persistent: true
         })
         
         showToast(`Update available: v${info.version}`, 'info')
@@ -133,12 +134,14 @@ export function initUpdaterListeners() {
       if (!notificationsState.updateSimulated) {
         notificationsState.updateStatus = 'downloaded'
         
+        removeNotification('new-version')
         addNotification({
           id: 'new-version-downloaded',
           title: 'Update Downloaded',
           message: `Version ${info.version || getSimulatedNextVersion()} has been downloaded. Restart to install.`,
           color: 'success',
-          icon: 'mdi-restart'
+          icon: 'mdi-restart',
+          persistent: true
         })
         
         showToast(`Update downloaded!`, 'success')
@@ -167,7 +170,8 @@ export async function checkUpdates(silent = false) {
         title: 'New Version Available',
         message: `Version ${nextVer} is available for download.`,
         color: 'info',
-        icon: 'mdi-cloud-download-outline'
+        icon: 'mdi-cloud-download-outline',
+        persistent: true
       })
 
       if (!silent) {
@@ -236,12 +240,14 @@ export async function downloadUpdates() {
         showToast('Simulated Download Complete!', 'success')
         
         const nextVer = getSimulatedNextVersion()
+        removeNotification('new-version')
         addNotification({
           id: 'new-version-downloaded',
           title: 'Update Downloaded',
           message: `Version ${nextVer} has been downloaded. Restart to install.`,
           color: 'success',
-          icon: 'mdi-restart'
+          icon: 'mdi-restart',
+          persistent: true
         })
       }
     }, 300)
@@ -270,6 +276,8 @@ export function installUpdates() {
   if (notificationsState.updateSimulated) {
     showToast('Simulating restart and install...', 'success')
     setTimeout(() => {
+      removeNotification('new-version-downloaded')
+      removeNotification('new-version')
       window.location.reload()
     }, 1500)
     return
