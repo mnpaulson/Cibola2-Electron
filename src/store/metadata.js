@@ -3,6 +3,7 @@ import { api } from '../utils/api'
 
 export const metadataState = reactive({
   employees: [],
+  assignableEmployees: [],
   customSheets: [],
   goldCredits: [],
   metalPrices: [],
@@ -16,12 +17,14 @@ export async function refreshMetadata() {
   metadataState.isLoading = true
   metadataState.error = null
   try {
-    const [employeesData, valuesData] = await Promise.all([
+    const [employeesData, assignableData, valuesData] = await Promise.all([
       api.get('/employees?active=true'),
+      api.get('/employees/assignable'),
       api.get('/values')
     ])
 
     metadataState.employees = employeesData || []
+    metadataState.assignableEmployees = assignableData || []
 
     const values = valuesData || []
     metadataState.customSheets = values.filter(v => v.type_id === 3)

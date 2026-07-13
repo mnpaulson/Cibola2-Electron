@@ -47,7 +47,7 @@ function saveRecentlyViewed() {
   }
 }
 
-// Add a record to the list (max 10, no duplicates)
+// Add a record to the list (max 50, no duplicates)
 export function addRecentRecord(record) {
   // Remove existing duplicate of same record (by ID and Type)
   recentlyViewedState.records = recentlyViewedState.records.filter(
@@ -57,8 +57,8 @@ export function addRecentRecord(record) {
   // Prepend to array
   recentlyViewedState.records.unshift(record)
 
-  // Cap at 10 items
-  if (recentlyViewedState.records.length > 10) {
+  // Cap at 50 items
+  if (recentlyViewedState.records.length > 50) {
     recentlyViewedState.records.pop()
   }
 
@@ -157,6 +157,9 @@ export async function refreshRecentRecord(type, id) {
           details: `${customer.fname} ${customer.lname}`.trim(),
           customerId: customer.id,
           customerName: `${customer.fname} ${customer.lname}`.trim(),
+          fname: customer.fname || '',
+          lname: customer.lname || '',
+          phone: customer.phone || '',
           created_at: customer.created_at || '',
           thumbnail: null,
           viewedAt: Date.now()

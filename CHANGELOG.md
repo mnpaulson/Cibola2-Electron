@@ -5,14 +5,23 @@ All notable changes to the Cibola2 Electron client will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.9.5]
 
+### Added
+- **UI**: Added a Hide/Unhide toggle button on the right-hand side of the customer note warning alert in [CustomerForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CustomerForm.vue). Clicking "Hide" stops the pulsing animation, turns the alert to a neutral grey color, and hides the customer note textarea. Clicking "Unhide" restores the active state and warning theme.
+- **UI**: Added a feature in [CustomerForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CustomerForm.vue) where the customer autocomplete dropdown shows up to 5 recently viewed customer records when focused/selected and the search input is empty. These items are displayed with a history clock icon (`mdi-history`) and a `"Recently Viewed"` tag. Typing a character clears the suggestions list.
+- **UI/Pagination**: Added pagination support to the **Recently Viewed Records** ([RecentlyViewed.vue](file:///c:/dev/Cibola2-Electron/src/components/RecentlyViewed.vue)) and **Recently Created Records** ([RecentlyCreated.vue](file:///c:/dev/Cibola2-Electron/src/components/RecentlyCreated.vue)) widgets on the dashboard. They now support up to 50 records, paginated in segments of 10 using the standard `DirectoryPagination.vue` component.
+- **Performance**: Optimized thumbnail loading in [RecentlyCreated.vue](file:///c:/dev/Cibola2-Electron/src/components/RecentlyCreated.vue) by lazily querying job thumbnails only when they become visible on the active page of the pagination widget.
+
+### Changed
+- **Employees**: Switched the employee selection dropdowns on Job Form (`JobForm.vue`) and Credit Form (`CreditForm.vue`) to load from the new `/employees/assignable` endpoint (cached via `metadataState.assignableEmployees` in `metadata.js`). This excludes system-default and unassignable records (like "Unassigned" / "Nobody", ID 1) from active assignment options. Additionally, updated the initial states and reset logic to set `employee_id` to `null` by default on new records so that the select dropdown starts empty and requires explicit user selection to pass form validation, while maintaining a computed fallback display for existing historical assignments.
+- **Storage**: Extended `recentlyViewedState.records` capacity from 10 to 50 in [recentlyViewed.js](file:///c:/dev/Cibola2-Electron/src/store/recentlyViewed.js) and modified the customer recording logic to save individual details (`fname`, `lname`, `phone`) along with standard information to populate suggestions.
 
 ## [1.9.4]
 
 ### Fixed
 - Fixed Quick Extra items not rendering on Custom Sheets.
-- Increased font size on Job Notes print field.
+- Adjusted font sizes on Job bag prints.
 - Update notification now persists until update is applied.
 
 

@@ -25,12 +25,18 @@
     <!-- Table of Records -->
     <v-card-text class="pa-0">
       <UnifiedRecordTable
-        :records="records"
+        :records="displayedRecords"
         :loading="loading"
         loading-text="Fetching recently created records..."
         empty-icon="mdi-plus-circle-outline"
         empty-title="No Created Records"
         empty-subtitle="No recently created records found in the database."
+      />
+      <v-divider v-if="allRecords.length > itemsPerPage"></v-divider>
+      <DirectoryPagination
+        v-model="currentPage"
+        :total-items="allRecords.length"
+        :items-per-page="itemsPerPage"
       />
     </v-card-text>
   </v-card>
@@ -42,12 +48,20 @@ import { useDirectoryTheme } from '../composables/useDirectoryTheme'
 import { api } from '../utils/api'
 import { sessionState } from '../store/session'
 import UnifiedRecordTable from './UnifiedRecordTable.vue'
+import DirectoryPagination from './DirectoryPagination.vue'
 
 const { isDark, headerTextClass, headerIconColor } = useDirectoryTheme()
 
-const records = ref([])
+const allRecords = ref([])
 const loading = ref(false)
+const currentPage = ref(1)
+const itemsPerPage = 10
 let intervalId = null
+
+const displayedRecords = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  return allRecords.value.slice(start, start + itemsPerPage)
+})
 
 // Fetch recent records from backend API
 async function fetchRecords() {
@@ -56,9 +70,9 @@ async function fetchRecords() {
   loading.value = true
   try {
     const [jobsData, creditsData, sheetsData, customersData] = await Promise.all([
-      api.get('/jobs?page=1&limit=10&sortBy=created_at&descending=true'),
-      api.get('/goldcredits?page=1&limit=10&sortBy=created_at&descending=true'),
-      api.get('/customsheets?page=1&limit=10&sortBy=created_at&descending=true'),
+      api.get('/jobs?page=1&limit=50&sortBy=created_at&descending=true'),
+      api.get('/goldcredits?page=1&limit=50&sortBy=created_at&descending=true'),
+      api.get('/customsheets?page=1&limit=50&sortBy=created_at&descending=true'),
       api.get('/customers')
     ])
 
@@ -75,7 +89,7 @@ async function fetchRecords() {
       customerId: job.customer_id,
       customerName: job.customer ? `${job.customer.fname} ${job.customer.lname}`.trim() : (customerMap.get(job.customer_id) || ''),
       created_at: job.created_at || '',
-      thumbnail: null
+      thumbnail: undefined // Set to undefined to lazy load
     }))
 
     // 2. Normalize Credits
@@ -130,31 +144,49 @@ async function fetchRecords() {
       return dateB.localeCompare(dateA)
     })
 
-    // Take top 10
-    const top10 = combined.slice(0, 10)
+    // Take top 50
+    const top50 = combined.slice(0, 50)
+    allRecords.value = top50
 
-    // Load thumbnails for top 10 jobs
-    records.value = await Promise.all(
-      top10.map(async (record) => {
-        if (record.type === 'job') {
-          try {
-            const fullJob = await api.get(`/jobs/${record.id}`)
-            if (fullJob && fullJob.job_images && fullJob.job_images.length > 0) {
-              record.thumbnail = fullJob.job_images[0].image
-            }
-          } catch (err) {
-            console.error('[RecentlyCreated] Failed to load job thumbnail:', err)
-          }
-        }
-        return record
-      })
-    )
+    // Adjust page if it exceeds the new total pages
+    const totalPages = Math.ceil(top50.length / itemsPerPage) || 1
+    if (currentPage.value > totalPages) {
+      currentPage.value = totalPages
+    }
   } catch (err) {
     console.error('[RecentlyCreated] Failed to fetch recently created records:', err)
   } finally {
     loading.value = false
   }
 }
+
+// Watch displayedRecords to load thumbnails for any job visible on the current page
+watch(displayedRecords, async (newVal) => {
+  if (!newVal || newVal.length === 0) return
+
+  // Filter out jobs on the current page whose thumbnail is still undefined
+  const jobsToFetch = newVal.filter(r => r.type === 'job' && r.thumbnail === undefined)
+
+  if (jobsToFetch.length === 0) return
+
+  // Set them to null first to prevent duplicate fetches
+  jobsToFetch.forEach(job => {
+    job.thumbnail = null
+  })
+
+  await Promise.all(
+    jobsToFetch.map(async (job) => {
+      try {
+        const fullJob = await api.get(`/jobs/${job.id}`)
+        if (fullJob && fullJob.job_images && fullJob.job_images.length > 0) {
+          job.thumbnail = fullJob.job_images[0].image
+        }
+      } catch (err) {
+        console.error('[RecentlyCreated] Failed to load job thumbnail:', err)
+      }
+    })
+  )
+}, { immediate: true, deep: true })
 
 // Watch connection status to auto-fetch once connected
 watch(

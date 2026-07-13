@@ -51,6 +51,7 @@ For static assets (such as `logo.png`) that need to render inside the headless p
 To keep the application lightweight and simple for a small-scale single terminal setup, do not introduce state libraries like Pinia or Vuex. Instead:
 * Use standard importable Vue 3 `reactive` store modules in `src/store/` (e.g., [settings.js](file:///c:/dev/Cibola2-Electron/src/store/settings.js), [session.js](file:///c:/dev/Cibola2-Electron/src/store/session.js), and [metadata.js](file:///c:/dev/Cibola2-Electron/src/store/metadata.js)).
 * **Cache DB configurations**: Configuration and lookup lists (like active employees, custom sheets, spot metal prices) should be cached once in `metadataState` when a network connection is established, rather than fetched on every page navigation.
+* **Assignable Employees Cache**: The list of active employees excluding the system default "Unassigned" / "Nobody" (ID 1) is fetched from `/employees/assignable` and cached in `metadataState.assignableEmployees`. When rendering employee selection inputs in transaction forms (such as `JobForm.vue` and `CreditForm.vue`), bind to a computed array that defaults to `metadataState.assignableEmployees` but dynamically prepends the record's current assigned employee (via a lookup in `metadataState.employees`) if they are not present in the assignable list. This ensures correct rendering of historical values (like "Unassigned") without allowing them to be re-selected for new assignments. To enforce this, new records set `employee_id` to `null` initially (rather than `1`), which displays an empty selector and triggers the form validation's required rule before save.
 
 ---
 
@@ -137,7 +138,7 @@ To prevent multiple instances of the application from running simultaneously (wh
 ---
 
 ## 15. Customer Note Alerts & Unsaved Safeguards
-* **Active Notes Alert Banner**: If a customer has a note stored in the database, `CustomerForm.vue` displays a pulsing warning banner (`pulsing-alert` class) above the customer info to highlight critical instructions.
+* **Active Notes Alert Banner**: If a customer has a note stored in the database, `CustomerForm.vue` displays a pulsing warning banner (`pulsing-alert` class) above the customer info to highlight critical instructions. A button on the right-hand side of this banner allows the operator to hide the note, which stops the pulsing animation and hides the notes textarea. Clicking "Unhide" restores the active state. This hidden state is transient and is not preserved across page changes or when loading a different customer.
 * **Explicit Save/Discard Buttons**: When editing notes, auto-save on blur is disabled. A sub-toolbar with **Save Note** and **Discard** buttons is rendered directly under the textarea when modifications are made.
 * **Parent Save Prevention Block**: `CustomerForm.vue` emits `@dirty-state-change` when the customer note has unsaved changes or if the customer profile is in edit mode. Parent form components (e.g., `JobForm.vue`, `CreditForm.vue`, `CustomSheetForm.vue`) must listen to this event, disable their save and print actions in `FormBottomNavigation`, and throw warning toasts if save attempts occur while customer information is dirty.
 
@@ -238,8 +239,15 @@ To maintain project history and communicate patches clearly to users, all agents
   2. Rename the `## [Unreleased]` header to the new version and release date: `## [X.Y.Z] - YYYY-MM-DD` (using current local date).
   3. Insert a new, empty `## [Unreleased]` block and standard headers (`### Added`, `### Changed`, etc.) above the new release block to keep the log ready for the next patch cycles.
 
+---
 
-
-
-
-
+## 24. Dashboard History Capacity & Search Bar Suggestions
+* **Recently Viewed Capacity**: The maximum limit for recently viewed items stored in `recentlyViewedState.records` (localStorage) is 50.
+* **Customer Suggestions**: The customer search bar in `CustomerForm.vue` shows up to 5 recently viewed customer records when focused/selected and the input query is empty. To support this:
+  * When resolving customer views (`refreshRecentRecord('customer', id)`), fetch and store the individual fields (`fname`, `lname`, and `phone`) to make them immediately suggestible.
+  * In `CustomerForm.vue`, compute `recentCustomers` and fall back to parsing `details` if fields are missing for backwards compatibility.
+  * The autocomplete dropdown item slot renders a grey `mdi-history` prefix icon and a `"Recently Viewed"` text label on the right side of the subtitle for suggested items.
+  * Any search query input length >= 1 instantly clears the suggestions list and falls back to normal search matches.
+* **Dashboard Widgets Pagination**:
+  * The `RecentlyViewed.vue` and `RecentlyCreated.vue` dashboard cards support up to 50 records paginated in slices of 10 items per page via the `DirectoryPagination.vue` component.
+  * **Lazy Thumbnail Loading**: To avoid concurrent request spam on startup, `RecentlyCreated.vue` does not fetch thumbnails for all 50 items up front. Instead, it queries job details/thumbnails lazily via a watcher only when those jobs are visible on the active page. Once a thumbnail is fetched or marked as not present (null), it is cached in the local record array to prevent redundant network calls.

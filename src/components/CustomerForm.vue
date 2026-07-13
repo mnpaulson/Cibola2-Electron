@@ -45,12 +45,18 @@
               <v-list-item
                 v-bind="props"
               >
+                <template v-slot:prepend v-if="item.raw.isRecent">
+                  <v-icon color="grey-darken-1" class="mr-n2">mdi-history</v-icon>
+                </template>
                 <template v-slot:title>
                   <span v-html="highlightText(`${item.raw.fname} ${item.raw.lname}`, searchQuery)"></span>
                 </template>
                 <template v-slot:subtitle>
-                  <span v-if="item.raw.phone" v-html="highlightText(item.raw.phone, searchQuery)"></span>
-                  <span v-else class="text-medium-emphasis">No phone number</span>
+                  <div class="d-flex align-center justify-space-between">
+                    <span v-if="item.raw.phone" v-html="highlightText(item.raw.phone, searchQuery)"></span>
+                    <span v-else class="text-medium-emphasis">No phone number</span>
+                    <span v-if="item.raw.isRecent" class="text-caption text-grey-darken-1 font-italic ml-2">Recently Viewed</span>
+                  </div>
                 </template>
               </v-list-item>
             </template>
@@ -120,63 +126,77 @@
               <!-- Pulsing Warning Alert when a customer note exists (only above the note field itself) -->
               <v-alert
                 v-if="customer.note"
-                type="warning"
+                :type="isNoteHidden ? undefined : 'warning'"
+                :color="isNoteHidden ? 'grey' : undefined"
                 variant="tonal"
                 density="comfortable"
                 icon="mdi-alert-decagram"
-                class="pulsing-alert mb-2"
+                :class="['mb-2', { 'pulsing-alert': !isNoteHidden }]"
               >
-                <strong>Customer Note Present</strong>
-              </v-alert>
-              <div class="d-flex align-center justify-space-between mb-1">
-                <span class="text-caption text-medium-emphasis">Customer Notes</span>
-                <v-btn
-                  v-if="lockNotes && isNotesLocked"
-                  variant="text"
-                  color="primary"
-                  density="comfortable"
-                  size="small"
-                  prepend-icon="mdi-pencil"
-                  class="text-none px-1"
-                  @click="isNotesLocked = false"
-                >
-                  Edit Note
-                </v-btn>
-              </div>
-              <v-textarea
-                v-model="customer.note"
-                :readonly="isNotesLocked"
-                :class="{ 'locked-textarea': isNotesLocked }"
-                variant="outlined"
-                rows="4"
-                no-resize
-                density="comfortable"
-                placeholder="Add private customer notes here..."
-                :messages="noteSavingStatus ? [noteSavingStatus] : []"
-                hide-details="auto"
-              ></v-textarea>
-              <v-expand-transition>
-                <div v-if="isNoteDirty" class="d-flex justify-end gap-2 mt-2 mb-2">
+                <div class="d-flex align-center justify-space-between w-100">
+                  <span><strong>Customer Note Present</strong></span>
                   <v-btn
-                    color="grey-darken-1"
-                    variant="text"
-                    size="small"
-                    @click="discardNotesOnly"
+                    size="x-small"
+                    :color="isNoteHidden ? 'grey' : 'warning'"
+                    variant="outlined"
+                    class="ml-2 text-none"
+                    @click="isNoteHidden = !isNoteHidden"
                   >
-                    Discard
-                  </v-btn>
-                  <v-btn
-                    color="success"
-                    variant="flat"
-                    size="small"
-                    prepend-icon="mdi-content-save"
-                    :loading="savingNote"
-                    @click="saveNotesOnly"
-                  >
-                    Save Note
+                    {{ isNoteHidden ? 'Unhide' : 'Hide' }}
                   </v-btn>
                 </div>
-              </v-expand-transition>
+              </v-alert>
+              <template v-if="!isNoteHidden">
+                <div class="d-flex align-center justify-space-between mb-1">
+                  <span class="text-caption text-medium-emphasis">Customer Notes</span>
+                  <v-btn
+                    v-if="lockNotes && isNotesLocked"
+                    variant="text"
+                    color="primary"
+                    density="comfortable"
+                    size="small"
+                    prepend-icon="mdi-pencil"
+                    class="text-none px-1"
+                    @click="isNotesLocked = false"
+                  >
+                    Edit Note
+                  </v-btn>
+                </div>
+                <v-textarea
+                  v-model="customer.note"
+                  :readonly="isNotesLocked"
+                  :class="{ 'locked-textarea': isNotesLocked }"
+                  variant="outlined"
+                  rows="4"
+                  no-resize
+                  density="comfortable"
+                  placeholder="Add private customer notes here..."
+                  :messages="noteSavingStatus ? [noteSavingStatus] : []"
+                  hide-details="auto"
+                ></v-textarea>
+                <v-expand-transition>
+                  <div v-if="isNoteDirty" class="d-flex justify-end gap-2 mt-2 mb-2">
+                    <v-btn
+                      color="grey-darken-1"
+                      variant="text"
+                      size="small"
+                      @click="discardNotesOnly"
+                    >
+                      Discard
+                    </v-btn>
+                    <v-btn
+                      color="success"
+                      variant="flat"
+                      size="small"
+                      prepend-icon="mdi-content-save"
+                      :loading="savingNote"
+                      @click="saveNotesOnly"
+                    >
+                      Save Note
+                    </v-btn>
+                  </div>
+                </v-expand-transition>
+              </template>
             </v-col>
 
             <!-- Activity Summary Column -->
@@ -382,7 +402,7 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { api } from '../utils/api'
 import Fuse from 'fuse.js'
 import { showToast } from '../store/toast'
-import { removeRecentRecord } from '../store/recentlyViewed'
+import { recentlyViewedState, removeRecentRecord } from '../store/recentlyViewed'
 import { sessionState, navigateBack } from '../store/session'
 
 const props = defineProps({
@@ -439,6 +459,7 @@ const startingNote = ref('')
 const noteSavingStatus = ref('')
 const isNotesLocked = ref(false)
 const savingNote = ref(false)
+const isNoteHidden = ref(false)
 
 // Sync notes locked state when lockNotes prop is passed or changed
 watch(() => props.lockNotes, (newVal) => {
@@ -480,10 +501,26 @@ const hasAddress = computed(() => {
   )
 })
 
+const recentCustomers = computed(() => {
+  return (recentlyViewedState.records || [])
+    .filter(r => r.type === 'customer')
+    .slice(0, 5)
+    .map(r => ({
+      id: r.id,
+      fname: r.fname || (r.details ? r.details.split(' ')[0] : ''),
+      lname: r.lname || (r.details ? r.details.split(' ').slice(1).join(' ') : ''),
+      phone: r.phone || '',
+      isRecent: true
+    }))
+})
+
 // Perform client-side fuzzy match and ranking instantly as the user types
 const filteredCandidates = computed(() => {
   const query = searchQuery.value || ''
-  if (!query || query.trim().length < 2) {
+  if (!query || query.trim().length === 0) {
+    return recentCustomers.value
+  }
+  if (query.trim().length < 2) {
     return []
   }
 
@@ -637,6 +674,7 @@ async function loadCustomer(id) {
       startingNote.value = data.note || ''
       currentState.value = 'info'
       isNotesLocked.value = props.lockNotes
+      isNoteHidden.value = false
       emit('update:modelValue', data.id)
       emit('select', data)
     }
@@ -726,7 +764,8 @@ function resetFormFields() {
   customer.custom_sheet_count = 0
   startingNote.value = ''
   noteSavingStatus.value = ''
-  isNotesLocked.value = props.lockNotes
+  isNotesLocked.value = props.lockNotes // relock
+  isNoteHidden.value = false
 }
 
 function resetState() {

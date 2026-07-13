@@ -310,7 +310,7 @@ function showDatePicker() {
 const credit = reactive({
   id: null,
   customer_id: null,
-  employee_id: 1, // Default 'Unassigned'
+  employee_id: null, // No default to force user selection
   gold_cad: 0,
   plat_cad: 0,
   silver_cad: 0,
@@ -339,7 +339,19 @@ const formatDate = (dateStr) => formatLocalDate(dateStr, 'short')
 
 // Computed checks
 const activeEmployees = computed(() => {
-  return metadataState.employees || []
+  const list = [...(metadataState.assignableEmployees || [])]
+  if (credit.employee_id) {
+    const exists = list.some(emp => emp.id === credit.employee_id)
+    if (!exists) {
+      const currentEmp = metadataState.employees?.find(emp => emp.id === credit.employee_id)
+      if (currentEmp) {
+        list.unshift(currentEmp)
+      } else {
+        list.unshift({ id: credit.employee_id, name: `Employee #${credit.employee_id}` })
+      }
+    }
+  }
+  return list
 })
 
 const selectableKaratItems = computed(() => {
@@ -373,7 +385,7 @@ function loadDefaultSpotPrices() {
 function resetCreditFields() {
   credit.id = null
   credit.customer_id = props.customerId
-  credit.employee_id = 1
+  credit.employee_id = null
   credit.gold_cad = 0
   credit.plat_cad = 0
   credit.silver_cad = 0

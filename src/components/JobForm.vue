@@ -217,7 +217,7 @@ function showDatePicker() {
 const job = reactive({
   id: null,
   customer_id: null,
-  employee_id: 1, // Default 'Unassigned'
+  employee_id: null, // No default to force user selection
   estimate: '',
   deposit: '',
   est_note: '',
@@ -278,7 +278,19 @@ const decimalRules = [
 
 // Computed Cache for Employees
 const activeEmployees = computed(() => {
-  return metadataState.employees || []
+  const list = [...(metadataState.assignableEmployees || [])]
+  if (job.employee_id) {
+    const exists = list.some(emp => emp.id === job.employee_id)
+    if (!exists) {
+      const currentEmp = metadataState.employees?.find(emp => emp.id === job.employee_id)
+      if (currentEmp) {
+        list.unshift(currentEmp)
+      } else {
+        list.unshift({ id: job.employee_id, name: `Employee #${job.employee_id}` })
+      }
+    }
+  }
+  return list
 })
 
 const today = computed(() => {
@@ -349,7 +361,7 @@ watch(() => props.jobId, (newId) => {
 function resetJobFields() {
   job.id = null
   job.customer_id = props.customerId
-  job.employee_id = 1
+  job.employee_id = null
   job.estimate = ''
   job.deposit = ''
   job.est_note = ''
