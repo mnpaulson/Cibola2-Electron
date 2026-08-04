@@ -75,6 +75,37 @@
       <!-- 2. INFO / DETAILS STATE -->
       <v-fade-transition hide-on-leave>
         <div v-if="currentState === 'info'" class="customer-info-container">
+          <!-- Duplicate Customer Warning Alert -->
+          <v-alert
+            v-if="potentialDuplicates.length > 0"
+            type="warning"
+            variant="tonal"
+            color="warning"
+            icon="mdi-alert-decagram"
+            class="mb-3 rounded-lg"
+            density="comfortable"
+          >
+            <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+              <div>
+                <span class="font-weight-bold">Possible Duplicate Detected</span>
+                <span class="text-caption d-block">
+                  <strong>Customer #{{ potentialDuplicates[0].otherCustomer.id }}</strong> ({{ potentialDuplicates[0].otherCustomer.fname }} {{ potentialDuplicates[0].otherCustomer.lname }}) - 
+                  {{ Math.round(potentialDuplicates[0].similarity_score) }}% match.
+                </span>
+              </div>
+              <v-btn
+                size="small"
+                color="warning"
+                variant="elevated"
+                prepend-icon="mdi-merge"
+                class="font-weight-bold"
+                @click="openDuplicateMerge(potentialDuplicates[0])"
+              >
+                Review & Merge
+              </v-btn>
+            </div>
+          </v-alert>
+
           <v-row>
             <v-col cols="12" :md="(hideNotes || (!startingNote && !isNoteExpanded)) ? 12 : 7" class="py-1">
               <div class="mb-1">
@@ -400,6 +431,16 @@
         </template>
       </div>
     </v-card-actions>
+
+    <!-- Reusable Customer Merge Modal -->
+    <CustomerMergeModal
+      v-if="selectedDuplicatePair"
+      v-model="showMergeModal"
+      :customer-id1="selectedDuplicatePair.customer_id_1"
+      :customer-id2="selectedDuplicatePair.customer_id_2"
+      :pair-id="selectedDuplicatePair.id"
+      @merged="handleCustomerMerged"
+    />
   </v-card>
 </template>
 
@@ -410,6 +451,7 @@ import Fuse from 'fuse.js'
 import { showToast } from '../store/toast'
 import { recentlyViewedState, removeRecentRecord } from '../store/recentlyViewed'
 import { sessionState, navigateBack } from '../store/session'
+import CustomerMergeModal from './CustomerMergeModal.vue'
 
 const props = defineProps({
   modelValue: {
@@ -676,6 +718,34 @@ watch(selectedSearchItem, (newItem) => {
   }
 })
 
+const potentialDuplicates = ref([])
+const showMergeModal = ref(false)
+const selectedDuplicatePair = ref(null)
+
+async function fetchDuplicatesForCustomer(id) {
+  if (!id) {
+    potentialDuplicates.value = []
+    return
+  }
+  try {
+    const res = await api.get(`/customers/${id}/duplicates`)
+    potentialDuplicates.value = res || []
+  } catch (err) {
+    console.error('Failed to fetch customer duplicates:', err)
+  }
+}
+
+function openDuplicateMerge(pair) {
+  selectedDuplicatePair.value = pair
+  showMergeModal.value = true
+}
+
+function handleCustomerMerged(mergedCust) {
+  if (mergedCust && mergedCust.id) {
+    loadCustomer(mergedCust.id)
+  }
+}
+
 // Load customer from backend
 async function loadCustomer(id) {
   if (!id) return
@@ -694,6 +764,9 @@ async function loadCustomer(id) {
       isNoteExpanded.value = false
       emit('update:modelValue', data.id)
       emit('select', data)
+
+      // Fetch potential duplicate pairs for this loaded customer
+      fetchDuplicatesForCustomer(data.id)
     }
   } catch (err) {
     console.error('Failed to load customer:', err)
@@ -842,6 +915,9 @@ async function saveCustomer() {
       currentState.value = 'info'
       emit('update:modelValue', responseData.id)
       emit('select', responseData)
+
+      // Immediately fetch potential duplicates for the newly saved/updated customer
+      fetchDuplicatesForCustomer(responseData.id)
     }
   } catch (err) {
     console.error('Failed to save customer:', err)

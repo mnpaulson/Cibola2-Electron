@@ -260,3 +260,22 @@ To maintain project history and communicate patches clearly to users, all agents
 * **Dynamic Calculations**: Centralized calculation `getAdjustedMarkup(itemName, baseMarkup, creditType, payoutMarkups)` in [pricing.js](file:///c:/dev/Cibola2-Electron/src/utils/pricing.js) applies these offsets to standard gold karats (8k, 9k, 10k, 12k, 14k, 18k).
 * **Form & Admin Management**: Markups are editable inline inside [CreditForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CreditForm.vue) (with a global save button to update DB defaults) and configurable in Admin settings on the Gold Credits screen in [CustomValuesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/CustomValuesAdmin.vue).
 
+---
+
+## 26. Duplicate Contact Detection & Merging Protocol
+* **Database Schema**: Potential duplicate customer pairs are stored in `customer_duplicates` (`id`, `customer_id_1`, `customer_id_2`, `similarity_score`, `match_reasons`, `status`, `created_at`, `updated_at`) with unique pair index `(customer_id_1, customer_id_2)`.
+* **Fuzzy & Weighted Detection Engine**: Standardized fuzzy logic in `duplicateDetector.js` evaluates normalized phone numbers (+45), exact emails (+45), exact First & Last name (+75), exact Last Name + minor First Name typo (+75), exact First Name + minor Last Name typo (+75), and Levenshtein full name distance (+75 for ratio >= 82%). Any score >= 75% triggers a duplicate pair.
+* **Hybrid Triggering**: Check executed synchronously on backend customer create (`POST /customers`) and update (`PUT /customers/:id`), as well as via an indexed candidate bucket scan (`POST /customers/duplicates/scan`).
+* **Customer Form Alert**: Loaded customer profiles in `CustomerForm.vue` check `GET /customers/:id/duplicates` and display a Vuetify alert banner with match details and a button launching `CustomerMergeModal.vue`.
+* **Side-by-Side Merge Comparison**: Interactive modal `CustomerMergeModal.vue` displays Primary vs. Secondary customer details, allowing operators to choose attributes line-by-line before executing `POST /customers/merge`. Associated Jobs, Gold Credits, Custom Sheets, Estimates, and Attached Images are automatically re-linked to the Primary ID, and the Secondary customer record is deleted.
+* **Admin Review Page**: `CustomerDuplicatesAdmin.vue` embedded in [Admin.vue](file:///c:/dev/Cibola2-Electron/src/components/Admin.vue) under "Customer Tools" provides unreviewed and rejected pair tabs with rejection rollback (`POST /customers/duplicates/:id/unreject`), manual batch auto-merge (`POST /customers/merge-exact`), and full database scanning.
+
+---
+
+## 27. Unused Customer Maintenance & Bulk Cleanup Protocol
+* **Definition of Unused Customer**: A customer profile with zero linked Jobs (`job_count = 0`), zero Gold Credits (`credit_count = 0`), and zero Custom Sheets (`custom_sheet_count = 0`). Unused customer lists include profiles regardless of whether they have pending duplicate flags.
+* **Backend Endpoints**:
+  * `GET /customers/orphans`: Returns list of all unused customer records.
+  * `DELETE /customers/orphans/:id`: Permanently deletes an unused customer record and purges any associated entries in `customer_duplicates`.
+  * `POST /customers/orphans/delete-bulk`: Executes an atomic transaction bulk deleting all unused customer profiles (or specified IDs) and purging associated `customer_duplicates` rows.
+* **Admin Maintenance Interface**: `CustomerOrphansAdmin.vue` embedded in [Admin.vue](file:///c:/dev/Cibola2-Electron/src/components/Admin.vue) under "Customer Tools" provides an explicit **Scan for Unused Customers** trigger button to scan on demand (avoiding page load latency). Features live filtering, profile links, individual record deletion, and a bulk deletion dialog with permanent deletion warnings.

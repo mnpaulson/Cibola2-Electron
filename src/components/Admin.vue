@@ -69,6 +69,29 @@
               @click="activeSection = 'gold-credit'"
               class="pl-4 menu-item-transition"
             ></v-list-item>
+
+            <!-- Customer Maintenance Header -->
+            <v-list-subheader class="text-uppercase text-caption font-weight-bold text-medium-emphasis mt-3 pl-3">
+              Customer Tools
+            </v-list-subheader>
+
+            <!-- Duplicate Contacts -->
+            <v-list-item
+              title="Duplicate Contacts"
+              value="customer-duplicates"
+              :active="activeSection === 'customer-duplicates'"
+              @click="activeSection = 'customer-duplicates'"
+              class="pl-4 menu-item-transition"
+            ></v-list-item>
+
+            <!-- Unused Customers -->
+            <v-list-item
+              title="Unused Customers"
+              value="customer-orphans"
+              :active="activeSection === 'customer-orphans'"
+              @click="activeSection = 'customer-orphans'"
+              class="pl-4 menu-item-transition"
+            ></v-list-item>
           </v-list>
         </div>
 
@@ -90,6 +113,12 @@
             <v-window-item value="gold-credit" :transition="false" :reverse-transition="false">
               <CustomValuesAdmin section="gold-credit" />
             </v-window-item>
+            <v-window-item value="customer-duplicates" :transition="false" :reverse-transition="false">
+              <CustomerDuplicatesAdmin />
+            </v-window-item>
+            <v-window-item value="customer-orphans" :transition="false" :reverse-transition="false">
+              <CustomerOrphansAdmin />
+            </v-window-item>
           </v-window>
         </div>
       </div>
@@ -103,6 +132,8 @@ import { sessionState } from '../store/session'
 import LocalSettingsAdmin from './admin/LocalSettingsAdmin.vue'
 import EmployeesAdmin from './admin/EmployeesAdmin.vue'
 import CustomValuesAdmin from './admin/CustomValuesAdmin.vue'
+import CustomerDuplicatesAdmin from './admin/CustomerDuplicatesAdmin.vue'
+import CustomerOrphansAdmin from './admin/CustomerOrphansAdmin.vue'
 
 const activeSection = computed({
   get: () => sessionState.configActiveSection || 'local',
