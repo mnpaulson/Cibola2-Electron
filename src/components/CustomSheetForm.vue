@@ -21,6 +21,7 @@
           v-model="sheet.customer_id"
           :clearable="!disabled"
           :hide-notes="false"
+          :hide-id="true"
           :clickable-name="true"
           :lock-notes="true"
           :show-activity="true"
@@ -383,17 +384,17 @@
               </div>
             </template>
 
-            <!-- Extras line items (type === 'Extra') -->
-            <div v-if="getItemsForCategory(activeEstimate, 'Extra').length > 0" class="mb-6">
+            <!-- Quick Extras line items (type === 'Quick Extra' || type === 'Extra') -->
+            <div v-if="getItemsForCategory(activeEstimate, 'Quick Extra').length > 0" class="mb-6">
               <div class="d-flex align-center justify-space-between mb-3">
                 <div class="text-subtitle-2 font-weight-bold text-primary d-flex align-center">
                   <v-icon size="18" class="mr-1">mdi-chevron-right</v-icon>
-                  Extras
+                  Quick Extras
                 </div>
               </div>
 
               <div
-                v-for="val in getItemsForCategory(activeEstimate, 'Extra')"
+                v-for="val in getItemsForCategory(activeEstimate, 'Quick Extra')"
                 :key="val.id"
                 class="mb-3 line-item-container"
               >
@@ -402,7 +403,7 @@
                   <v-col cols="12" sm="5" md="5" class="py-1">
                     <v-text-field
                       v-model="val.name"
-                      placeholder="Extra item"
+                      placeholder="Quick Extra item"
                       variant="underlined"
                       density="compact"
                       hide-details
@@ -673,31 +674,46 @@ const disabled = computed(() => {
   return sheet.id !== null && sheet.id !== undefined && sheet.id !== 0
 })
 
+const isExtraCategory = (type) => type === 'Quick Extra' || type === 'Extra'
+
 // Dynamic categories and option filters from cache
 const categories = computed(() => {
   let cats = []
+  const catsSet = new Set()
+
   if (Array.isArray(metadataState.customSheetCategories)) {
     const sortedCats = [...metadataState.customSheetCategories]
-      .filter(c => c.active === 1)
+      .filter(c => c.active === 1 && c.name?.trim())
       .sort((a, b) => {
         const orderA = a.order !== null && a.order !== undefined && a.order !== '' ? parseInt(a.order) : -999
         const orderB = b.order !== null && b.order !== undefined && b.order !== '' ? parseInt(b.order) : -999
         return orderB - orderA
       })
-    cats = sortedCats.map(c => c.name)
+
+    sortedCats.forEach(c => {
+      const nameTrimmed = c.name.trim()
+      const key = nameTrimmed.toLowerCase()
+      if (nameTrimmed && !isExtraCategory(nameTrimmed) && !catsSet.has(key)) {
+        catsSet.add(key)
+        cats.push(nameTrimmed)
+      }
+    })
   }
 
   // Merge with categories present in customSheets options
-  const catsSet = new Set(cats)
   if (Array.isArray(metadataState.customSheets)) {
     metadataState.customSheets.forEach(item => {
-      if (item.value1 && item.value1 !== 'Extra' && !catsSet.has(item.value1)) {
-        // Only merge if the category is not explicitly set to inactive
-        const categoryConfig = metadataState.customSheetCategories?.find(c => c.name === item.value1)
-        const isInactive = categoryConfig && categoryConfig.active !== 1
-        if (!isInactive) {
-          catsSet.add(item.value1)
-          cats.push(item.value1)
+      const val1 = item.value1?.trim()
+      if (val1 && !isExtraCategory(val1)) {
+        const key = val1.toLowerCase()
+        if (!catsSet.has(key)) {
+          // Only merge if the category is not explicitly set to inactive
+          const categoryConfig = metadataState.customSheetCategories?.find(c => c.name?.trim().toLowerCase() === key)
+          const isInactive = categoryConfig && categoryConfig.active !== 1
+          if (!isInactive) {
+            catsSet.add(key)
+            cats.push(val1)
+          }
         }
       }
     })
@@ -708,31 +724,43 @@ const categories = computed(() => {
     sheet.estimates.forEach(est => {
       if (Array.isArray(est.estValues)) {
         est.estValues.forEach(val => {
-          if (val.type && val.type !== 'Extra' && !catsSet.has(val.type)) {
-            catsSet.add(val.type)
-            cats.push(val.type)
+          const typeVal = val.type?.trim()
+          if (typeVal && !isExtraCategory(typeVal)) {
+            const key = typeVal.toLowerCase()
+            if (!catsSet.has(key)) {
+              catsSet.add(key)
+              cats.push(typeVal)
+            }
           }
         })
       }
     })
   }
 
-  return cats.filter(c => c !== 'Extra')
+  return cats.filter(c => !isExtraCategory(c))
 })
 
 const extras = computed(() => {
   if (!Array.isArray(metadataState.customSheets)) return []
-  return metadataState.customSheets.filter(item => item.value1 === 'Extra' && item.active !== 0)
+  return metadataState.customSheets.filter(item => isExtraCategory(item.value1?.trim()) && item.active !== 0)
 })
 
 function getOptionsForCategory(category) {
   if (!Array.isArray(metadataState.customSheets)) return []
-  return metadataState.customSheets.filter(item => item.value1 === category && item.active !== 0)
+  const catLower = category?.trim().toLowerCase()
+  return metadataState.customSheets.filter(item => {
+    const itemCat = item.value1?.trim().toLowerCase()
+    return itemCat === catLower && item.active !== 0
+  })
 }
 
 function getItemsForCategory(est, category) {
   if (!est || !est.estValues) return []
-  return est.estValues.filter(val => val.type === category)
+  if (isExtraCategory(category)) {
+    return est.estValues.filter(val => isExtraCategory(val.type?.trim()))
+  }
+  const catLower = category?.trim().toLowerCase()
+  return est.estValues.filter(val => val.type?.trim().toLowerCase() === catLower)
 }
 
 // Calculate formulas
@@ -868,7 +896,7 @@ function addExtraItem(est, extraOption) {
   const markupVal = parseFloat(extraOption.markup)
   const newItem = {
     id: `clientId-${estValIdCounter++}`,
-    type: 'Extra',
+    type: extraOption.value1 || 'Quick Extra',
     name: extraOption.name,
     amt: '1',
     basePrice: String(parseFloat(extraOption.value2) || 0),

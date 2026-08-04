@@ -22,6 +22,7 @@
             v-model="job.customer_id"
             :clearable="true"
             :hide-notes="false"
+            :hide-id="true"
             :clickable-name="true"
             :lock-notes="true"
             :show-activity="true"
@@ -34,9 +35,9 @@
       </div>
 
       <v-form ref="formRef" v-model="isFormValid" lazy-validation>
-        <v-row>
+        <v-row dense>
           <!-- Left Column inputs -->
-          <v-col cols="12" md="6">
+          <v-col cols="12" md="6" class="py-1">
             <v-text-field
               v-model="job.estimate"
               label="Estimate ($)"
@@ -83,7 +84,7 @@
           </v-col>
 
           <!-- Right Column inputs -->
-          <v-col cols="12" md="6" class="d-flex flex-column">
+          <v-col cols="12" md="6" class="d-flex flex-column py-1">
             <v-textarea
               v-model="job.est_note"
               label="Estimate Details (Visible on customer slip)"
@@ -96,12 +97,13 @@
           </v-col>
 
           <!-- Bottom Job Note -->
-          <v-col cols="12">
+          <v-col cols="12" class="py-1">
             <v-textarea
               v-model="job.note"
               label="Job Notes"
               variant="outlined"
               rows="3"
+              auto-grow
               counter="230"
               maxlength="230"
               density="compact"
@@ -116,22 +118,20 @@
         v-if="showPrintLimitWarning"
         type="warning"
         variant="tonal"
-        class="mt-4 mb-2"
+        class="mt-2 mb-1"
         density="compact"
       >
         {{ printWarningText }}
       </v-alert>
 
       <!-- Attached Jewelry Images Grid -->
-      <v-row class="mt-4">
-        <v-col cols="12">
-          <AttachedImages
-            ref="attachedImagesRef"
-            v-model="job.job_images"
-            delete-endpoint="/jobs/images"
-          />
-        </v-col>
-      </v-row>
+      <div class="mt-2">
+        <AttachedImages
+          ref="attachedImagesRef"
+          v-model="job.job_images"
+          delete-endpoint="/jobs/images"
+        />
+      </div>
     </v-card-text>
 
     <!-- Delete Job Modal -->
@@ -593,9 +593,6 @@ async function executeHeadlessPrint() {
   .custom-est-textarea :deep(textarea) {
     height: 100% !important;
   }
-}
-.job-notes-textarea :deep(textarea) {
-  min-height: 140px;
 }
 .custom-date-field :deep(input[type="date"]::-webkit-calendar-picker-indicator) {
   display: none;

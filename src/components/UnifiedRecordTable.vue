@@ -33,11 +33,10 @@
           <th
             class="text-left font-weight-bold text-caption py-2"
             :class="{ 'sortable-header': sortable }"
-            style="overflow: hidden; max-width: 0;"
             @click="toggleSort('details')"
           >
-            <div class="d-flex align-center">
-              Details
+            <div class="d-flex align-center text-truncate">
+              {{ showCustomerName ? 'Customer / Details' : 'Details' }}
               <v-icon size="small" class="ml-1" v-if="sortable && sortBy === 'details'">
                 {{ sortDesc ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
               </v-icon>
@@ -101,7 +100,7 @@
           <!-- Details Column -->
           <td class="py-2" style="overflow: hidden; max-width: 0;">
             <div class="text-body-2 font-weight-medium text-truncate" style="max-width: 100%;">
-              {{ showCustomerName ? item.customerName : item.details }}
+              {{ showCustomerName ? (item.customerName || item.details) : item.details }}
             </div>
           </td>
 

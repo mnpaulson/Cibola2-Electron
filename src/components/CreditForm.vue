@@ -21,6 +21,7 @@
           v-model="credit.customer_id"
           :clearable="!disabled"
           :hide-notes="false"
+          :hide-id="true"
           :clickable-name="true"
           :lock-notes="true"
           :show-activity="true"

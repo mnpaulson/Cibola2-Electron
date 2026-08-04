@@ -3,10 +3,10 @@
     <v-slide-y-reverse-transition>
       <div
         v-if="customerDirty"
-        class="bottom-nav-warning-banner d-flex align-center justify-center py-2 px-4 text-caption font-weight-bold"
+        class="bottom-nav-warning-banner d-flex align-center justify-center text-center py-2 px-4 text-caption font-weight-bold"
       >
-        <v-icon start size="16" class="mr-1">mdi-alert-circle-outline</v-icon>
-        <span>Unsaved customer changes. Please <strong>Save Note</strong> or <strong>Discard</strong> in the customer card first.</span>
+        <v-icon size="16" class="mr-1">mdi-alert-circle-outline</v-icon>
+        <span class="text-center">Uncommitted customer changes.</span>
       </div>
     </v-slide-y-reverse-transition>
 
@@ -202,10 +202,11 @@ defineEmits(['discard', 'delete', 'capture', 'print', 'preview', 'save', 'save-p
   text-align: center;
   position: fixed;
   bottom: 64px;
-  left: 0;
-  right: 0;
+  left: var(--v-layout-left, 0px);
+  right: var(--v-layout-right, 0px);
   z-index: 1003;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15);
   backdrop-filter: blur(10px) saturate(180%);
+  transition: left 0.2s ease, right 0.2s ease;
 }
 </style>

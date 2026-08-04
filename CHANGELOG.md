@@ -5,6 +5,26 @@ All notable changes to the Cibola2 Electron client will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0]
+
+### Changed
+- **UI & Layout**: Compacted the customer summary header card at the top of Job, Gold Credit, and Custom Sheet forms to reduce vertical scrolling and maximize active workspace:
+  - Moved customer history totals (Jobs, Gold Credits, Custom Sheets) into a compact row in the card footer.
+  - Hidden Customer ID in transaction form headers while retaining it on the main Customer Manager page.
+  - Removed empty address placeholders for customers without physical addresses on file.
+- **Custom Sheet Admin & Workflow**: Redesigned the Custom Sheet Values and Categories configuration interface:
+  - Replaced the single monolithic table in `CustomValuesAdmin.vue` with organized category section cards (`Metal`, `Labor`, `Stones`, `Quick Extra`) matching custom sheet estimate layouts.
+  - Added section-specific `+ Add [Category] Item` buttons to create items pre-filled to that category.
+  - Unified `Extra` and `Quick Extra` into a single, merged `Quick Extra` section card and dropdown option.
+  - Added case-insensitive, whitespace-trimmed category deduplication to prevent duplicate section headers or dropdown entries.
+  - Replaced the numeric `Order` text field on the Sheet Categories configuration page with Up/Down arrow buttons (`mdi-chevron-up` / `mdi-chevron-down`) for quick reordering.
+  - Removed the Category column from section cards to maximize table space, and converted "Delete" buttons into compact icon-only trash actions.
+  - Attached a full-height 36px pulsing warning strip button (`mdi-alert-decagram`) seamlessly to the left edge of the note text field, saving ~45px of vertical space while keeping high-visibility warning styling.
+  - Clicking the warning strip toggles privacy mode, switching to a quiet grey eye-off strip (`mdi-eye-off-outline`) and displaying a discrete privacy placeholder bar.
+  - Unified all note controls (`Add Note`, `Edit Note`, `Discard`, `Save Note`) into the card footer action bar, keeping the card body completely clean.
+  - Set notes to be locked by default (`lockNotes: true`) and removed field `autofocus` to prevent unintended focus theft or edit mode entry when clicking customer names or loading customer records.
+  - Moved save progress indicators to the Save button itself, eliminating layout movement and using toast notifications for save confirmation.
+
 ## [1.9.5]
 
 ### Added

@@ -121,7 +121,7 @@ Always reuse these core components rather than rebuilding their functionality:
 * **[CameraCapture.vue](file:///c:/dev/Cibola2-Electron/src/components/CameraCapture.vue)**: Handles webcam permissions, multi-device selection, alignment masks, exports base64 JPEG at maximum resolution (`canvas.toDataURL('image/jpeg', 1.0)`), and defaults the camera light/torch to ON with an interactive UI toggle and fallback constraints. Pre-queries devices list on mount to bypass permission checks on opening, and utilizes a 10-second cool-down window to keep the stream warm when closing and quickly reopening the dialog.
 * **[ImageDropzone.vue](file:///C:/dev/Cibola2-Electron/src/components/ImageDropzone.vue)**: Supports drag-and-drop or file input uploads, emitting the base64 data URL. Supports `:compact` mode for grid embedding.
 * **[AttachedImages.vue](file:///C:/dev/Cibola2-Electron/src/components/AttachedImages.vue)**: Embedded image gallery with lightboxes, description note inputs, camera/upload triggers, and database delete capabilities. Supports `disable-add` prop (boolean) to hide the upload/capture dropzone tile and prevent new image additions.
-* **[UnifiedRecordTable.vue](file:///c:/dev/Cibola2-Electron/src/components/UnifiedRecordTable.vue)**: Reusable list rendering table. Used on the Dashboard (Recent lists) and Customer Manager (Unified History tab) to display record listings with support for type colors, left border highlights, job thumbnails/fallback icons, sorting logic, and custom empty/loading states.
+* **[UnifiedRecordTable.vue](file:///c:/dev/Cibola2-Electron/src/components/UnifiedRecordTable.vue)**: Reusable list rendering table. Used on the Dashboard (Recent lists) and Customer Manager (Unified History tab) to display record listings with support for type colors, left border highlights, job thumbnails/fallback icons, sorting logic, and custom empty/loading states. Dynamically displays "Customer / Details" header when customer names are shown (`showCustomerName = true`), or "Details" when scoped to a single customer (`showCustomerName = false`), with automatic fallback to item details if `customerName` is missing.
 * **[DirectoryPagination.vue](file:///C:/dev/Cibola2-Electron/src/components/DirectoryPagination.vue)**: Handles paginating tabular views and search pages.
 * **[DeleteConfirmationDialog.vue](file:///C:/dev/Cibola2-Electron/src/components/DeleteConfirmationDialog.vue)**: Confirmation dialog requiring match validation keys (e.g. typing customer last name) and checkbox acknowledgement.
 * **[MetalPricesCard.vue](file:///c:/dev/Cibola2-Electron/src/components/MetalPricesCard.vue)**: Used in Large mode (dashboard) or `small` mode (transactional forms). Handles spot syncs, manual overrides, price staleness, and database metadata updates. Disable state must be bound on historical items.
@@ -138,8 +138,8 @@ To prevent multiple instances of the application from running simultaneously (wh
 ---
 
 ## 15. Customer Note Alerts & Unsaved Safeguards
-* **Active Notes Alert Banner**: If a customer has a note stored in the database, `CustomerForm.vue` displays a pulsing warning banner (`pulsing-alert` class) above the customer info to highlight critical instructions. A button on the right-hand side of this banner allows the operator to hide the note, which stops the pulsing animation and hides the notes textarea. Clicking "Unhide" restores the active state. This hidden state is transient and is not preserved across page changes or when loading a different customer.
-* **Explicit Save/Discard Buttons**: When editing notes, auto-save on blur is disabled. A sub-toolbar with **Save Note** and **Discard** buttons is rendered directly under the textarea when modifications are made.
+* **Full-Height Attached Warning Strip**: If a customer has a note stored in the database, `CustomerForm.vue` attaches a 36px wide full-height pulsing warning strip button (`pulsing-strip` class with `mdi-alert-decagram`) seamlessly to the left-hand edge of the note text field. Clicking the strip button toggles `isNoteHidden`: when hidden, it switches to a quiet grey icon (`mdi-eye-off-outline`), stops pulsing, and displays a discrete placeholder bar reading *"Customer note hidden for privacy (Click to view)"*.
+* **Footer Save/Discard Action Buttons**: All note operations (**Add Note**, **Edit Note**, **Discard**, **Save Note**) are unified in the card footer action bar (`v-card-actions`). Default buttons (**Change**, **Edit**) are hidden while editing notes.
 * **Parent Save Prevention Block**: `CustomerForm.vue` emits `@dirty-state-change` when the customer note has unsaved changes or if the customer profile is in edit mode. Parent form components (e.g., `JobForm.vue`, `CreditForm.vue`, `CustomSheetForm.vue`) must listen to this event, disable their save and print actions in `FormBottomNavigation`, and throw warning toasts if save attempts occur while customer information is dirty.
 
 ---
@@ -174,10 +174,10 @@ The color themes are applied permanently throughout the application using:
 ---
 ## 18. Customer Activity Summary (Counts)
 When the customer card is rendered at the top of record views (`JobForm.vue`, `CreditForm.vue`, `CustomSheetForm.vue`), it passes the `show-activity` prop to `CustomerForm.vue`.
-* **Dynamic Grid Layout**: The `CustomerForm.vue` template dynamically adapts the medium-size viewport (`md`) grid columns:
-  * Details column: `:md="showActivity ? (hideNotes ? 6 : 4) : (hideNotes ? 12 : 6)"`
-  * Activity column: `:md="hideNotes ? 6 : 4" v-if="showActivity"`
-  * Notes column: `:md="showActivity ? 4 : 6" v-if="!hideNotes"`
+* **Footer Bar Single-Row Layout**: To minimize vertical card height, the Activity Summary renders as a compact horizontal strip of pill badges (`.stat-pill`) side-by-side in the bottom-left of the card actions footer bar (`v-card-actions`), displaying icons and counts for Jobs (`text-job`), Gold Credits (`text-credit`), and Custom Sheets (`text-sheet`).
+* **Dynamic Grid Layout**: The `CustomerForm.vue` template adapts the medium-size viewport (`md`) grid columns:
+  * Details column: `:md="hideNotes ? 12 : 7"`
+  * Notes column: `:md="hideNotes ? 12 : 5"`
 * **Record Counts Mapping**: The component maps `job_count`, `credit_count`, and `custom_sheet_count` from the backend `GET /customers/:id` response, defaulting to `0` if not present.
 * **Preservation on Save**: When executing customer profile edits, the local state counts are explicitly preserved to prevent them from being overwritten if the update response does not return counts.
 

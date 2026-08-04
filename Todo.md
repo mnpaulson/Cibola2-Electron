@@ -12,6 +12,7 @@
 
 ## Credits
 - adjustable values for different types
+- Alert to check with management when over a certain amount
 
 ## Customer
 - Duplicate detection and merging for customers

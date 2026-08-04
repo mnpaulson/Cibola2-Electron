@@ -1,5 +1,5 @@
 <template>
-  <div class="attached-images-container mt-4">
+  <div class="attached-images-container">
     <!-- Header -->
     <div class="text-subtitle-2 font-weight-bold mb-2 d-flex align-center">
       <v-icon start class="mr-2" color="primary">mdi-camera-image</v-icon>

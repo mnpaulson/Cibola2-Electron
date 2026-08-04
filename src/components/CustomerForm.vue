@@ -76,34 +76,34 @@
       <v-fade-transition hide-on-leave>
         <div v-if="currentState === 'info'" class="customer-info-container">
           <v-row>
-            <v-col cols="12" :md="showActivity ? (hideNotes ? 6 : 4) : (hideNotes ? 12 : 6)" class="py-1">
-              <div class="mb-2">
+            <v-col cols="12" :md="(hideNotes || (!startingNote && !isNoteExpanded)) ? 12 : 7" class="py-1">
+              <div class="mb-1">
                 <div>
                   <h3
-                    class="text-h6 font-weight-bold mb-0"
+                    class="text-h6 font-weight-bold mb-0 d-inline-block"
                     :class="{ 'clickable-title': clickableName }"
                     @click="clickableName && $emit('click-name', customer.id)"
                   >
                     {{ customer.fname }} {{ customer.lname }}
                   </h3>
-                  <span class="text-caption text-medium-emphasis">Customer ID: #{{ customer.id }}</span>
+                  <span v-if="!hideId" class="text-caption text-medium-emphasis d-block">Customer ID: #{{ customer.id }}</span>
                 </div>
               </div>
 
               <!-- Contact Info -->
-              <div class="my-3 text-body-2">
-                <div v-if="customer.phone" class="d-flex align-center my-1 text-medium-emphasis">
-                  <v-icon size="16" start class="mr-2">mdi-phone</v-icon>
+              <div class="my-2 text-body-2 d-flex flex-wrap align-center gap-4">
+                <div v-if="customer.phone" class="d-flex align-center text-medium-emphasis">
+                  <v-icon size="16" start class="mr-1">mdi-phone</v-icon>
                   <span>{{ customer.phone }}</span>
                 </div>
-                <div v-if="customer.email" class="d-flex align-center my-1 text-medium-emphasis">
-                  <v-icon size="16" start class="mr-2">mdi-email</v-icon>
+                <div v-if="customer.email" class="d-flex align-center text-medium-emphasis">
+                  <v-icon size="16" start class="mr-1">mdi-email</v-icon>
                   <span class="text-truncate">{{ customer.email }}</span>
                 </div>
               </div>
 
               <!-- Address Block -->
-              <div v-if="hasAddress" class="mt-3">
+              <div v-if="hasAddress" class="mt-2">
                 <div class="d-flex align-start text-caption text-medium-emphasis">
                   <v-icon size="16" start class="mr-2 mt-1">mdi-map-marker</v-icon>
                   <div>
@@ -115,129 +115,48 @@
                   </div>
                 </div>
               </div>
-              <div v-else class="text-caption text-medium-emphasis italic mt-2">
-                <v-icon size="16" start class="mr-2">mdi-map-marker-off</v-icon>
-                No address on file
-              </div>
             </v-col>
 
             <!-- Customer Notes -->
-            <v-col cols="12" :md="showActivity ? 4 : 6" v-if="!hideNotes">
-              <!-- Pulsing Warning Alert when a customer note exists (only above the note field itself) -->
-              <v-alert
-                v-if="customer.note"
-                :type="isNoteHidden ? undefined : 'warning'"
-                :color="isNoteHidden ? 'grey' : undefined"
-                variant="tonal"
-                density="comfortable"
-                icon="mdi-alert-decagram"
-                :class="['mb-2', { 'pulsing-alert': !isNoteHidden }]"
-              >
-                <div class="d-flex align-center justify-space-between w-100">
-                  <span><strong>Customer Note Present</strong></span>
-                  <v-btn
-                    size="x-small"
-                    :color="isNoteHidden ? 'grey' : 'warning'"
-                    variant="outlined"
-                    class="ml-2 text-none"
-                    @click="isNoteHidden = !isNoteHidden"
-                  >
-                    {{ isNoteHidden ? 'Unhide' : 'Hide' }}
-                  </v-btn>
-                </div>
-              </v-alert>
-              <template v-if="!isNoteHidden">
-                <div class="d-flex align-center justify-space-between mb-1">
-                  <span class="text-caption text-medium-emphasis">Customer Notes</span>
-                  <v-btn
-                    v-if="lockNotes && isNotesLocked"
-                    variant="text"
-                    color="primary"
-                    density="comfortable"
-                    size="small"
-                    prepend-icon="mdi-pencil"
-                    class="text-none px-1"
-                    @click="isNotesLocked = false"
-                  >
-                    Edit Note
-                  </v-btn>
-                </div>
+            <v-col cols="12" :md="5" class="py-1" v-if="!hideNotes && (startingNote || isNoteExpanded)">
+              <div class="d-flex align-stretch position-relative w-100">
+                <!-- Full-height vertical indicator strip attached to the left edge -->
+                <v-btn
+                  v-if="startingNote"
+                  variant="flat"
+                  :color="isNoteHidden ? 'grey-darken-1' : 'warning'"
+                  class="note-strip-btn d-flex align-center justify-center pa-0 min-w-0"
+                  :class="{ 'pulsing-strip': !isNoteHidden }"
+                  style="width: 36px; min-width: 36px; border-radius: 8px 0 0 8px; align-self: stretch; height: auto;"
+                  @click="isNoteHidden = !isNoteHidden"
+                  :title="isNoteHidden ? 'Customer Note Hidden (Click to show)' : 'Customer Note Present (Click to hide)'"
+                >
+                  <v-icon size="20" color="white">{{ isNoteHidden ? 'mdi-eye-off-outline' : 'mdi-alert-decagram' }}</v-icon>
+                </v-btn>
+
+                <!-- Textarea input area -->
                 <v-textarea
+                  v-if="!isNoteHidden"
                   v-model="customer.note"
                   :readonly="isNotesLocked"
-                  :class="{ 'locked-textarea': isNotesLocked }"
+                  :class="['flex-grow-1', { 'locked-textarea': isNotesLocked }, { 'attached-textarea': startingNote }]"
                   variant="outlined"
-                  rows="4"
-                  no-resize
+                  rows="2"
+                  auto-grow
+                  max-rows="4"
                   density="comfortable"
                   placeholder="Add private customer notes here..."
-                  :messages="noteSavingStatus ? [noteSavingStatus] : []"
                   hide-details="auto"
                 ></v-textarea>
-                <v-expand-transition>
-                  <div v-if="isNoteDirty" class="d-flex justify-end gap-2 mt-2 mb-2">
-                    <v-btn
-                      color="grey-darken-1"
-                      variant="text"
-                      size="small"
-                      @click="discardNotesOnly"
-                    >
-                      Discard
-                    </v-btn>
-                    <v-btn
-                      color="success"
-                      variant="flat"
-                      size="small"
-                      prepend-icon="mdi-content-save"
-                      :loading="savingNote"
-                      @click="saveNotesOnly"
-                    >
-                      Save Note
-                    </v-btn>
-                  </div>
-                </v-expand-transition>
-              </template>
-            </v-col>
 
-            <!-- Activity Summary Column -->
-            <v-col cols="12" :md="hideNotes ? 6 : 4" class="py-1" v-if="showActivity">
-              <div class="activity-summary-column pl-md-4">
-                <div class="text-caption text-medium-emphasis mb-2 font-weight-bold uppercase tracking-wider">
-                  Activity Summary
-                </div>
-                <div class="d-flex flex-column gap-2">
-                  <!-- Jobs Count -->
-                  <div class="stat-card d-flex align-center justify-space-between pa-2 rounded-lg">
-                    <div class="d-flex align-center">
-                      <v-avatar size="32" class="bg-job-avatar text-white mr-3">
-                        <v-icon size="18">mdi-briefcase-outline</v-icon>
-                      </v-avatar>
-                      <span class="text-body-2 font-weight-medium">Total Jobs</span>
-                    </div>
-                    <span class="text-subtitle-1 font-weight-bold text-job pr-2">{{ customer.job_count ?? 0 }}</span>
-                  </div>
-
-                  <!-- Gold Credits Count -->
-                  <div class="stat-card d-flex align-center justify-space-between pa-2 rounded-lg">
-                    <div class="d-flex align-center">
-                      <v-avatar size="32" class="bg-credit-avatar text-white mr-3">
-                        <v-icon size="18">mdi-credit-card-outline</v-icon>
-                      </v-avatar>
-                      <span class="text-body-2 font-weight-medium">Gold Credits</span>
-                    </div>
-                    <span class="text-subtitle-1 font-weight-bold text-credit pr-2">{{ customer.credit_count ?? 0 }}</span>
-                  </div>
-
-                  <!-- Custom Sheets Count -->
-                  <div class="stat-card d-flex align-center justify-space-between pa-2 rounded-lg">
-                    <div class="d-flex align-center">
-                      <v-avatar size="32" class="bg-sheet-avatar text-white mr-3">
-                        <v-icon size="18">mdi-list-box-outline</v-icon>
-                      </v-avatar>
-                      <span class="text-body-2 font-weight-medium">Custom Sheets</span>
-                    </div>
-                    <span class="text-subtitle-1 font-weight-bold text-sheet pr-2">{{ customer.custom_sheet_count ?? 0 }}</span>
-                  </div>
+                <!-- Hidden State Bar placeholder when note is hidden -->
+                <div
+                  v-else
+                  class="flex-grow-1 d-flex align-center px-3 py-2 text-caption text-medium-emphasis bg-grey-lighten-4 rounded-e"
+                  style="border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); border-left: none; cursor: pointer;"
+                  @click="isNoteHidden = false"
+                >
+                  <em>Customer note hidden for privacy (Click to view)</em>
                 </div>
               </div>
             </v-col>
@@ -272,7 +191,7 @@
             <v-col cols="12" sm="6">
               <v-text-field
                 v-model="customer.phone"
-                label="Phone Number"
+                label="Phone"
                 prepend-inner-icon="mdi-phone"
                 variant="outlined"
                 density="compact"
@@ -289,47 +208,65 @@
               ></v-text-field>
             </v-col>
             
-            <v-col cols="12">
-              <v-text-field
-                v-model="customer.addr_st"
-                label="Street Address"
-                prepend-inner-icon="mdi-home"
-                variant="outlined"
-                density="compact"
-              ></v-text-field>
+            <!-- Physical Address Section -->
+            <v-col cols="12" class="py-1">
+              <div v-if="!showAddressFields" class="d-flex justify-start">
+                <v-btn
+                  variant="text"
+                  color="primary"
+                  size="small"
+                  prepend-icon="mdi-map-marker-plus-outline"
+                  class="text-none font-weight-medium px-1"
+                  @click="showAddressFields = true"
+                >
+                  + Add Physical Address
+                </v-btn>
+              </div>
             </v-col>
-            <v-col cols="12" sm="6">
-              <v-text-field
-                v-model="customer.addr_city"
-                label="City"
-                variant="outlined"
-                density="compact"
-              ></v-text-field>
-            </v-col>
-            <v-col cols="12" sm="3">
-              <v-text-field
-                v-model="customer.addr_prov"
-                label="Province/State"
-                variant="outlined"
-                density="compact"
-              ></v-text-field>
-            </v-col>
-            <v-col cols="12" sm="3">
-              <v-text-field
-                v-model="customer.addr_postal"
-                label="Postal Code"
-                variant="outlined"
-                density="compact"
-              ></v-text-field>
-            </v-col>
-            <v-col cols="12">
-              <v-text-field
-                v-model="customer.addr_country"
-                label="Country"
-                variant="outlined"
-                density="compact"
-              ></v-text-field>
-            </v-col>
+
+            <template v-if="showAddressFields">
+              <v-col cols="12">
+                <v-text-field
+                  v-model="customer.addr_st"
+                  label="Street Address"
+                  prepend-inner-icon="mdi-home"
+                  variant="outlined"
+                  density="compact"
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="6">
+                <v-text-field
+                  v-model="customer.addr_city"
+                  label="City"
+                  variant="outlined"
+                  density="compact"
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="3">
+                <v-text-field
+                  v-model="customer.addr_prov"
+                  label="Province/State"
+                  variant="outlined"
+                  density="compact"
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="3">
+                <v-text-field
+                  v-model="customer.addr_postal"
+                  label="Postal Code"
+                  variant="outlined"
+                  density="compact"
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12">
+                <v-text-field
+                  v-model="customer.addr_country"
+                  label="Country"
+                  variant="outlined"
+                  density="compact"
+                ></v-text-field>
+              </v-col>
+            </template>
 
             <v-col cols="12" v-if="!hideNotes">
               <v-textarea
@@ -348,57 +285,126 @@
 
     <!-- Card Actions -->
     <v-divider v-if="currentState !== 'search'"></v-divider>
-    <v-card-actions class="pa-3 bg-light-surface d-flex justify-end gap-2" v-if="currentState !== 'search'">
-      <!-- Actions for Details state -->
-      <template v-if="currentState === 'info'">
-        <v-btn
-          v-if="clearable"
-          color="grey-darken-1"
-          variant="outlined"
-          prepend-icon="mdi-account-switch"
-          size="small"
-          @click="clearSelectedCustomer"
-        >
-          Change
-        </v-btn>
-        <v-btn
-          color="primary"
-          variant="flat"
-          prepend-icon="mdi-pencil"
-          size="small"
-          @click="currentState = 'form'"
-        >
-          Edit
-        </v-btn>
-      </template>
+    <v-card-actions class="pa-3 bg-light-surface d-flex align-center justify-space-between flex-wrap gap-2" v-if="currentState !== 'search'">
+      <!-- Left side: Activity Summary (Single-Row) -->
+      <div v-if="currentState === 'info' && showActivity" class="d-flex align-center gap-2 flex-wrap">
+        <div class="stat-pill d-inline-flex align-center px-2 py-1 rounded-lg">
+          <v-icon size="16" color="job" class="mr-1">mdi-briefcase-outline</v-icon>
+          <span class="text-caption text-medium-emphasis mr-1">Jobs:</span>
+          <span class="text-caption font-weight-bold text-job">{{ customer.job_count ?? 0 }}</span>
+        </div>
+        <div class="stat-pill d-inline-flex align-center px-2 py-1 rounded-lg">
+          <v-icon size="16" color="credit" class="mr-1">mdi-credit-card-outline</v-icon>
+          <span class="text-caption text-medium-emphasis mr-1">Credits:</span>
+          <span class="text-caption font-weight-bold text-credit">{{ customer.credit_count ?? 0 }}</span>
+        </div>
+        <div class="stat-pill d-inline-flex align-center px-2 py-1 rounded-lg">
+          <v-icon size="16" color="sheet" class="mr-1">mdi-list-box-outline</v-icon>
+          <span class="text-caption text-medium-emphasis mr-1">Sheets:</span>
+          <span class="text-caption font-weight-bold text-sheet">{{ customer.custom_sheet_count ?? 0 }}</span>
+        </div>
+      </div>
+      <div v-else></div>
 
-      <!-- Actions for Form state -->
-      <template v-if="currentState === 'form'">
-        <v-btn
-          color="grey-darken-1"
-          variant="outlined"
-          size="small"
-          @click="cancelForm"
-        >
-          Cancel
-        </v-btn>
-        <v-btn
-          color="success"
-          variant="flat"
-          size="small"
-          :disabled="!isFormValid"
-          prepend-icon="mdi-content-save"
-          @click="saveCustomer"
-        >
-          {{ customer.id ? 'Save Changes' : 'Create Customer' }}
-        </v-btn>
-      </template>
+      <!-- Right side: Actions -->
+      <div class="d-flex align-center gap-2">
+        <!-- Actions for Details state -->
+        <template v-if="currentState === 'info'">
+          <!-- Note Editing Actions -->
+          <template v-if="showNoteToolbar">
+            <v-btn
+              color="grey-darken-1"
+              variant="outlined"
+              size="small"
+              @click="discardNotesOnly"
+            >
+              Discard
+            </v-btn>
+            <v-btn
+              color="success"
+              variant="flat"
+              size="small"
+              prepend-icon="mdi-content-save"
+              :disabled="!isNoteDirty"
+              :loading="savingNote"
+              @click="saveNotesOnly"
+            >
+              Save Note
+            </v-btn>
+          </template>
+
+          <!-- Standard Actions -->
+          <template v-else>
+            <v-btn
+              v-if="!hideNotes && !startingNote && !isNoteExpanded"
+              color="primary"
+              variant="outlined"
+              prepend-icon="mdi-note-plus-outline"
+              size="small"
+              @click="isNoteExpanded = true; isNotesLocked = false"
+            >
+              Add Note
+            </v-btn>
+            <v-btn
+              v-if="!hideNotes && startingNote && lockNotes && isNotesLocked"
+              color="primary"
+              variant="outlined"
+              prepend-icon="mdi-pencil"
+              size="small"
+              @click="isNotesLocked = false"
+            >
+              Edit Note
+            </v-btn>
+            <v-btn
+              v-if="clearable"
+              color="grey-darken-1"
+              variant="outlined"
+              prepend-icon="mdi-account-switch"
+              size="small"
+              @click="clearSelectedCustomer"
+            >
+              Change
+            </v-btn>
+            <v-btn
+              color="primary"
+              variant="flat"
+              prepend-icon="mdi-pencil"
+              size="small"
+              @click="startEditForm"
+            >
+              Edit
+            </v-btn>
+          </template>
+        </template>
+
+        <!-- Actions for Form state -->
+        <template v-if="currentState === 'form'">
+          <v-btn
+            color="grey-darken-1"
+            variant="outlined"
+            size="small"
+            @click="cancelForm"
+          >
+            Cancel
+          </v-btn>
+          <v-btn
+            color="success"
+            variant="flat"
+            size="small"
+            :disabled="!isFormValid"
+            prepend-icon="mdi-content-save"
+            @click="saveCustomer"
+          >
+            {{ customer.id ? 'Save Changes' : 'Create Customer' }}
+          </v-btn>
+        </template>
+      </div>
     </v-card-actions>
   </v-card>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue'
 import { api } from '../utils/api'
 import Fuse from 'fuse.js'
 import { showToast } from '../store/toast'
@@ -436,9 +442,13 @@ const props = defineProps({
   },
   lockNotes: {
     type: Boolean,
-    default: false
+    default: true
   },
   showActivity: {
+    type: Boolean,
+    default: false
+  },
+  hideId: {
     type: Boolean,
     default: false
   }
@@ -456,10 +466,16 @@ const rawCandidates = ref([])
 const isFormValid = ref(true)
 const formRef = ref(null)
 const startingNote = ref('')
-const noteSavingStatus = ref('')
 const isNotesLocked = ref(false)
 const savingNote = ref(false)
 const isNoteHidden = ref(false)
+const isNoteExpanded = ref(false)
+const showAddressFields = ref(false)
+
+function startEditForm() {
+  showAddressFields.value = hasAddress.value
+  currentState.value = 'form'
+}
 
 // Sync notes locked state when lockNotes prop is passed or changed
 watch(() => props.lockNotes, (newVal) => {
@@ -675,6 +691,7 @@ async function loadCustomer(id) {
       currentState.value = 'info'
       isNotesLocked.value = props.lockNotes
       isNoteHidden.value = false
+      isNoteExpanded.value = false
       emit('update:modelValue', data.id)
       emit('select', data)
     }
@@ -734,6 +751,7 @@ function parseSearchQuery(query) {
 // Initialize the "Create New" state with prepopulated names/phone if possible
 function initCreateForm() {
   resetFormFields()
+  showAddressFields.value = false
   
   const query = searchQuery.value || lastSearchText.value || props.prefillQuery || ''
   if (query.trim().length > 0) {
@@ -763,9 +781,10 @@ function resetFormFields() {
   customer.credit_count = 0
   customer.custom_sheet_count = 0
   startingNote.value = ''
-  noteSavingStatus.value = ''
   isNotesLocked.value = props.lockNotes // relock
   isNoteHidden.value = false
+  isNoteExpanded.value = false
+  showAddressFields.value = false
 }
 
 function resetState() {
@@ -838,6 +857,10 @@ const isNoteDirty = computed(() => {
   return !!customer.id && current !== starting
 })
 
+const showNoteToolbar = computed(() => {
+  return !isNotesLocked.value || isNoteDirty.value || (!startingNote.value && isNoteExpanded.value)
+})
+
 const isProfileEditing = computed(() => {
   return currentState.value === 'form'
 })
@@ -857,7 +880,6 @@ async function saveNotesOnly() {
   if (!customer.id || current === starting) return
   
   savingNote.value = true
-  noteSavingStatus.value = 'Saving...'
   try {
     const data = await api.put(`/customers/${customer.id}`, {
       ...customer,
@@ -865,15 +887,15 @@ async function saveNotesOnly() {
     })
     if (data) {
       startingNote.value = data.note || ''
-      noteSavingStatus.value = 'Saved!'
+      showToast('Customer note saved successfully', 'success')
       isNotesLocked.value = props.lockNotes // relock
-      setTimeout(() => {
-        noteSavingStatus.value = ''
-      }, 2000)
+      if (!data.note) {
+        isNoteExpanded.value = false
+      }
     }
   } catch (err) {
     console.error('Failed to save notes:', err)
-    noteSavingStatus.value = 'Error!'
+    showToast('Failed to save customer note: ' + err.message, 'error')
   } finally {
     savingNote.value = false
   }
@@ -882,6 +904,9 @@ async function saveNotesOnly() {
 function discardNotesOnly() {
   customer.note = startingNote.value
   isNotesLocked.value = props.lockNotes // relock
+  if (!startingNote.value) {
+    isNoteExpanded.value = false
+  }
 }
 
 const handleEnterKey = () => {
@@ -937,6 +962,7 @@ onMounted(() => {
 .clickable-title {
   cursor: pointer;
   color: rgb(var(--v-theme-primary));
+  display: inline-block;
 }
 .clickable-title:hover {
   text-decoration: underline;
@@ -958,6 +984,22 @@ onMounted(() => {
   animation: pulse-border 2s infinite;
 }
 
+@keyframes pulse-strip {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-warning), 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(var(--v-theme-warning), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-warning), 0);
+  }
+}
+
+.pulsing-strip {
+  animation: pulse-strip 2s infinite;
+}
+
 .locked-textarea :deep(.v-field__outline) {
   display: none !important;
 }
@@ -967,7 +1009,14 @@ onMounted(() => {
 }
 .locked-textarea :deep(.v-field) {
   background-color: rgba(var(--v-theme-on-surface), 0.03) !important;
-  border-radius: 8px !important;
+  border-radius: 8px;
+}
+
+.attached-textarea :deep(.v-field),
+.attached-textarea :deep(.v-field__outline),
+.attached-textarea :deep(.v-field__outline__start) {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
 }
 
 .stat-card {
@@ -989,6 +1038,26 @@ onMounted(() => {
 
 .tracking-wider {
   letter-spacing: 0.08em;
+}
+
+.stat-pill {
+  transition: all 0.2s ease;
+  border: 1px solid rgba(var(--v-border-color), 0.12);
+  background: rgba(var(--v-theme-on-surface), 0.03);
+  font-size: 0.8125rem;
+}
+.stat-pill:hover {
+  background: rgba(var(--v-theme-on-surface), 0.06);
+}
+
+.edit-note-btn {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  z-index: 2;
+  background: rgba(var(--v-theme-surface), 0.85);
+  backdrop-filter: blur(4px);
+  border-radius: 4px;
 }
 
 .bg-job-avatar {

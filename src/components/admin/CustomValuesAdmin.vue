@@ -2,170 +2,183 @@
   <div>
     <!-- Custom Sheets Config Section -->
     <div v-if="section === 'custom-sheet'">
-      <div class="d-flex align-center justify-end mb-3">
-        <v-checkbox
-          v-model="hideInactiveCustomSheets"
-          label="Hide Inactive"
-          hide-details
-          density="compact"
-          color="primary"
-        ></v-checkbox>
+      <div class="d-flex align-center justify-space-between mb-4">
+        <div class="text-caption text-medium-emphasis">
+          Custom Sheet items are grouped into category sections below.
+        </div>
+        <div class="d-flex align-center gap-3">
+          <v-checkbox
+            v-model="hideInactiveCustomSheets"
+            label="Hide Inactive"
+            hide-details
+            density="compact"
+            color="primary"
+          ></v-checkbox>
+        </div>
       </div>
-      <v-card variant="outlined" class="border-light">
-        <v-card-text class="pa-0">
-          <v-table hover class="config-table">
-            <thead>
-              <tr>
-                <th class="font-weight-bold" style="width: 17%">Name</th>
-                <th class="font-weight-bold" style="width: 14%">
-                  Category
-                  <v-tooltip activator="parent" location="bottom">Category headers group estimate parameters (Use 'Extra' for dynamic buttons)</v-tooltip>
-                </th>
-                <th class="font-weight-bold" style="width: 10%">
-                  Base Price
-                  <v-tooltip activator="parent" location="bottom">Static price fallback if no metal calculations are used</v-tooltip>
-                </th>
-                <th class="font-weight-bold" style="width: 15%">
-                  Metal Type
-                  <v-tooltip activator="parent" location="bottom">Set to 'Gold' or 'Plat' to bound calculations to cached metal rates</v-tooltip>
-                </th>
-                <th class="font-weight-bold" style="width: 9%">
-                  Markup
-                  <v-tooltip activator="parent" location="bottom">The markup factor applied to calculations</v-tooltip>
-                </th>
-                <th class="font-weight-bold" style="width: 9%">
-                  Default Quantity
-                  <v-tooltip activator="parent" location="bottom">The default item quantity for estimates</v-tooltip>
-                </th>
-                <th class="font-weight-bold text-center" style="width: 10%">Active</th>
-                <th class="text-right font-weight-bold" style="width: 16%">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="val in filteredCustomSheets" :key="val.tempId">
-                <td class="py-1">
-                  <v-text-field
-                    v-model="val.name"
-                    density="compact"
-                    variant="underlined"
-                    hide-details
-                    @input="markPending(val)"
-                    @blur="saveIfPending(val)"
-                  ></v-text-field>
-                </td>
-                <td class="py-1">
-                  <v-combobox
-                    v-model="val.value1"
-                    :items="categoryNames"
-                    density="compact"
-                    variant="underlined"
-                    hide-details
-                    @input="markPending(val)"
-                    @update:model-value="onComboboxChange(val)"
-                  ></v-combobox>
-                </td>
-                <td class="py-1">
-                  <v-text-field
-                    v-model="val.value2"
-                    density="compact"
-                    variant="underlined"
-                    hide-details
-                    @input="markPending(val)"
-                    @blur="saveIfPending(val)"
-                  ></v-text-field>
-                </td>
-                <td class="py-1">
-                  <v-select
-                    v-model="val.value3"
-                    :items="['Gold', 'Plat', 'Silver']"
-                    density="compact"
-                    variant="underlined"
-                    hide-details
-                    clearable
-                    placeholder="Select"
-                    @update:model-value="onComboboxChange(val)"
-                  ></v-select>
-                </td>
-                <td class="py-1">
-                  <v-text-field
-                    v-model="val.markup"
-                    density="compact"
-                    variant="underlined"
-                    hide-details
-                    @input="markPending(val)"
-                    @blur="saveIfPending(val)"
-                  ></v-text-field>
-                </td>
-                <td class="py-1">
-                  <v-text-field
-                    v-model="val.default"
-                    density="compact"
-                    variant="underlined"
-                    hide-details
-                    @input="markPending(val)"
-                    @blur="saveIfPending(val)"
-                  ></v-text-field>
-                </td>
-                <td class="py-1">
-                  <div class="d-flex justify-center">
-                    <v-switch
-                      :model-value="val.active === 1"
-                      @update:model-value="toggleValueActive(val)"
-                      color="success"
+
+      <!-- Category Sections -->
+      <div v-for="sec in groupedCustomSheetSections" :key="sec.category" class="mb-6">
+        <div class="d-flex align-center justify-space-between mb-2">
+          <div class="text-subtitle-1 font-weight-bold text-primary d-flex align-center">
+            <v-icon size="20" class="mr-2" color="primary">
+              {{ sec.category === 'Quick Extra' || sec.category === 'Extra' ? 'mdi-lightning-bolt-outline' : 'mdi-folder-outline' }}
+            </v-icon>
+            {{ sec.category }}
+            <v-chip size="x-small" class="ml-2" color="primary" variant="tonal">
+              {{ sec.items.length }} {{ sec.items.length === 1 ? 'item' : 'items' }}
+            </v-chip>
+          </div>
+          <v-btn
+            color="primary"
+            variant="tonal"
+            size="small"
+            prepend-icon="mdi-plus"
+            class="text-none font-weight-medium"
+            @click="newValue(3, sec.category)"
+          >
+            Add {{ sec.category }} Item
+          </v-btn>
+        </div>
+
+        <v-card variant="outlined" class="border-light">
+          <v-card-text class="pa-0">
+            <v-table hover class="config-table">
+              <thead>
+                <tr>
+                  <th class="font-weight-bold" style="width: 30%">Item Name</th>
+                  <th class="font-weight-bold" style="width: 15%">
+                    Base Price
+                    <v-tooltip activator="parent" location="bottom">Static price fallback if no metal calculations are used</v-tooltip>
+                  </th>
+                  <th class="font-weight-bold" style="width: 16%">
+                    Metal Type
+                    <v-tooltip activator="parent" location="bottom">Set to 'Gold', 'Plat', or 'Silver' to bound calculations to cached metal rates</v-tooltip>
+                  </th>
+                  <th class="font-weight-bold" style="width: 10%">
+                    Markup
+                    <v-tooltip activator="parent" location="bottom">The markup factor applied to calculations</v-tooltip>
+                  </th>
+                  <th class="font-weight-bold" style="width: 10%">
+                    Default Qty
+                    <v-tooltip activator="parent" location="bottom">The default item quantity for estimates</v-tooltip>
+                  </th>
+                  <th class="font-weight-bold text-center" style="width: 8%">Active</th>
+                  <th class="text-right font-weight-bold" style="width: 11%">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="val in sec.items" :key="val.tempId || val.id">
+                  <td class="py-1">
+                    <v-text-field
+                      v-model="val.name"
                       density="compact"
+                      variant="underlined"
                       hide-details
-                      inset
-                      :loading="val.saveStatus === 'saving'"
-                      :disabled="val.saveStatus === 'saving'"
-                    ></v-switch>
-                  </div>
-                </td>
-                <td class="text-right py-1">
-                  <div class="d-inline-flex align-center justify-end">
-                    <v-tooltip location="bottom">
-                      <template v-slot:activator="{ props }">
-                        <v-icon
-                          v-bind="props"
-                          :color="getStatusColor(val.saveStatus)"
-                          class="mr-3"
-                          size="small"
-                        >
-                          {{ getStatusIcon(val.saveStatus) }}
-                        </v-icon>
-                      </template>
-                      <span>{{ getStatusTooltip(val.saveStatus) }}</span>
-                    </v-tooltip>
-                    <v-btn
-                      color="error"
-                      variant="outlined"
-                      size="small"
-                      class="text-none font-weight-medium rounded-pill"
-                      prepend-icon="mdi-trash-can-outline"
-                      @click="confirmDeleteValue(val)"
-                    >
-                      Delete
-                    </v-btn>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="filteredCustomSheets.length === 0">
-                <td colspan="8" class="text-center py-6 text-medium-emphasis">
-                  {{ customSheets.length === 0 ? 'No custom sheet items configured.' : 'No active custom sheet items found matching the filter.' }}
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
-        </v-card-text>
-      </v-card>
-      <v-btn
-        variant="outlined"
-        color="primary"
-        class="mt-4 text-none font-weight-medium"
-        prepend-icon="mdi-plus"
-        @click="newValue(3)"
-      >
-        New Custom Sheet Item
-      </v-btn>
+                      placeholder="Enter item name..."
+                      @input="markPending(val)"
+                      @blur="saveIfPending(val)"
+                    ></v-text-field>
+                  </td>
+                  <td class="py-1">
+                    <v-text-field
+                      v-model="val.value2"
+                      density="compact"
+                      variant="underlined"
+                      hide-details
+                      @input="markPending(val)"
+                      @blur="saveIfPending(val)"
+                    ></v-text-field>
+                  </td>
+                  <td class="py-1">
+                    <v-select
+                      v-model="val.value3"
+                      :items="['Gold', 'Plat', 'Silver']"
+                      density="compact"
+                      variant="underlined"
+                      hide-details
+                      clearable
+                      placeholder="Select"
+                      @update:model-value="onComboboxChange(val)"
+                    ></v-select>
+                  </td>
+                  <td class="py-1">
+                    <v-text-field
+                      v-model="val.markup"
+                      density="compact"
+                      variant="underlined"
+                      hide-details
+                      @input="markPending(val)"
+                      @blur="saveIfPending(val)"
+                    ></v-text-field>
+                  </td>
+                  <td class="py-1">
+                    <v-text-field
+                      v-model="val.default"
+                      density="compact"
+                      variant="underlined"
+                      hide-details
+                      @input="markPending(val)"
+                      @blur="saveIfPending(val)"
+                    ></v-text-field>
+                  </td>
+                  <td class="py-1">
+                    <div class="d-flex justify-center">
+                      <v-switch
+                        :model-value="val.active === 1"
+                        @update:model-value="toggleValueActive(val)"
+                        color="success"
+                        density="compact"
+                        hide-details
+                        inset
+                        :loading="val.saveStatus === 'saving'"
+                        :disabled="val.saveStatus === 'saving'"
+                      ></v-switch>
+                    </div>
+                  </td>
+                  <td class="text-right py-1">
+                    <div class="d-inline-flex align-center justify-end">
+                      <v-btn
+                        color="error"
+                        variant="text"
+                        density="comfortable"
+                        icon
+                        size="small"
+                        title="Delete Item"
+                        @click="confirmDeleteValue(val)"
+                      >
+                        <v-icon size="18">mdi-trash-can-outline</v-icon>
+                      </v-btn>
+                      <v-tooltip location="bottom">
+                        <template v-slot:activator="{ props: tooltipProps }">
+                          <v-icon
+                            v-bind="tooltipProps"
+                            :color="getStatusColor(val.saveStatus)"
+                            class="ml-2"
+                            size="small"
+                          >
+                            {{ getStatusIcon(val.saveStatus) }}
+                          </v-icon>
+                        </template>
+                        <span>{{ getStatusTooltip(val.saveStatus) }}</span>
+                      </v-tooltip>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="sec.items.length === 0">
+                  <td colspan="7" class="text-center py-4 text-medium-emphasis text-caption">
+                    No items configured in {{ sec.category }}. Click "+ Add {{ sec.category }} Item" above to add one.
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </v-card-text>
+        </v-card>
+      </div>
+
+      <div v-if="groupedCustomSheetSections.length === 0" class="text-center py-8 text-medium-emphasis">
+        No custom sheet categories or items found matching the current filter.
+      </div>
     </div>
 
     <!-- Custom Sheet Categories Config Section -->
@@ -184,13 +197,13 @@
           <v-table hover class="config-table">
             <thead>
               <tr>
-                <th class="font-weight-bold" style="width: 45%">Category Name</th>
-                <th class="font-weight-bold" style="width: 20%">
+                <th class="font-weight-bold" style="width: 55%">Category Name</th>
+                <th class="font-weight-bold" style="width: 15%">
                   Order
-                  <v-tooltip activator="parent" location="bottom">Set display ordering index of custom sheet categories</v-tooltip>
+                  <v-tooltip activator="parent" location="bottom">Reorder custom sheet categories</v-tooltip>
                 </th>
                 <th class="font-weight-bold text-center" style="width: 15%">Active</th>
-                <th class="text-right font-weight-bold" style="width: 20%">Actions</th>
+                <th class="text-right font-weight-bold" style="width: 15%">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -206,39 +219,27 @@
                   ></v-text-field>
                 </td>
                 <td class="py-1">
-                  <div class="d-flex align-center" style="gap: 8px;">
-                    <v-text-field
-                      v-model="val.order"
-                      density="compact"
-                      variant="underlined"
-                      hide-details
-                      type="number"
-                      style="max-width: 60px;"
-                      @input="markPending(val)"
-                      @blur="saveIfPending(val)"
-                    ></v-text-field>
-                    <div class="d-flex flex-column align-center justify-center">
-                      <v-btn
-                        icon="mdi-chevron-up"
-                        variant="text"
-                        size="x-small"
-                        density="compact"
-                        :disabled="index === 0"
-                        @click="moveCategory(val, 'up')"
-                        class="ma-0 pa-0"
-                        style="font-size: 14px; height: 16px; width: 16px;"
-                      ></v-btn>
-                      <v-btn
-                        icon="mdi-chevron-down"
-                        variant="text"
-                        size="x-small"
-                        density="compact"
-                        :disabled="index === filteredCustomSheetCategories.length - 1"
-                        @click="moveCategory(val, 'down')"
-                        class="ma-0 pa-0"
-                        style="font-size: 14px; height: 16px; width: 16px;"
-                      ></v-btn>
-                    </div>
+                  <div class="d-flex align-center gap-1">
+                    <v-btn
+                      icon="mdi-chevron-up"
+                      variant="tonal"
+                      color="primary"
+                      size="x-small"
+                      density="comfortable"
+                      :disabled="index === 0"
+                      title="Move Up"
+                      @click="moveCategory(val, 'up')"
+                    ></v-btn>
+                    <v-btn
+                      icon="mdi-chevron-down"
+                      variant="tonal"
+                      color="primary"
+                      size="x-small"
+                      density="comfortable"
+                      :disabled="index === filteredCustomSheetCategories.length - 1"
+                      title="Move Down"
+                      @click="moveCategory(val, 'down')"
+                    ></v-btn>
                   </div>
                 </td>
                 <td class="py-1">
@@ -257,12 +258,23 @@
                 </td>
                 <td class="text-right py-1">
                   <div class="d-inline-flex align-center justify-end">
+                    <v-btn
+                      color="error"
+                      variant="text"
+                      density="comfortable"
+                      icon
+                      size="small"
+                      title="Delete Category"
+                      @click="confirmDeleteValue(val)"
+                    >
+                      <v-icon size="18">mdi-trash-can-outline</v-icon>
+                    </v-btn>
                     <v-tooltip location="bottom">
-                      <template v-slot:activator="{ props }">
+                      <template v-slot:activator="{ props: tooltipProps }">
                         <v-icon
-                          v-bind="props"
+                          v-bind="tooltipProps"
                           :color="getStatusColor(val.saveStatus)"
-                          class="mr-3"
+                          class="ml-2"
                           size="small"
                         >
                           {{ getStatusIcon(val.saveStatus) }}
@@ -270,16 +282,6 @@
                       </template>
                       <span>{{ getStatusTooltip(val.saveStatus) }}</span>
                     </v-tooltip>
-                    <v-btn
-                      color="error"
-                      variant="outlined"
-                      size="small"
-                      class="text-none font-weight-medium rounded-pill"
-                      prepend-icon="mdi-trash-can-outline"
-                      @click="confirmDeleteValue(val)"
-                    >
-                      Delete
-                    </v-btn>
                   </div>
                 </td>
               </tr>
@@ -402,12 +404,23 @@
                 </td>
                 <td class="text-right py-1">
                   <div class="d-inline-flex align-center justify-end">
+                    <v-btn
+                      color="error"
+                      variant="text"
+                      density="comfortable"
+                      icon
+                      size="small"
+                      title="Delete Item"
+                      @click="confirmDeleteValue(val)"
+                    >
+                      <v-icon size="18">mdi-trash-can-outline</v-icon>
+                    </v-btn>
                     <v-tooltip location="bottom">
-                      <template v-slot:activator="{ props }">
+                      <template v-slot:activator="{ props: tooltipProps }">
                         <v-icon
-                          v-bind="props"
+                          v-bind="tooltipProps"
                           :color="getStatusColor(val.saveStatus)"
-                          class="mr-3"
+                          class="ml-2"
                           size="small"
                         >
                           {{ getStatusIcon(val.saveStatus) }}
@@ -415,16 +428,6 @@
                       </template>
                       <span>{{ getStatusTooltip(val.saveStatus) }}</span>
                     </v-tooltip>
-                    <v-btn
-                      color="error"
-                      variant="outlined"
-                      size="small"
-                      class="text-none font-weight-medium rounded-pill"
-                      prepend-icon="mdi-trash-can-outline"
-                      @click="confirmDeleteValue(val)"
-                    >
-                      Delete
-                    </v-btn>
                   </div>
                 </td>
               </tr>
@@ -457,7 +460,7 @@
         </v-toolbar>
         <v-card-text class="pa-6">
           <p class="mb-0">
-            Are you sure you want to delete <strong class="text-error">{{ valueToDelete?.name || 'this item' }}</strong> from configuration? This will permanently remove its calculations.
+            Are you sure you want to delete <strong class="text-error">{{ valueToDelete?.name || 'this item' }}</strong>
           </p>
         </v-card-text>
         <v-card-actions class="px-6 pb-6 pt-0">
@@ -522,8 +525,102 @@ const filteredCustomSheetCategories = computed(() => {
   return customSheetCategories.value
 })
 
+const isExtraCategory = (name) => {
+  if (!name) return false
+  const lower = name.trim().toLowerCase()
+  return lower === 'quick extra' || lower === 'extra'
+}
+
 const categoryNames = computed(() => {
-  return customSheetCategories.value.map(c => c.name).filter(Boolean)
+  const names = customSheetCategories.value.map(c => c.name?.trim()).filter(Boolean)
+  const lowerSet = new Set(['quick extra', 'extra'])
+  const result = ['Quick Extra']
+  names.forEach(n => {
+    if (!isExtraCategory(n)) {
+      const key = n.toLowerCase()
+      if (!lowerSet.has(key)) {
+        lowerSet.add(key)
+        result.push(n)
+      }
+    }
+  })
+  return result
+})
+
+const groupedCustomSheetSections = computed(() => {
+  let configuredCategories = []
+  const categoryLowerSet = new Set()
+
+  if (Array.isArray(customSheetCategories.value)) {
+    const sorted = [...customSheetCategories.value]
+      .filter(c => hideInactiveCategories.value ? c.active === 1 : true)
+      .sort((a, b) => {
+        const orderA = a.order !== null && a.order !== undefined && a.order !== '' ? parseInt(a.order) : -999
+        const orderB = b.order !== null && b.order !== undefined && b.order !== '' ? parseInt(b.order) : -999
+        return orderB - orderA
+      })
+    
+    sorted.forEach(c => {
+      const name = c.name?.trim()
+      if (name) {
+        if (isExtraCategory(name)) {
+          if (!categoryLowerSet.has('quick extra')) {
+            categoryLowerSet.add('quick extra')
+            categoryLowerSet.add('extra')
+            configuredCategories.push('Quick Extra')
+          }
+        } else {
+          const key = name.toLowerCase()
+          if (!categoryLowerSet.has(key)) {
+            categoryLowerSet.add(key)
+            configuredCategories.push(name)
+          }
+        }
+      }
+    })
+  }
+
+  if (!categoryLowerSet.has('quick extra')) {
+    categoryLowerSet.add('quick extra')
+    categoryLowerSet.add('extra')
+    configuredCategories.push('Quick Extra')
+  }
+
+  filteredCustomSheets.value.forEach(item => {
+    const cat = item.value1?.trim() || 'Uncategorized'
+    if (isExtraCategory(cat)) {
+      if (!categoryLowerSet.has('quick extra')) {
+        categoryLowerSet.add('quick extra')
+        categoryLowerSet.add('extra')
+        configuredCategories.push('Quick Extra')
+      }
+    } else {
+      const key = cat.toLowerCase()
+      if (!categoryLowerSet.has(key)) {
+        categoryLowerSet.add(key)
+        configuredCategories.push(cat)
+      }
+    }
+  })
+
+  return configuredCategories.map(category => {
+    const items = filteredCustomSheets.value.filter(item => {
+      const itemCat = item.value1?.trim() || 'Uncategorized'
+      if (isExtraCategory(category)) {
+        return isExtraCategory(itemCat)
+      }
+      return itemCat.toLowerCase() === category.toLowerCase()
+    })
+    return {
+      category,
+      items
+    }
+  }).filter(section => {
+    if (hideInactiveCustomSheets.value && section.items.length === 0) {
+      return false
+    }
+    return true
+  })
 })
 
 const showSnackbar = (text, color = 'success') => {
@@ -647,18 +744,18 @@ const getStatusTooltip = (status) => {
   }
 }
 
-const newValue = (typeId) => {
+const newValue = (typeId, defaultCategory = '') => {
   const newItem = {
     id: null,
     tempId: `new-${Date.now()}-${Math.random()}`,
     type_id: typeId,
     name: '',
-    value1: '',
+    value1: defaultCategory,
     value2: '',
     value3: typeId === 1 ? 'Gold' : '',
     order: '',
-    markup: '',
-    default: '',
+    markup: '1',
+    default: '1',
     active: 1,
     saveStatus: null
   }

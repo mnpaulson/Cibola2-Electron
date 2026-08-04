@@ -279,33 +279,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       font-weight: bold;
     }
     
-    .meta-row {
-      display: flex;
-      width: 100%;
-      height: 7mm;
-      gap: 0.5mm;
-    }
-    .meta-item {
-      border: 1px solid #000;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      padding: 0 6px;
-      font-size: 10px;
-    }
-    .job-id-box {
-      flex: 1;
-      font-size: 25px;
-      font-weight: bold;
-      justify-content: center;
-      background-color: #f5f5f5;
-    }
-    .employee-box {
-      flex: 1.5;
-      font-weight: bold;
-      justify-content: center;
-      font-size: 18px;
-    }
+
 
     .info-block {
       border: 1px solid #000;
@@ -347,19 +321,48 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       flex-direction: row !important;
       justify-content: space-between;
       align-items: center;
+      padding: 0 4px;
+    }
+    .emp-job-col {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      overflow: hidden;
+      white-space: nowrap;
+      max-width: 52%;
+    }
+    .emp-name-val {
+      font-size: 12px;
+      font-weight: bold;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .job-id-val {
+      font-size: 10px;
+      font-weight: bold;
+      color: #555;
+      font-family: monospace;
+      flex-shrink: 0;
     }
     .date-col {
       display: flex;
       align-items: center;
-      width: 48%;
+      justify-content: flex-end;
+      max-width: 48%;
+      white-space: nowrap;
     }
     .date-icon {
-      font-size: 20px !important;
-      margin-right: 6px;
+      font-size: 15px !important;
+      margin-right: 3px;
       color: #6e6e6e;
+      flex-shrink: 0;
     }
     .date-val {
-      font-size: 20px;
+      font-size: 13.5px;
+      font-weight: bold;
+    }
+    .date-val.date-small {
+      font-size: 10.5px;
       font-weight: bold;
     }
 
@@ -602,12 +605,6 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
           </div>
         </div>
         
-        <!-- Meta Row -->
-        <div class="block meta-row">
-          <div class="meta-item job-id-box"># ${job.id || ''}</div>
-          <div class="meta-item employee-box">${empName}</div>
-        </div>
-
         <!-- Combined Customer Info & Estimate details row -->
         <div class="block q1-combined-row">
           <!-- Customer info -->
@@ -639,16 +636,18 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
           </div>
         </div>
 
-        <!-- Dates Box -->
+        <!-- Dates Box with Employee & Job # -->
         <div class="block info-block dates-block">
           <div class="block-content row-content">
-            <div class="date-col">
-              <span class="material-icons date-icon">today</span>
-              <span class="date-val">${createdDateStr}</span>
+            <div class="emp-job-col">
+              <span class="emp-name-val">${empName}</span>
+              <span class="job-id-val">#${job.id || ''}</span>
             </div>
             <div class="date-col">
-              <span class="material-icons date-icon">event_available</span>
-              <span class="date-val date-urgent">${dueDateStr}</span>
+              <span class="material-icons date-icon">event</span>
+              <span class="date-val ${dueDateStr ? 'date-small' : ''}">
+                ${createdDateStr}${dueDateStr ? ` → <span class="date-urgent">${dueDateStr}</span>` : ''}
+              </span>
             </div>
           </div>
         </div>
