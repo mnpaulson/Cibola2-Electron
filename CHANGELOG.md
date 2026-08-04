@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Customer Profile Contact Layout**: Updated [CustomerForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CustomerForm.vue) contact info block layout so customer email addresses render on a newline directly below the phone number for cleaner visual hierarchy.
 - **Navigation Drawer Logo Header Alignment**: Styled `.drawer-logo-header` in [App.vue](file:///c:/dev/Cibola2-Electron/src/App.vue) to explicitly match the 64px height of `<v-app-bar>`, ensuring the navigation drawer logo divider lines up seamlessly with the main header bar border.
+- **Spot Metal Price Auto-Sync Interval**: Adjusted background auto-refresh threshold in [MetalPricesCard.vue](file:///c:/dev/Cibola2-Electron/src/components/MetalPricesCard.vue) from 15 minutes to **23 hours** (and updated `priceAgeWarn` stale indicator threshold to 23 hours), while maintaining immediate on-demand manual sync and inline editing.
 
 ### Fixed
 - **Duplicate Merge Modal Lifecycle & Field Selection**:

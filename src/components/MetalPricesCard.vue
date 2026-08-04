@@ -418,7 +418,7 @@ const priceAgeWarn = computed(() => {
       cleanDate = cleanDate.replace(' ', 'T') + 'Z'
     }
     const age = new Date() - Date.parse(cleanDate)
-    return age > 86400000 // More than 24 hours
+    return age > (23 * 60 * 60 * 1000) // More than 23 hours
   } catch {
     return true
   }
@@ -652,11 +652,11 @@ onMounted(async () => {
     }
   }
 
-  const fifteenMinutesMs = 15 * 60 * 1000
+  const twentyThreeHoursMs = 23 * 60 * 60 * 1000
   const nowMs = Date.now()
 
-  if (maxTimeMs === 0 || (nowMs - maxTimeMs) > fifteenMinutesMs) {
-    console.log('[MetalPricesCard] Prices are older than 15 minutes or missing. Auto-refreshing...')
+  if (maxTimeMs === 0 || (nowMs - maxTimeMs) > twentyThreeHoursMs) {
+    console.log('[MetalPricesCard] Prices are older than 23 hours or missing. Auto-refreshing...')
     syncPrices()
   }
 })
