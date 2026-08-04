@@ -11,7 +11,8 @@
     >
       <v-list-item
         title="Cibola2"
-        :class="isRail ? 'px-2 py-4' : 'pa-4'"
+        :class="isRail ? 'px-2' : 'px-4'"
+        class="drawer-logo-header"
       >
         <template v-slot:prepend>
           <v-avatar rounded="0" size="40" :class="isRail ? 'mr-0' : 'mr-3'">
@@ -638,6 +639,14 @@ const currentMenuIcon = computed(() => {
   height: 64px;
   display: flex;
   flex-direction: column;
+}
+
+.drawer-logo-header {
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  display: flex;
+  align-items: center;
 }
 
 .drawer-append-list {
