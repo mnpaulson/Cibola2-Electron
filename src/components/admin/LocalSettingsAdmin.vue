@@ -172,23 +172,9 @@
 
       <!-- Application Updates Section -->
       <v-card variant="outlined" class="border-light pa-4 mt-6">
-        <v-card-title class="px-0 pt-0 text-subtitle-1 font-weight-bold d-flex align-center justify-space-between">
-          <span class="d-flex align-center">
-            <v-icon color="primary" class="mr-2">mdi-cloud-download</v-icon>
-            Application Updates
-          </span>
-          
-          <!-- Simulation Toggle -->
-          <div class="d-flex align-center">
-            <span class="text-caption text-medium-emphasis mr-2">Simulate</span>
-            <v-switch
-              v-model="updateSimulated"
-              color="warning"
-              density="compact"
-              hide-details
-              inset
-            ></v-switch>
-          </div>
+        <v-card-title class="px-0 pt-0 text-subtitle-1 font-weight-bold d-flex align-center">
+          <v-icon color="primary" class="mr-2">mdi-cloud-download</v-icon>
+          Application Updates
         </v-card-title>
         
         <v-card-text class="px-0 pb-0 pt-4">
@@ -372,13 +358,7 @@ const latestVersionClass = computed(() => {
   return notificationsState.latestVersion !== appVersion.value ? 'text-warning font-weight-bold' : 'text-success'
 })
 
-// Proxy simulation toggle to the global notifications store
-const updateSimulated = computed({
-  get: () => notificationsState.updateSimulated,
-  set: (val) => {
-    notificationsState.updateSimulated = val
-  }
-})
+
 
 // Wrapper functions for updates flow actions
 const triggerCheckUpdates = () => {

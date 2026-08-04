@@ -48,9 +48,9 @@
       <span>Print</span>
     </v-btn>
 
-    <!-- Preview HTML -->
+    <!-- Preview HTML (Dev Only) -->
     <v-btn
-      v-if="showPreview"
+      v-if="showPreview && isDev"
       class="btn-preview"
       @click="$emit('preview')"
     >
@@ -136,6 +136,8 @@ defineProps({
 })
 
 defineEmits(['discard', 'delete', 'capture', 'print', 'preview', 'save', 'save-print-close'])
+
+const isDev = import.meta.env.DEV
 </script>
 
 <style scoped>

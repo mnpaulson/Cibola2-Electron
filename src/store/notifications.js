@@ -1,21 +1,9 @@
 import { reactive } from 'vue'
 import { showToast } from './toast'
-import pkg from '../../package.json'
-
-// Dynamically generate a simulated version that is higher than the current package version
-function getSimulatedNextVersion() {
-  const current = pkg.version || '1.0.0'
-  const parts = current.split('.').map(Number)
-  if (parts.length === 3 && !parts.some(isNaN)) {
-    return `${parts[0] + 1}.0.0`
-  }
-  return '2.0.0'
-}
 
 export const notificationsState = reactive({
   list: [],
-  updateSimulated: false,
-  
+
   // Shared update state
   updateStatus: 'idle', // 'idle', 'checking', 'available', 'not-available', 'downloading', 'downloaded', 'error'
   updateError: '',
@@ -28,8 +16,6 @@ export const notificationsState = reactive({
     transferred: 0
   }
 })
-
-let simulationInterval = null
 
 /**
  * Add or update a notification.
@@ -72,80 +58,68 @@ export function initUpdaterListeners() {
 
   if (typeof window.electronAPI.onUpdateChecking === 'function') {
     window.electronAPI.onUpdateChecking(() => {
-      if (!notificationsState.updateSimulated) {
-        notificationsState.updateStatus = 'checking'
-      }
+      notificationsState.updateStatus = 'checking'
     })
   }
 
   if (typeof window.electronAPI.onUpdateAvailable === 'function') {
     window.electronAPI.onUpdateAvailable((info) => {
-      if (!notificationsState.updateSimulated) {
-        notificationsState.latestVersion = info.version || ''
-        notificationsState.releaseNotes = info.releaseNotes || ''
-        notificationsState.updateStatus = 'available'
-        
-        addNotification({
-          id: 'new-version',
-          title: 'New Version Available',
-          message: `Version ${info.version} is available for download.`,
-          color: 'info',
-          icon: 'mdi-cloud-download-outline',
-          persistent: true
-        })
-        
-        showToast(`Update available: v${info.version}`, 'info')
-      }
+      notificationsState.latestVersion = info.version || ''
+      notificationsState.releaseNotes = info.releaseNotes || ''
+      notificationsState.updateStatus = 'available'
+      
+      addNotification({
+        id: 'new-version',
+        title: 'New Version Available',
+        message: `Version ${info.version} is available for download.`,
+        color: 'info',
+        icon: 'mdi-cloud-download-outline',
+        persistent: true
+      })
+      
+      showToast(`Update available: v${info.version}`, 'info')
     })
   }
 
   if (typeof window.electronAPI.onUpdateNotAvailable === 'function') {
     window.electronAPI.onUpdateNotAvailable((info) => {
-      if (!notificationsState.updateSimulated) {
-        notificationsState.latestVersion = info.version || ''
-        notificationsState.updateStatus = 'not-available'
-      }
+      notificationsState.latestVersion = info.version || ''
+      notificationsState.updateStatus = 'not-available'
     })
   }
 
   if (typeof window.electronAPI.onUpdateError === 'function') {
     window.electronAPI.onUpdateError((err) => {
-      if (!notificationsState.updateSimulated) {
-        notificationsState.updateStatus = 'error'
-        notificationsState.updateError = err || 'Unknown update error.'
-      }
+      notificationsState.updateStatus = 'error'
+      notificationsState.updateError = err || 'Unknown update error.'
     })
   }
 
   if (typeof window.electronAPI.onDownloadProgress === 'function') {
     window.electronAPI.onDownloadProgress((progress) => {
-      if (!notificationsState.updateSimulated) {
-        notificationsState.updateStatus = 'downloading'
-        notificationsState.downloadProgress.percent = progress.percent || 0
-        notificationsState.downloadProgress.bytesPerSecond = progress.bytesPerSecond || 0
-        notificationsState.downloadProgress.total = progress.total || 0
-        notificationsState.downloadProgress.transferred = progress.transferred || 0
-      }
+      notificationsState.updateStatus = 'downloading'
+      notificationsState.downloadProgress.percent = progress.percent || 0
+      notificationsState.downloadProgress.bytesPerSecond = progress.bytesPerSecond || 0
+      notificationsState.downloadProgress.total = progress.total || 0
+      notificationsState.downloadProgress.transferred = progress.transferred || 0
     })
   }
 
   if (typeof window.electronAPI.onUpdateDownloaded === 'function') {
     window.electronAPI.onUpdateDownloaded((info) => {
-      if (!notificationsState.updateSimulated) {
-        notificationsState.updateStatus = 'downloaded'
-        
-        removeNotification('new-version')
-        addNotification({
-          id: 'new-version-downloaded',
-          title: 'Update Downloaded',
-          message: `Version ${info.version || getSimulatedNextVersion()} has been downloaded. Restart to install.`,
-          color: 'success',
-          icon: 'mdi-restart',
-          persistent: true
-        })
-        
-        showToast(`Update downloaded!`, 'success')
-      }
+      notificationsState.updateStatus = 'downloaded'
+      
+      removeNotification('new-version')
+      addNotification({
+        id: 'new-version-downloaded',
+        title: 'Update Downloaded',
+        message: `Version ${info.version || ''} has been downloaded. Restart to install.`,
+        color: 'success',
+        icon: 'mdi-restart',
+        persistent: true
+      })
+      
+      showToast(`Update downloaded!`, 'success')
     })
   }
 }
@@ -157,29 +131,6 @@ export function initUpdaterListeners() {
 export async function checkUpdates(silent = false) {
   notificationsState.updateError = ''
   notificationsState.updateStatus = 'checking'
-  
-  if (notificationsState.updateSimulated) {
-    setTimeout(() => {
-      const nextVer = getSimulatedNextVersion()
-      notificationsState.latestVersion = nextVer
-      notificationsState.releaseNotes = `<h3>v${nextVer} Features</h3><ul><li>Added customer duplicate merging functionality</li><li>Reworked job printer speed optimizations</li><li>Fixed gold credit spot price evaluation UI bugs</li></ul>`
-      notificationsState.updateStatus = 'available'
-      
-      addNotification({
-        id: 'new-version',
-        title: 'New Version Available',
-        message: `Version ${nextVer} is available for download.`,
-        color: 'info',
-        icon: 'mdi-cloud-download-outline',
-        persistent: true
-      })
-
-      if (!silent) {
-        showToast('Simulated Update Found!', 'info')
-      }
-    }, 1500)
-    return
-  }
 
   if (window.electronAPI && typeof window.electronAPI.checkForUpdate === 'function') {
     try {
@@ -219,41 +170,6 @@ export async function checkUpdates(silent = false) {
  * Trigger update download.
  */
 export async function downloadUpdates() {
-  if (notificationsState.updateSimulated) {
-    notificationsState.updateStatus = 'downloading'
-    notificationsState.downloadProgress.percent = 0
-    notificationsState.downloadProgress.bytesPerSecond = 1250000 // 1.25 MB/s
-    notificationsState.downloadProgress.total = 45000000 // 45 MB
-    notificationsState.downloadProgress.transferred = 0
-
-    if (simulationInterval) clearInterval(simulationInterval)
-
-    simulationInterval = setInterval(() => {
-      const step = 45000000 / 20 // 5% chunks
-      notificationsState.downloadProgress.transferred += step
-      notificationsState.downloadProgress.percent = (notificationsState.downloadProgress.transferred / notificationsState.downloadProgress.total) * 100
-      if (notificationsState.downloadProgress.transferred >= notificationsState.downloadProgress.total) {
-        notificationsState.downloadProgress.transferred = notificationsState.downloadProgress.total
-        notificationsState.downloadProgress.percent = 100
-        clearInterval(simulationInterval)
-        notificationsState.updateStatus = 'downloaded'
-        showToast('Simulated Download Complete!', 'success')
-        
-        const nextVer = getSimulatedNextVersion()
-        removeNotification('new-version')
-        addNotification({
-          id: 'new-version-downloaded',
-          title: 'Update Downloaded',
-          message: `Version ${nextVer} has been downloaded. Restart to install.`,
-          color: 'success',
-          icon: 'mdi-restart',
-          persistent: true
-        })
-      }
-    }, 300)
-    return
-  }
-
   if (window.electronAPI && typeof window.electronAPI.downloadUpdate === 'function') {
     notificationsState.updateStatus = 'downloading'
     try {
@@ -273,16 +189,6 @@ export async function downloadUpdates() {
  * Trigger update installation and app restart.
  */
 export function installUpdates() {
-  if (notificationsState.updateSimulated) {
-    showToast('Simulating restart and install...', 'success')
-    setTimeout(() => {
-      removeNotification('new-version-downloaded')
-      removeNotification('new-version')
-      window.location.reload()
-    }, 1500)
-    return
-  }
-
   if (window.electronAPI && typeof window.electronAPI.installUpdate === 'function') {
     window.electronAPI.installUpdate()
   }

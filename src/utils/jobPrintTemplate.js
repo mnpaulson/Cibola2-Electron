@@ -28,6 +28,38 @@ function formatPrintDate(dateStr) {
 }
 
 /**
+ * Calculates dynamic font styling for image note cards based on note character length.
+ */
+function getNoteFontSize(text) {
+  const len = text ? text.length : 0
+  if (len <= 25) {
+    return { fontSize: '15px', lineHeight: '1.25', lineClamp: 4 }
+  } else if (len <= 55) {
+    return { fontSize: '12.5px', lineHeight: '1.3', lineClamp: 5 }
+  } else if (len <= 100) {
+    return { fontSize: '10.5px', lineHeight: '1.3', lineClamp: 6 }
+  } else {
+    return { fontSize: '9px', lineHeight: '1.25', lineClamp: 7 }
+  }
+}
+
+/**
+ * Calculates dynamic font size for customer name based on string length.
+ */
+function getCustomerNameFontSize(nameStr) {
+  const len = nameStr ? nameStr.length : 0
+  if (len <= 15) {
+    return '16px'
+  } else if (len <= 25) {
+    return '14px'
+  } else if (len <= 35) {
+    return '12.5px'
+  } else {
+    return '11px'
+  }
+}
+
+/**
  * Resolves local and server image URLs for rendering inside the print window.
  */
 function getImageUrl(imgStr) {
@@ -54,6 +86,9 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
   const empName = emp ? emp.name : 'Unassigned'
   const estVal = parseFloat(String(job.estimate).replace(/,/g, '')) || 0
   const depVal = parseFloat(String(job.deposit).replace(/,/g, '')) || 0
+
+  const custFullName = `${customer?.fname || ''} ${customer?.lname || ''}`.trim() || '—'
+  const custNameFontSize = getCustomerNameFontSize(custFullName)
 
   const createdDateStr = formatPrintDate(job.created_at || new Date().toISOString())
   const dueDateStr = job.due_date ? formatPrintDate(job.due_date) : ''
@@ -85,9 +120,10 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
 
     // Add Note Card if present
     if (imgNote) {
+      const { fontSize, lineHeight, lineClamp } = getNoteFontSize(imgNote)
       allItems.push(`
         <div class="image-card note-card">
-          <div class="note-text">${imgNote}</div>
+          <div class="note-text" style="font-size: ${fontSize}; line-height: ${lineHeight}; -webkit-line-clamp: ${lineClamp};">${imgNote}</div>
         </div>
       `)
     }
@@ -220,17 +256,21 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       width: 100%;
       margin-bottom: 0mm;
     }
-    .q1-combined-row {
-      display: flex;
+    .info-block {
+      border: 1px solid #000;
+      border-radius: 4px;
       width: 100%;
-      min-height: 15mm;
-      height: auto;
-      gap: 0.5mm;
-      box-sizing: border-box;
-      align-items: stretch;
+      height: 13mm;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      justify-content: center;
     }
-    .q1-combined-row .info-block {
-      flex: 1;
+    .block-content {
+      padding: 2px 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
       height: 100%;
     }
     .blanks-block {
@@ -278,128 +318,107 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       font-size: 20px;
       font-weight: bold;
     }
-    
-
-
-    .info-block {
-      border: 1px solid #000;
-      border-radius: 4px;
+    .q1-combined-row {
+      display: flex;
       width: 100%;
-      height: 13mm;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      justify-content: center;
+      min-height: 22mm;
+      height: 22mm;
+      gap: 0.5mm;
+      box-sizing: border-box;
+      align-items: stretch;
     }
-    .block-content {
-      padding: 2px 4px;
+    .customer-meta-col {
+      flex: 1;
       display: flex;
       flex-direction: column;
+      height: 100%;
+    }
+    .customer-meta-col .customer-block {
+      height: 12.5mm;
+      min-height: 12.5mm;
+    }
+    .customer-meta-col .meta-block {
+      flex: 1;
+      height: auto;
+    }
+    .q1-combined-row .estimate-block {
+      flex: 1;
+      height: 100%;
+      min-height: 22mm;
+    }
+    .customer-block .block-content {
       justify-content: space-around;
+      padding: 1px 4px;
+      height: 100%;
+    }
+    .meta-block .block-content {
+      justify-content: space-around;
+      padding: 1px 4px;
+      height: 100%;
+    }
+    .estimate-block .block-content {
+      justify-content: flex-start;
+      gap: 2px;
+      padding: 2px 4px;
       height: 100%;
     }
     .info-line {
       display: flex;
       align-items: center;
-      font-size: 14px;
-      line-height: 1.2;
+      font-size: 12px;
+      line-height: 1.15;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .info-icon {
-      font-size: 11px !important;
-      margin-right: 5px;
-      color: #6e6e6e;
-    }
-
-    .dates-block {
-      height: 8mm;
-      justify-content: center;
-    }
-    .row-content {
-      flex-direction: row !important;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0 4px;
-    }
-    .emp-job-col {
-      display: flex;
-      align-items: baseline;
-      gap: 4px;
-      overflow: hidden;
-      white-space: nowrap;
-      max-width: 52%;
-    }
-    .emp-name-val {
-      font-size: 12px;
-      font-weight: bold;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 12px !important;
+      margin-right: 4px;
+      color: #555;
+      flex-shrink: 0;
     }
     .job-id-val {
-      font-size: 10px;
+      font-size: 10.5px;
       font-weight: bold;
-      color: #555;
+      color: #444;
       font-family: monospace;
-      flex-shrink: 0;
-    }
-    .date-col {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      max-width: 48%;
-      white-space: nowrap;
-    }
-    .date-icon {
-      font-size: 15px !important;
-      margin-right: 3px;
-      color: #6e6e6e;
-      flex-shrink: 0;
+      margin-left: 2px;
     }
     .date-val {
-      font-size: 13.5px;
+      font-size: 11.5px;
       font-weight: bold;
     }
     .date-val.date-small {
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: bold;
     }
-
     .date-urgent {
       color: red;
     }
 
-    .estimate-block {
-      min-height: 13mm;
-      height: auto;
-    }
     .est-amount {
       font-size: 12px;
       font-weight: bold;
     }
     .est-note {
-      font-size: 11.5px;
+      font-size: 11px;
       color: #333;
-      line-height: 1.3;
+      line-height: 1.25;
       white-space: pre-wrap;
       word-break: break-word;
       overflow: hidden;
     }
 
     .notes-block {
-      height: 18mm;
+      height: 26mm;
       margin-bottom: 2px;
     }
     .notes-content {
-      font-size: 16px;
-      line-height: 1.2;
+      font-size: 13px;
+      line-height: 1.25;
       overflow: hidden;
-      text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
       white-space: pre-wrap;
+      word-break: break-word;
     }
 
     /* Ruled Writing Lines Background */
@@ -420,7 +439,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       box-sizing: border-box;
     }
     .q1-grid {
-      margin-top: 1.5mm;
+      margin-top: 0.5mm;
     }
     .image-card {
       overflow: hidden;
@@ -558,24 +577,24 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
     .warning-container {
       position: absolute;
       bottom: 6mm;
-      left: 5mm;
+      left: 0mm;
       right: 5mm;
       text-align: center;
       pointer-events: none;
       z-index: 10;
     }
     .warning-text {
-      font-size: 14px;
+      font-size: 12px;
       width: 100%;
       font-weight: bold;
       color: #000;
       text-transform: uppercase;
       line-height: 1.2;
       text-shadow: 
-        -1.5px -1.5px 0 #fff,  
-         1.5px -1.5px 0 #fff,
-        -1.5px  1.5px 0 #fff,
-         1.5px  1.5px 0 #fff,
+        -1px -1px 0 #fff,  
+         1px -1px 0 #fff,
+        -1px  1px 0 #fff,
+         1px  1px 0 #fff,
         -1px -1px 0 #fff,  
          1px -1px 0 #fff,
         -1px  1px 0 #fff,
@@ -607,20 +626,39 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
         
         <!-- Combined Customer Info & Estimate details row -->
         <div class="block q1-combined-row">
-          <!-- Customer info -->
-          <div class="info-block customer-block">
-            <div class="block-content">
-              <div class="info-line">
-                <span class="material-icons info-icon">person</span>
-                <strong>${customer?.fname || ''} ${customer?.lname || ''}</strong>
+          <!-- Left Column: Customer Card & Meta/Dates Card -->
+          <div class="customer-meta-col">
+            <!-- Customer Card -->
+            <div class="info-block customer-block">
+              <div class="block-content">
+                <div class="info-line">
+                  <span class="material-icons info-icon">person</span>
+                  <strong style="font-size: ${custNameFontSize}; overflow: hidden; text-overflow: ellipsis;">${custFullName}</strong>
+                </div>
+                <div class="info-line">
+                  <span class="material-icons info-icon">phone</span>
+                  <span>${customer?.phone || '—'}</span>
+                </div>
+                <div class="info-line">
+                  <span class="material-icons info-icon">email</span>
+                  <span>${customer?.email || '—'}</span>
+                </div>
               </div>
-              <div class="info-line">
-                <span class="material-icons info-icon">phone</span>
-                <span>${customer?.phone || '—'}</span>
-              </div>
-              <div class="info-line">
-                <span class="material-icons info-icon">email</span>
-                <span>${customer?.email || '—'}</span>
+            </div>
+
+            <!-- Employee & Dates Card -->
+            <div class="info-block meta-block">
+              <div class="block-content">
+                <div class="info-line">
+                  <span class="material-icons info-icon">assignment_ind</span>
+                  <span><strong>${empName}</strong> <span class="job-id-val">#${job.id || ''}</span></span>
+                </div>
+                <div class="info-line">
+                  <span class="material-icons info-icon">event</span>
+                  <span class="date-val ${dueDateStr ? 'date-small' : ''}">
+                    ${createdDateStr}${dueDateStr ? ` → <span class="date-urgent">${dueDateStr}</span>` : ''}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -636,27 +674,10 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
           </div>
         </div>
 
-        <!-- Dates Box with Employee & Job # -->
-        <div class="block info-block dates-block">
-          <div class="block-content row-content">
-            <div class="emp-job-col">
-              <span class="emp-name-val">${empName}</span>
-              <span class="job-id-val">#${job.id || ''}</span>
-            </div>
-            <div class="date-col">
-              <span class="material-icons date-icon">event</span>
-              <span class="date-val ${dueDateStr ? 'date-small' : ''}">
-                ${createdDateStr}${dueDateStr ? ` → <span class="date-urgent">${dueDateStr}</span>` : ''}
-              </span>
-            </div>
-          </div>
-        </div>
-
         <!-- Job Notes -->
         <div class="block info-block notes-block">
           <div class="block-content notes-content">${(job.note || '—').trim()}</div>
-
-          </div>
+        </div>
       </div>
 
       <!-- Q1 Images Section -->
@@ -679,7 +700,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
           <img class="store-logo" src="${logoBase64}" alt="Logo">
         </div>
         <div class="cust-name-row">
-          <strong>Customer:</strong> ${customer?.fname || ''} ${customer?.lname || ''}
+          <strong>Customer:</strong> <span style="font-size: ${custNameFontSize}; font-weight: bold;">${custFullName}</span>
         </div>
       </div>
       
