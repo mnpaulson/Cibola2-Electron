@@ -5,7 +5,7 @@
       <v-card-item class="pa-6">
         <div class="d-flex align-center justify-space-between flex-wrap gap-4">
           <div>
-            <h3 class="text-h6 font-weight-bold">Duplicate Contact Management</h3>
+            <h3 class="text-h6 font-weight-bold">Duplicate Customer Management</h3>
             <p class="text-subtitle-2 text-medium-emphasis mb-0">
               Identify, review, and merge potential duplicate customer records.
             </p>

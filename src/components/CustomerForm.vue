@@ -122,7 +122,7 @@
               </div>
 
               <!-- Contact Info -->
-              <div class="my-2 text-body-2 d-flex flex-wrap align-center gap-4">
+              <div class="my-2 text-body-2 d-flex flex-column ga-1">
                 <div v-if="customer.phone" class="d-flex align-center text-medium-emphasis">
                   <v-icon size="16" start class="mr-1">mdi-phone</v-icon>
                   <span>{{ customer.phone }}</span>
@@ -180,6 +180,19 @@
                   hide-details="auto"
                 ></v-textarea>
 
+                <!-- Top-right Hide Note button -->
+                <v-btn
+                  v-if="!isNoteHidden"
+                  icon="mdi-eye-off-outline"
+                  variant="text"
+                  density="compact"
+                  size="small"
+                  color="grey-darken-1"
+                  class="hide-note-btn"
+                  title="Hide Customer Note"
+                  @click="isNoteHidden = true"
+                ></v-btn>
+
                 <!-- Hidden State Bar placeholder when note is hidden -->
                 <div
                   v-else
@@ -187,7 +200,7 @@
                   style="border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); border-left: none; cursor: pointer;"
                   @click="isNoteHidden = false"
                 >
-                  <em>Customer note hidden for privacy (Click to view)</em>
+                  <em>(Click to view)</em>
                 </div>
               </div>
             </v-col>
@@ -367,6 +380,16 @@
           <!-- Standard Actions -->
           <template v-else>
             <v-btn
+              v-if="clearable"
+              color="grey-darken-1"
+              variant="outlined"
+              prepend-icon="mdi-account-switch"
+              size="small"
+              @click="clearSelectedCustomer"
+            >
+              Change
+            </v-btn>
+            <v-btn
               v-if="!hideNotes && !startingNote && !isNoteExpanded"
               color="primary"
               variant="outlined"
@@ -387,23 +410,13 @@
               Edit Note
             </v-btn>
             <v-btn
-              v-if="clearable"
-              color="grey-darken-1"
-              variant="outlined"
-              prepend-icon="mdi-account-switch"
-              size="small"
-              @click="clearSelectedCustomer"
-            >
-              Change
-            </v-btn>
-            <v-btn
               color="primary"
               variant="flat"
               prepend-icon="mdi-pencil"
               size="small"
               @click="startEditForm"
             >
-              Edit
+              Edit Customer
             </v-btn>
           </template>
         </template>
@@ -1134,6 +1147,21 @@ onMounted(() => {
   background: rgba(var(--v-theme-surface), 0.85);
   backdrop-filter: blur(4px);
   border-radius: 4px;
+}
+
+.hide-note-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  background: rgba(var(--v-theme-surface), 0.85);
+  backdrop-filter: blur(4px);
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: opacity 0.15s ease-in-out;
+}
+.hide-note-btn:hover {
+  opacity: 1;
 }
 
 .bg-job-avatar {

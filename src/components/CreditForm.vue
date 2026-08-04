@@ -31,6 +31,22 @@
         />
       </div>
 
+      <!-- High Value Credit Payout Warning Alert ($3,000+) -->
+      <v-alert
+        v-if="!credit.id && credit.total >= 3000"
+        type="warning"
+        variant="tonal"
+        color="warning"
+        icon="mdi-alert-decagram-outline"
+        class="mb-4 rounded-lg"
+        density="comfortable"
+      >
+        <div class="font-weight-bold text-subtitle-2">Management Confirmation Required</div>
+        <div class="text-caption">
+          The sum total for this gold credit payout reaches or exceeds <strong>$3,000.00</strong> (Current Total: <strong>${{ credit.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong>). Please confirm with management before proceeding.
+        </div>
+      </v-alert>
+
       <v-form ref="formRef" v-model="isFormValid" lazy-validation>
         <v-row>
           <!-- Left Column: Settings and Metadata -->
@@ -282,6 +298,22 @@
           delete-endpoint="/goldcredits/images"
           :disable-add="disabled"
         />
+
+        <!-- High Value Credit Payout Warning Alert ($3,000+) - Bottom Banner -->
+        <v-alert
+          v-if="!credit.id && credit.total >= 3000"
+          type="warning"
+          variant="tonal"
+          color="warning"
+          icon="mdi-alert-decagram-outline"
+          class="mt-4 mb-2 rounded-lg"
+          density="comfortable"
+        >
+          <div class="font-weight-bold text-subtitle-2">Management Confirmation Required</div>
+          <div class="text-caption">
+            The sum total for this gold credit payout reaches or exceeds <strong>$3,000.00</strong> (Current Total: <strong>${{ credit.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong>). Please confirm with management before proceeding.
+          </div>
+        </v-alert>
       </v-form>
     </v-card-text>
 

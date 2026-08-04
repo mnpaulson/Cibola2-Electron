@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Admin Review Hub**: Integrated `CustomerDuplicatesAdmin.vue` into [Admin.vue](file:///c:/dev/Cibola2-Electron/src/components/Admin.vue) under "Customer Tools" for reviewing unreviewed and rejected duplicate pairs and running manual database scans.
   - **Batch Auto-Merge Exact Matches**: Added a **Merge All Exact Matches** action button and prominent warning modal in `CustomerDuplicatesAdmin.vue` paired with a backend transaction endpoint `POST /customers/merge-exact` to automatically consolidate 100% exact matching candidate pairs across the database.
   - **Unused Customer Maintenance & Bulk Cleanup**: Integrated `CustomerOrphansAdmin.vue` under "Customer Tools" in [Admin.vue](file:///c:/dev/Cibola2-Electron/src/components/Admin.vue) paired with `GET /customers/orphans`, `DELETE /customers/orphans/:id`, and `POST /customers/orphans/delete-bulk` backend endpoints. Provides an explicit **Scan for Unused Customers** trigger button to scan the database on demand rather than on page load. Automatically purges associated `customer_duplicates` pairs on single or bulk customer deletion.
+  - **High Value Credit Payout Warning Alert ($3,000+)**: Added dual alert banners (`mdi-alert-decagram-outline`) at both the top and bottom of [CreditForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CreditForm.vue) that automatically display when creating a new credit payout whose sum total reaches or exceeds $3,000.00, prompting operators to confirm with management before proceeding.
+  - **Top-Right Hide Customer Note Button**: Added a compact icon button (`mdi-eye-off-outline`) in the top-right corner of the customer note field in [CustomerForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CustomerForm.vue) to easily hide customer notes for privacy.
+
+### Changed
+- **Customer Profile Contact Layout**: Updated [CustomerForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CustomerForm.vue) contact info block layout so customer email addresses render on a newline directly below the phone number for cleaner visual hierarchy.
 
 ### Fixed
 - **Duplicate Merge Modal Lifecycle & Field Selection**:

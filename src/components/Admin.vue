@@ -77,7 +77,7 @@
 
             <!-- Duplicate Contacts -->
             <v-list-item
-              title="Duplicate Contacts"
+              title="Duplicate Customers"
               value="customer-duplicates"
               :active="activeSection === 'customer-duplicates'"
               @click="activeSection = 'customer-duplicates'"
