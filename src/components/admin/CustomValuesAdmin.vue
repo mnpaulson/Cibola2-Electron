@@ -307,6 +307,79 @@
 
     <!-- Gold Credits Config Section -->
     <div v-else-if="section === 'gold-credit'">
+      <!-- Payout Type Markups Section -->
+      <div class="mb-6">
+        <div class="d-flex align-center justify-space-between mb-2">
+          <div class="text-subtitle-1 font-weight-bold text-primary d-flex align-center">
+            <v-icon size="20" class="mr-2" color="primary">mdi-percent-outline</v-icon>
+            Payout Type Markups
+          </div>
+          <div class="text-caption text-medium-emphasis">
+            Default markup adjustment added to base markup pricing when selecting Credit, Split, or Cash.
+          </div>
+        </div>
+
+        <v-card variant="outlined" class="border-light">
+          <v-card-text class="pa-0">
+            <v-table hover class="config-table">
+              <thead>
+                <tr>
+                  <th class="font-weight-bold" style="width: 30%">Payout Type</th>
+                  <th class="font-weight-bold" style="width: 45%">
+                    Markup Adjustment
+                    <v-tooltip activator="parent" location="bottom">Value added to karat base markup (e.g., +0.10 adds +10%)</v-tooltip>
+                  </th>
+                  <th class="text-right font-weight-bold" style="width: 25%">Save Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="pm in payoutMarkupsList" :key="pm.tempId || pm.id || pm.name">
+                  <td class="py-2 text-capitalize font-weight-bold text-primary">
+                    {{ pm.name }}
+                  </td>
+                  <td class="py-1">
+                    <v-text-field
+                      v-model="pm.value1"
+                      density="compact"
+                      variant="underlined"
+                      hide-details
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      prefix="+"
+                      @input="markPending(pm)"
+                      @blur="saveIfPending(pm)"
+                    ></v-text-field>
+                  </td>
+                  <td class="text-right py-1">
+                    <div class="d-inline-flex align-center justify-end">
+                      <v-tooltip location="bottom">
+                        <template v-slot:activator="{ props: tooltipProps }">
+                          <v-icon
+                            v-bind="tooltipProps"
+                            :color="getStatusColor(pm.saveStatus)"
+                            class="ml-2"
+                            size="small"
+                          >
+                            {{ getStatusIcon(pm.saveStatus) }}
+                          </v-icon>
+                        </template>
+                        <span>{{ getStatusTooltip(pm.saveStatus) }}</span>
+                      </v-tooltip>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </v-card-text>
+        </v-card>
+      </div>
+
+      <div class="text-subtitle-1 font-weight-bold text-primary mb-2 d-flex align-center">
+        <v-icon size="20" class="mr-2" color="primary">mdi-gold</v-icon>
+        Karat Metal Items
+      </div>
+
       <v-card variant="outlined" class="border-light">
         <v-card-text class="pa-0">
           <v-table hover class="config-table">
@@ -506,10 +579,32 @@ const valuesList = ref([])
 const customSheets = ref([])
 const customSheetCategories = ref([])
 const goldCredits = ref([])
+const payoutMarkups = ref([])
 const valueDeleteDialog = ref(false)
 const valueToDelete = ref(null)
 const hideInactiveCustomSheets = ref(true)
 const hideInactiveCategories = ref(true)
+
+const payoutMarkupsList = computed(() => {
+  const defaultTypes = [
+    { name: 'cash', value1: '0.00' },
+    { name: 'split', value1: '0.10' },
+    { name: 'credit', value1: '0.20' }
+  ]
+  return defaultTypes.map(def => {
+    const existing = payoutMarkups.value.find(v => v.name && v.name.toLowerCase().trim() === def.name)
+    if (existing) return existing
+    return {
+      id: null,
+      tempId: `payout-${def.name}`,
+      type_id: 5,
+      name: def.name,
+      value1: def.value1,
+      active: 1,
+      saveStatus: null
+    }
+  })
+})
 
 const filteredCustomSheets = computed(() => {
   if (hideInactiveCustomSheets.value) {
@@ -643,6 +738,7 @@ const getValues = async () => {
     const unsavedSheets = customSheets.value.filter(v => !v.id)
     const unsavedCategories = customSheetCategories.value.filter(v => !v.id)
     const unsavedCredits = goldCredits.value.filter(v => !v.id)
+    const unsavedPayoutMarkups = payoutMarkups.value.filter(v => !v.id)
 
     const data = await api.get('/values')
     valuesList.value = (data || []).map(v => {
@@ -663,6 +759,10 @@ const getValues = async () => {
     goldCredits.value = [
       ...valuesList.value.filter(v => v.type_id === 1),
       ...unsavedCredits
+    ]
+    payoutMarkups.value = [
+      ...valuesList.value.filter(v => v.type_id === 5),
+      ...unsavedPayoutMarkups
     ]
     
     const dbCategories = valuesList.value.filter(v => v.type_id === 4)

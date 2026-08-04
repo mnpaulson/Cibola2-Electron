@@ -8,6 +8,7 @@ export const metadataState = reactive({
   goldCredits: [],
   metalPrices: [],
   customSheetCategories: [],
+  payoutMarkups: [],
   isLoading: false,
   isLoaded: false,
   error: null
@@ -31,6 +32,7 @@ export async function refreshMetadata() {
     metadataState.goldCredits = values.filter(v => v.type_id === 1)
     metadataState.metalPrices = values.filter(v => v.type_id === 2)
     metadataState.customSheetCategories = values.filter(v => v.type_id === 4)
+    metadataState.payoutMarkups = values.filter(v => v.type_id === 5)
 
     metadataState.isLoaded = true
     console.log('[Metadata Store] Successfully loaded cache')

@@ -62,20 +62,79 @@
               class="custom-date-field"
             ></v-text-field>
 
-            <div class="d-flex align-center gap-4 mb-4">
+            <!-- Payout Type & Markups Config -->
+            <v-sheet border class="pa-3 rounded-lg bg-light-surface mb-4">
+              <div class="d-flex align-center justify-space-between mb-2">
+                <span class="text-caption font-weight-bold text-medium-emphasis">Payout Type & Markups</span>
+                <v-btn
+                  v-if="!disabled && isMarkupsModified"
+                  icon="mdi-content-save"
+                  variant="text"
+                  density="comfortable"
+                  color="success"
+                  title="Commit markups globally as defaults"
+                  :loading="isSavingMarkups"
+                  @click="savePayoutMarkups"
+                ></v-btn>
+              </div>
+
               <v-radio-group
                 v-model="credit.credit_type"
                 inline
-                label="Payout Type *"
                 hide-details
                 :disabled="disabled"
+                class="mb-3"
               >
                 <v-radio label="Credit" value="credit" class="mr-3"></v-radio>
                 <v-radio label="Split" value="split" class="mr-3"></v-radio>
                 <v-radio label="Cash" value="cash"></v-radio>
               </v-radio-group>
 
-            </div>
+              <v-row dense>
+                <v-col cols="4">
+                  <v-text-field
+                    v-model="localMarkups.credit"
+                    label="Credit Markup"
+                    prefix="+"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    type="number"
+                    step="0.01"
+                    :disabled="disabled"
+                    @input="onMarkupInput"
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="4">
+                  <v-text-field
+                    v-model="localMarkups.split"
+                    label="Split Markup"
+                    prefix="+"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    type="number"
+                    step="0.01"
+                    :disabled="disabled"
+                    @input="onMarkupInput"
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="4">
+                  <v-text-field
+                    v-model="localMarkups.cash"
+                    label="Cash Markup"
+                    prefix="+"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    type="number"
+                    step="0.01"
+                    :disabled="disabled"
+                    @input="onMarkupInput"
+                  ></v-text-field>
+                </v-col>
+              </v-row>
+            </v-sheet>
 
             <!-- Spot Prices Info & Manual Update -->
             <MetalPricesCard
@@ -567,11 +626,113 @@ function removeItem(index) {
   recalculateTotal()
 }
 
+// Local state for editable payout markups
+const localMarkups = reactive({
+  credit: '0.20',
+  split: '0.10',
+  cash: '0.00'
+})
+const isSavingMarkups = ref(false)
+
+const activePayoutMarkups = computed(() => [
+  { name: 'credit', value1: String(localMarkups.credit) },
+  { name: 'split', value1: String(localMarkups.split) },
+  { name: 'cash', value1: String(localMarkups.cash) }
+])
+
+function syncLocalMarkupsFromMetadata() {
+  const markups = metadataState.payoutMarkups || []
+  const creditRec = markups.find(p => p.name && p.name.toLowerCase().trim() === 'credit')
+  const splitRec = markups.find(p => p.name && p.name.toLowerCase().trim() === 'split')
+  const cashRec = markups.find(p => p.name && p.name.toLowerCase().trim() === 'cash')
+
+  localMarkups.credit = creditRec?.value1 !== undefined && creditRec?.value1 !== null ? String(creditRec.value1) : '0.20'
+  localMarkups.split = splitRec?.value1 !== undefined && splitRec?.value1 !== null ? String(splitRec.value1) : '0.10'
+  localMarkups.cash = cashRec?.value1 !== undefined && cashRec?.value1 !== null ? String(cashRec.value1) : '0.00'
+}
+
+watch(
+  () => metadataState.payoutMarkups,
+  () => {
+    syncLocalMarkupsFromMetadata()
+  },
+  { immediate: true, deep: true }
+)
+
+const isMarkupsModified = computed(() => {
+  const markups = metadataState.payoutMarkups || []
+  const creditRec = markups.find(p => p.name && p.name.toLowerCase().trim() === 'credit')
+  const splitRec = markups.find(p => p.name && p.name.toLowerCase().trim() === 'split')
+  const cashRec = markups.find(p => p.name && p.name.toLowerCase().trim() === 'cash')
+
+  const origCredit = creditRec?.value1 !== undefined && creditRec?.value1 !== null ? parseFloat(creditRec.value1) || 0 : 0.20
+  const origSplit = splitRec?.value1 !== undefined && splitRec?.value1 !== null ? parseFloat(splitRec.value1) || 0 : 0.10
+  const origCash = cashRec?.value1 !== undefined && cashRec?.value1 !== null ? parseFloat(cashRec.value1) || 0 : 0.00
+
+  const curCredit = parseFloat(localMarkups.credit) || 0
+  const curSplit = parseFloat(localMarkups.split) || 0
+  const curCash = parseFloat(localMarkups.cash) || 0
+
+  return curCredit !== origCredit || curSplit !== origSplit || curCash !== origCash
+})
+
+function onMarkupInput() {
+  if (!disabled.value) {
+    itemList.value.forEach(item => {
+      recalculateItem(item)
+    })
+    recalculateTotal()
+  }
+}
+
+async function savePayoutMarkups() {
+  isSavingMarkups.value = true
+  try {
+    const markups = metadataState.payoutMarkups || []
+    const targets = [
+      { name: 'credit', value: String(parseFloat(localMarkups.credit) || 0) },
+      { name: 'split', value: String(parseFloat(localMarkups.split) || 0) },
+      { name: 'cash', value: String(parseFloat(localMarkups.cash) || 0) }
+    ]
+
+    const updates = []
+    for (const target of targets) {
+      const rec = markups.find(p => p.name && p.name.toLowerCase().trim() === target.name)
+      if (rec && rec.id) {
+        updates.push(
+          api.put(`/values/${rec.id}`, {
+            ...rec,
+            value1: target.value
+          })
+        )
+      } else {
+        updates.push(
+          api.post('/values', {
+            type_id: 5,
+            name: target.name,
+            value1: target.value,
+            active: 1
+          })
+        )
+      }
+    }
+
+    await Promise.all(updates)
+    await refreshMetadata()
+    showToast('Default payout markups saved to database', 'success')
+  } catch (err) {
+    console.error('Failed to save payout markups:', err)
+    showToast('Failed to save markups: ' + err.message, 'error')
+  } finally {
+    isSavingMarkups.value = false
+  }
+}
+
 function onItemTypeChange(item) {
   if (item.itemObj) {
     item.itemId = item.itemObj.id
     item.multiplier = parseFloat(item.itemObj.value1) || 0
-    item.markup = getAdjustedMarkup(item.itemObj.name, item.itemObj.value2, credit.credit_type)
+    item.markup = getAdjustedMarkup(item.itemObj.name, item.itemObj.value2, credit.credit_type, activePayoutMarkups.value)
     recalculateItem(item)
   } else {
     item.itemId = null
@@ -589,7 +750,7 @@ function recalculateItem(item) {
   const w = parseFloat(item.weight) || 0
   
   // Re-adjust markup factor locally based on active credit_type
-  item.markup = getAdjustedMarkup(item.itemObj.name, item.itemObj.value2, credit.credit_type)
+  item.markup = getAdjustedMarkup(item.itemObj.name, item.itemObj.value2, credit.credit_type, activePayoutMarkups.value)
   
   // Identify spot price per gram
   let spot = 1

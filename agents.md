@@ -251,3 +251,12 @@ To maintain project history and communicate patches clearly to users, all agents
 * **Dashboard Widgets Pagination**:
   * The `RecentlyViewed.vue` and `RecentlyCreated.vue` dashboard cards support up to 50 records paginated in slices of 10 items per page via the `DirectoryPagination.vue` component.
   * **Lazy Thumbnail Loading**: To avoid concurrent request spam on startup, `RecentlyCreated.vue` does not fetch thumbnails for all 50 items up front. Instead, it queries job details/thumbnails lazily via a watcher only when those jobs are visible on the active page. Once a thumbnail is fetched or marked as not present (null), it is cached in the local record array to prevent redundant network calls.
+
+---
+
+## 25. Payout Type Markups Protocol
+* **Database Storage**: Payout Type markup adjustment offsets (for Cash, Split, Credit) are stored in the `values` table with `type_id = 5` (`name: 'cash'`, `name: 'split'`, `name: 'credit'`, with `value1` storing the decimal markup offset).
+* **Metadata Cache**: Cached in `metadataState.payoutMarkups` alongside other lookup tables in [metadata.js](file:///c:/dev/Cibola2-Electron/src/store/metadata.js).
+* **Dynamic Calculations**: Centralized calculation `getAdjustedMarkup(itemName, baseMarkup, creditType, payoutMarkups)` in [pricing.js](file:///c:/dev/Cibola2-Electron/src/utils/pricing.js) applies these offsets to standard gold karats (8k, 9k, 10k, 12k, 14k, 18k).
+* **Form & Admin Management**: Markups are editable inline inside [CreditForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CreditForm.vue) (with a global save button to update DB defaults) and configurable in Admin settings on the Gold Credits screen in [CustomValuesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/CustomValuesAdmin.vue).
+

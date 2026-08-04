@@ -5,6 +5,15 @@ All notable changes to the Cibola2 Electron client will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Gold Credit Payout Markups**: Made Credit, Split, and Cash payout markup values editable and persistent:
+  - **Database Persistence**: Stored payout type markups in the `values` table with `type_id = 5` (records for Cash, Split, Credit storing decimal markup adjustment offsets) and cached them in `metadataState.payoutMarkups` in [metadata.js](file:///c:/dev/Cibola2-Electron/src/store/metadata.js).
+  - **Dynamic Pricing Calculations**: Updated `getAdjustedMarkup()` in [pricing.js](file:///c:/dev/Cibola2-Electron/src/utils/pricing.js) to resolve markup adjustment offsets dynamically from cached `payoutMarkups` values.
+  - **CreditForm Inline Editing**: Added editable markup offset text fields for Cash, Split, and Credit next to the Payout Type radio group in [CreditForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CreditForm.vue), complete with dynamic item recalculation and a "Save Markups" button to commit modified defaults globally to the database.
+  - **Admin Settings**: Added a "Payout Type Markups" configuration section on the Gold Credits page (`section === 'gold-credit'`) in [CustomValuesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/CustomValuesAdmin.vue) allowing administrators to edit and save default markup adjustments.
+
 ## [2.0.0]
 
 ### Changed
@@ -24,6 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Unified all note controls (`Add Note`, `Edit Note`, `Discard`, `Save Note`) into the card footer action bar, keeping the card body completely clean.
   - Set notes to be locked by default (`lockNotes: true`) and removed field `autofocus` to prevent unintended focus theft or edit mode entry when clicking customer names or loading customer records.
   - Moved save progress indicators to the Save button itself, eliminating layout movement and using toast notifications for save confirmation.
+- **Job Print Template & Layout**:
+  - Overhauled Quadrant 1 (Office/Store Copy) layout in `jobPrintTemplate.js`: stacked Customer Info (Name, Phone, Email) and Employee/Dates Meta info (`assignment_ind` & `event` icons) into dedicated rounded bordered cards in the left column.
+  - Expanded the right-hand Estimate Details box to match the full height of the stacked left cards.
+  - Implemented dynamic character-length font scaling for Customer Names and Image Notes.
+  - Removed legacy line-clamp CSS rules from multi-line job notes to prevent premature ellipsis truncation.
+  - Adjusted bottom receipt warning text size and positioning.
+- **Form Navigation & Admin Configuration**:
+  - Scoped the Print Preview button in `FormBottomNavigation.vue` to development environments (`import.meta.env.DEV`), hiding it automatically in production builds.
+  - Aligned the uncommitted customer changes warning banner relative to the active workspace area offset from the navigation sidebar.
+  - Removed update simulation mode toggle and purged all simulation state properties and logic from `LocalSettingsAdmin.vue` and `notifications.js`.
 
 ## [1.9.5]
 

@@ -47,19 +47,34 @@ export function calculateGoldCreditUnitPrice(value, weight) {
  * @param {string} itemName - Name of karat item (e.g. '10k', 'Platinum')
  * @param {number|string} baseMarkup - Baseline markup percentage (e.g. 0.6)
  * @param {string} creditType - Selected payout type ('credit', 'split', 'cash')
+ * @param {Array} [payoutMarkups] - Optional array of payout markup records from values table (type_id = 5)
  * @returns {number} The adjusted markup percentage
  */
-export function getAdjustedMarkup(itemName, baseMarkup, creditType) {
+export function getAdjustedMarkup(itemName, baseMarkup, creditType, payoutMarkups = []) {
   const parsedBase = parseFloat(baseMarkup) || 0
   const isAdjustableGold = ['8k', '9k', '10k', '12k', '14k', '18k'].includes(itemName)
   if (!isAdjustableGold) return parsedBase
 
   let adjustment = 0
-  if (creditType === 'credit') {
-    adjustment = 0.2
-  } else if (creditType === 'split') {
-    adjustment = 0.1
+  const normType = (creditType || 'cash').toLowerCase().trim()
+
+  if (Array.isArray(payoutMarkups) && payoutMarkups.length > 0) {
+    const record = payoutMarkups.find(p => p.name && p.name.toLowerCase().trim() === normType)
+    if (record && record.value1 !== undefined && record.value1 !== null && record.value1 !== '') {
+      adjustment = parseFloat(record.value1) || 0
+    } else {
+      if (normType === 'credit') adjustment = 0.2
+      else if (normType === 'split') adjustment = 0.1
+      else adjustment = 0
+    }
+  } else {
+    if (normType === 'credit') {
+      adjustment = 0.2
+    } else if (normType === 'split') {
+      adjustment = 0.1
+    }
   }
+
   return Math.round((parsedBase + adjustment) * 100) / 100
 }
 
