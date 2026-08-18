@@ -41,19 +41,19 @@ export function calculateGoldCreditUnitPrice(value, weight) {
 
 /**
  * Get adjusted markup based on the credit type (credit, split, cash).
- * Cash is the baseline. Split adds +10% (+0.1). Credit adds +20% (+0.2).
- * This adjustment only applies to standard gold karats: 8k, 9k, 10k, 12k, 14k, 18k.
+ * Resolves payout markup adjustments dynamically from payoutMarkups configuration.
+ * If ignoreTypeMarkup is true, returns baseMarkup directly.
  * 
  * @param {string} itemName - Name of karat item (e.g. '10k', 'Platinum')
  * @param {number|string} baseMarkup - Baseline markup percentage (e.g. 0.6)
  * @param {string} creditType - Selected payout type ('credit', 'split', 'cash')
  * @param {Array} [payoutMarkups] - Optional array of payout markup records from values table (type_id = 5)
+ * @param {boolean} [ignoreTypeMarkup] - Whether to ignore payout type markup adjustment
  * @returns {number} The adjusted markup percentage
  */
-export function getAdjustedMarkup(itemName, baseMarkup, creditType, payoutMarkups = []) {
+export function getAdjustedMarkup(itemName, baseMarkup, creditType, payoutMarkups = [], ignoreTypeMarkup = false) {
   const parsedBase = parseFloat(baseMarkup) || 0
-  const isAdjustableGold = ['8k', '9k', '10k', '12k', '14k', '18k'].includes(itemName)
-  if (!isAdjustableGold) return parsedBase
+  if (ignoreTypeMarkup) return parsedBase
 
   let adjustment = 0
   const normType = (creditType || 'cash').toLowerCase().trim()
@@ -62,16 +62,6 @@ export function getAdjustedMarkup(itemName, baseMarkup, creditType, payoutMarkup
     const record = payoutMarkups.find(p => p.name && p.name.toLowerCase().trim() === normType)
     if (record && record.value1 !== undefined && record.value1 !== null && record.value1 !== '') {
       adjustment = parseFloat(record.value1) || 0
-    } else {
-      if (normType === 'credit') adjustment = 0.2
-      else if (normType === 'split') adjustment = 0.1
-      else adjustment = 0
-    }
-  } else {
-    if (normType === 'credit') {
-      adjustment = 0.2
-    } else if (normType === 'split') {
-      adjustment = 0.1
     }
   }
 

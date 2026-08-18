@@ -29,9 +29,17 @@ export async function refreshMetadata() {
 
     const values = valuesData || []
     metadataState.customSheets = values.filter(v => v.type_id === 3)
-    metadataState.goldCredits = values.filter(v => v.type_id === 1)
+    metadataState.goldCredits = values.filter(v => v.type_id === 1).sort((a, b) => {
+      const orderA = a.order !== null && a.order !== undefined && a.order !== '' ? Number(a.order) : -999
+      const orderB = b.order !== null && b.order !== undefined && b.order !== '' ? Number(b.order) : -999
+      return orderB - orderA
+    })
     metadataState.metalPrices = values.filter(v => v.type_id === 2)
-    metadataState.customSheetCategories = values.filter(v => v.type_id === 4)
+    metadataState.customSheetCategories = values.filter(v => v.type_id === 4).sort((a, b) => {
+      const orderA = a.order !== null && a.order !== undefined && a.order !== '' ? Number(a.order) : -999
+      const orderB = b.order !== null && b.order !== undefined && b.order !== '' ? Number(b.order) : -999
+      return orderB - orderA
+    })
     metadataState.payoutMarkups = values.filter(v => v.type_id === 5)
 
     metadataState.isLoaded = true

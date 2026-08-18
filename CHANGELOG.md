@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Editable Line-Item Markup on Scrap Payout Form**: Converted the `Markup` column in [CreditForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CreditForm.vue) items table from static text to an editable numeric text field, allowing operators to manually customize the markup multiplier per item on the fly while automatically recalculating line item unit prices and total values.
+- **Gold Credit 'Ignore Payout Markup' Configuration (`value4`)**: Stored an ignore payout markup boolean in the `value4` column for Karat Metal Items (`type_id = 1` in `values` table):
+  - Added an "Ignore Payout Markup" switch column in [CustomValuesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/CustomValuesAdmin.vue) allowing administrators to configure which metals bypass payout type markup adjustments (such as Cash vs Split vs Credit).
+  - Updated `getAdjustedMarkup()` in [pricing.js](file:///c:/dev/Cibola2-Electron/src/utils/pricing.js) to dynamically bypass adjustments when `ignoreTypeMarkup` is true, eliminating hardcoded metal name lists (`['8k', '9k', '10k', '12k', '14k', '18k']`).
+  - Updated [CreditForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CreditForm.vue) to pass item `value4` flags dynamically when calculating and recalculating scrap payout line items.
+- **Gold Credit Item Reordering & Inactive Filter**: Replaced numeric order text inputs on the Gold Credits admin page in [CustomValuesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/CustomValuesAdmin.vue) with Up/Down buttons (`mdi-chevron-up` / `mdi-chevron-down`) for quick item reordering:
+  - Added interactive reordering with `moveGoldCredit()` to recalculate item sequence orders and batch update the database via `api.put`.
+  - Added a "Hide Inactive" toggle checkbox for Karat Metal Items matching sheet category configuration.
+  - Updated [metadata.js](file:///c:/dev/Cibola2-Electron/src/store/metadata.js) to sort `metadataState.goldCredits` by `order` descending so selection dropdowns throughout the app (such as [CreditForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CreditForm.vue)) reflect the configured sequence.
 - **Duplicate Contact Detection & Merging**: Built an automated fuzzy duplicate contact detection and merging suite:
   - **Database Schema**: Created `customer_duplicates` table in SQLite schema storing potential duplicate customer pairs with similarity scores, match reasons, and status tracking (`unreviewed`, `merged`, `rejected`).
   - **Fuzzy & Weighted Match Engine**: Built `duplicateDetector.js` module featuring weighted Levenshtein distance on normalized names, phone numbers, and email matching to flag pairs scoring >= 75% similarity.
@@ -21,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Top-Right Hide Customer Note Button**: Added a compact icon button (`mdi-eye-off-outline`) in the top-right corner of the customer note field in [CustomerForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CustomerForm.vue) to easily hide customer notes for privacy.
 
 ### Changed
+- **Credit Form Save Defaults Button Text**: Updated the save markup defaults button in [CreditForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CreditForm.vue) to explicitly display the text "Save Defaults" alongside the save icon.
 - **Customer Profile Contact Layout**: Updated [CustomerForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CustomerForm.vue) contact info block layout so customer email addresses render on a newline directly below the phone number for cleaner visual hierarchy.
 - **Navigation Drawer Logo Header Alignment**: Styled `.drawer-logo-header` in [App.vue](file:///c:/dev/Cibola2-Electron/src/App.vue) to explicitly match the 64px height of `<v-app-bar>`, ensuring the navigation drawer logo divider lines up seamlessly with the main header bar border.
 - **Spot Metal Price Auto-Sync Interval**: Adjusted background auto-refresh threshold in [MetalPricesCard.vue](file:///c:/dev/Cibola2-Electron/src/components/MetalPricesCard.vue) from 15 minutes to **23 hours** (and updated `priceAgeWarn` stale indicator threshold to 23 hours), while maintaining immediate on-demand manual sync and inline editing.

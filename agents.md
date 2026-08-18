@@ -197,7 +197,7 @@ To keep the Admin settings component clean and maintainable, the local parameter
 * **Dedicated Sub-Components**: All content pages are extracted into individual files under `src/components/admin/`:
   * [LocalSettingsAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/LocalSettingsAdmin.vue): Local parameters (network connection URL, camera configuration, printer routing, and update triggers).
   * [EmployeesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/EmployeesAdmin.vue): Store employee directory table, profile editor, active status toggles, and deletion confirmation dialog.
-  * [CustomValuesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/CustomValuesAdmin.vue): Unified configurations table. It accepts a `section` prop from `Admin.vue` to determine which dynamic table configuration to mount (Custom Sheets, Categories, or Gold Credits multipliers). All database lookup loading and inline table status tools (mark pending, save on blur, up/down category order movements) are self-contained here.
+  * [CustomValuesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/CustomValuesAdmin.vue): Unified configurations table. It accepts a `section` prop from `Admin.vue` to determine which dynamic table configuration to mount (Custom Sheets, Categories, or Gold Credits multipliers). All database lookup loading, inactive filtering, and inline table status tools (mark pending, save on blur, up/down order movement buttons for categories and karat metal items) are self-contained here.
 
 ---
 ## 21. Application Versioning Configuration
@@ -257,8 +257,9 @@ To maintain project history and communicate patches clearly to users, all agents
 ## 25. Payout Type Markups Protocol
 * **Database Storage**: Payout Type markup adjustment offsets (for Cash, Split, Credit) are stored in the `values` table with `type_id = 5` (`name: 'cash'`, `name: 'split'`, `name: 'credit'`, with `value1` storing the decimal markup offset).
 * **Metadata Cache**: Cached in `metadataState.payoutMarkups` alongside other lookup tables in [metadata.js](file:///c:/dev/Cibola2-Electron/src/store/metadata.js).
-* **Dynamic Calculations**: Centralized calculation `getAdjustedMarkup(itemName, baseMarkup, creditType, payoutMarkups)` in [pricing.js](file:///c:/dev/Cibola2-Electron/src/utils/pricing.js) applies these offsets to standard gold karats (8k, 9k, 10k, 12k, 14k, 18k).
-* **Form & Admin Management**: Markups are editable inline inside [CreditForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CreditForm.vue) (with a global save button to update DB defaults) and configurable in Admin settings on the Gold Credits screen in [CustomValuesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/CustomValuesAdmin.vue).
+* **Dynamic Calculations**: Centralized calculation `getAdjustedMarkup(itemName, baseMarkup, creditType, payoutMarkups, ignoreTypeMarkup)` in [pricing.js](file:///c:/dev/Cibola2-Electron/src/utils/pricing.js) dynamically applies these offsets to metal items based on whether `ignoreTypeMarkup` is false.
+* **Ignore Payout Markup (`value4`)**: Each Karat Metal Item (`type_id = 1`) in the `values` table stores an `ignoreTypeMarkup` flag in its `value4` column (`'1'` to ignore type adjustments, `'0'` / `null` to apply adjustments).
+* **Form & Admin Management**: Payout type adjustment offsets are editable inline at the top of [CreditForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CreditForm.vue) (with a global save button to update DB defaults) and configurable in Admin settings on the Gold Credits screen in [CustomValuesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/CustomValuesAdmin.vue) via an "Ignore Payout Markup" switch column. Additionally, individual line-item markups are directly editable in the credit items table for on-the-fly custom pricing adjustments.
 
 ---
 

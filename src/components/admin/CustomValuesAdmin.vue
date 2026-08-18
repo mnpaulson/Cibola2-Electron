@@ -375,9 +375,20 @@
         </v-card>
       </div>
 
-      <div class="text-subtitle-1 font-weight-bold text-primary mb-2 d-flex align-center">
-        <v-icon size="20" class="mr-2" color="primary">mdi-gold</v-icon>
-        Karat Metal Items
+      <div class="d-flex align-center justify-space-between mb-2">
+        <div class="text-subtitle-1 font-weight-bold text-primary d-flex align-center">
+          <v-icon size="20" class="mr-2" color="primary">mdi-gold</v-icon>
+          Karat Metal Items
+        </div>
+        <div class="d-flex align-center gap-3">
+          <v-checkbox
+            v-model="hideInactiveGoldCredits"
+            label="Hide Inactive"
+            hide-details
+            density="compact"
+            color="primary"
+          ></v-checkbox>
+        </div>
       </div>
 
       <v-card variant="outlined" class="border-light">
@@ -385,12 +396,12 @@
           <v-table hover class="config-table">
             <thead>
               <tr>
-                <th class="font-weight-bold" style="width: 22%">Name</th>
-                <th class="font-weight-bold" style="width: 18%">
+                <th class="font-weight-bold" style="width: 18%">Name</th>
+                <th class="font-weight-bold" style="width: 16%">
                   Metal Price Multiplier
                   <v-tooltip activator="parent" location="bottom">Multiplied by the spot rate (e.g. 14k = 0.585)</v-tooltip>
                 </th>
-                <th class="font-weight-bold" style="width: 12%">
+                <th class="font-weight-bold" style="width: 10%">
                   Markup
                   <v-tooltip activator="parent" location="bottom">Value factor multiplied to metal price and weight</v-tooltip>
                 </th>
@@ -398,13 +409,20 @@
                   Metal Type
                   <v-tooltip activator="parent" location="bottom">Assigns 'Gold' or 'Platinum' spot prices to evaluate item value</v-tooltip>
                 </th>
-                <th class="font-weight-bold" style="width: 8%">Order</th>
-                <th class="font-weight-bold text-center" style="width: 10%">Active</th>
-                <th class="text-right font-weight-bold" style="width: 18%">Actions</th>
+                <th class="font-weight-bold text-center" style="width: 14%">
+                  Ignore Payout Markup
+                  <v-tooltip activator="parent" location="bottom">When enabled, payout type markup adjustments will not be added to this metal</v-tooltip>
+                </th>
+                <th class="font-weight-bold" style="width: 10%">
+                  Order
+                  <v-tooltip activator="parent" location="bottom">Reorder gold credit items</v-tooltip>
+                </th>
+                <th class="font-weight-bold text-center" style="width: 8%">Active</th>
+                <th class="text-right font-weight-bold" style="width: 12%">Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="val in goldCredits" :key="val.tempId">
+              <tr v-for="(val, index) in filteredGoldCredits" :key="val.tempId">
                 <td class="py-1">
                   <v-text-field
                     v-model="val.name"
@@ -451,15 +469,41 @@
                   ></v-text-field>
                 </td>
                 <td class="py-1">
-                  <v-text-field
-                    v-model="val.order"
-                    density="compact"
-                    variant="underlined"
-                    hide-details
-                    type="number"
-                    @input="markPending(val)"
-                    @blur="saveIfPending(val)"
-                  ></v-text-field>
+                  <div class="d-flex justify-center">
+                    <v-switch
+                      :model-value="val.value4 === '1' || val.value4 === 'true'"
+                      @update:model-value="toggleIgnoreTypeMarkup(val)"
+                      color="primary"
+                      density="compact"
+                      hide-details
+                      inset
+                      :disabled="val.saveStatus === 'saving'"
+                    ></v-switch>
+                  </div>
+                </td>
+                <td class="py-1">
+                  <div class="d-flex align-center gap-1">
+                    <v-btn
+                      icon="mdi-chevron-up"
+                      variant="tonal"
+                      color="primary"
+                      size="x-small"
+                      density="comfortable"
+                      :disabled="index === 0"
+                      title="Move Up"
+                      @click="moveGoldCredit(val, 'up')"
+                    ></v-btn>
+                    <v-btn
+                      icon="mdi-chevron-down"
+                      variant="tonal"
+                      color="primary"
+                      size="x-small"
+                      density="comfortable"
+                      :disabled="index === filteredGoldCredits.length - 1"
+                      title="Move Down"
+                      @click="moveGoldCredit(val, 'down')"
+                    ></v-btn>
+                  </div>
                 </td>
                 <td class="py-1">
                   <div class="d-flex justify-center">
@@ -504,8 +548,10 @@
                   </div>
                 </td>
               </tr>
-              <tr v-if="goldCredits.length === 0">
-                <td colspan="7" class="text-center py-6 text-medium-emphasis">No gold credit items configured.</td>
+              <tr v-if="filteredGoldCredits.length === 0">
+                <td colspan="8" class="text-center py-6 text-medium-emphasis">
+                  {{ goldCredits.length === 0 ? 'No gold credit items configured.' : 'No active gold credit items found matching the filter.' }}
+                </td>
               </tr>
             </tbody>
           </v-table>
@@ -584,6 +630,7 @@ const valueDeleteDialog = ref(false)
 const valueToDelete = ref(null)
 const hideInactiveCustomSheets = ref(true)
 const hideInactiveCategories = ref(true)
+const hideInactiveGoldCredits = ref(true)
 
 const payoutMarkupsList = computed(() => {
   const defaultTypes = [
@@ -611,6 +658,13 @@ const filteredCustomSheets = computed(() => {
     return customSheets.value.filter(val => val.active === 1 || !val.id || val.justDeactivated)
   }
   return customSheets.value
+})
+
+const filteredGoldCredits = computed(() => {
+  if (hideInactiveGoldCredits.value) {
+    return goldCredits.value.filter(val => val.active === 1 || !val.id || val.justDeactivated)
+  }
+  return goldCredits.value
 })
 
 const filteredCustomSheetCategories = computed(() => {
@@ -756,8 +810,13 @@ const getValues = async () => {
       ...valuesList.value.filter(v => v.type_id === 3),
       ...unsavedSheets
     ]
+    const dbGoldCredits = valuesList.value.filter(v => v.type_id === 1)
     goldCredits.value = [
-      ...valuesList.value.filter(v => v.type_id === 1),
+      ...dbGoldCredits.sort((a, b) => {
+        const orderA = a.order !== null && a.order !== undefined && a.order !== '' ? Number(a.order) : -999
+        const orderB = b.order !== null && b.order !== undefined && b.order !== '' ? Number(b.order) : -999
+        return orderB - orderA
+      }),
       ...unsavedCredits
     ]
     payoutMarkups.value = [
@@ -788,6 +847,13 @@ const toggleValueActive = async (val) => {
     val.justDeactivated = false
   }
   
+  if (val.id) {
+    await saveValue(val)
+  }
+}
+
+const toggleIgnoreTypeMarkup = async (val) => {
+  val.value4 = (val.value4 === '1' || val.value4 === 'true') ? '0' : '1'
   if (val.id) {
     await saveValue(val)
   }
@@ -853,6 +919,7 @@ const newValue = (typeId, defaultCategory = '') => {
     value1: defaultCategory,
     value2: '',
     value3: typeId === 1 ? 'Gold' : '',
+    value4: '0',
     order: '',
     markup: '1',
     default: '1',
@@ -882,6 +949,7 @@ const saveValue = async (value) => {
       value1: value.value1 !== null && value.value1 !== undefined ? String(value.value1).trim() : null,
       value2: value.value2 !== null && value.value2 !== undefined ? String(value.value2).trim() : null,
       value3: value.value3 !== null && value.value3 !== undefined ? String(value.value3).trim() : null,
+      value4: value.value4 !== null && value.value4 !== undefined ? String(value.value4).trim() : null,
       order: value.order !== null && value.order !== undefined ? String(value.order).trim() : null,
       markup: value.markup !== null && value.markup !== undefined ? String(value.markup).trim() : null,
       default: value.default !== null && value.default !== undefined ? String(value.default).trim() : null,
@@ -975,26 +1043,76 @@ const moveCategory = async (item, direction) => {
   customSheetCategories.value = [...mainList]
   
   try {
-    const itemsToSave = [item, targetItem].filter(it => it.id)
-    for (const it of itemsToSave) {
+    const itemsToSave = mainList.filter(it => it.id)
+    await Promise.all(itemsToSave.map(it => {
       const payload = {
         name: it.name.trim(),
         value1: it.value1 !== null && it.value1 !== undefined ? String(it.value1).trim() : null,
         value2: it.value2 !== null && it.value2 !== undefined ? String(it.value2).trim() : null,
         value3: it.value3 !== null && it.value3 !== undefined ? String(it.value3).trim() : null,
+        value4: it.value4 !== null && it.value4 !== undefined ? String(it.value4).trim() : null,
         order: String(it.order),
         markup: it.markup !== null && it.markup !== undefined ? String(it.markup).trim() : null,
         default: it.default !== null && it.default !== undefined ? String(it.default).trim() : null,
         active: it.active === 0 || it.active === false ? 0 : 1
       }
-      await api.put(`/values/${it.id}`, payload)
-    }
+      return api.put(`/values/${it.id}`, payload)
+    }))
     
     await refreshMetadata()
     await getValues()
     showSnackbar('Category order updated successfully', 'success')
   } catch (err) {
     showSnackbar('Failed to save category order: ' + err.message, 'error')
+  }
+}
+
+const moveGoldCredit = async (item, direction) => {
+  const filteredList = filteredGoldCredits.value
+  const filteredIndex = filteredList.indexOf(item)
+  if (filteredIndex === -1) return
+  
+  const targetFilteredIndex = direction === 'up' ? filteredIndex - 1 : filteredIndex + 1
+  if (targetFilteredIndex < 0 || targetFilteredIndex >= filteredList.length) return
+  
+  const targetItem = filteredList[targetFilteredIndex]
+  
+  const mainList = goldCredits.value
+  const index = mainList.indexOf(item)
+  const targetIndex = mainList.indexOf(targetItem)
+  if (index === -1 || targetIndex === -1) return
+  
+  mainList[index] = targetItem
+  mainList[targetIndex] = item
+  
+  mainList.forEach((it, idx) => {
+    it.order = mainList.length - idx
+  })
+  
+  goldCredits.value = [...mainList]
+  
+  try {
+    const itemsToSave = mainList.filter(it => it.id)
+    await Promise.all(itemsToSave.map(it => {
+      const payload = {
+        name: it.name.trim(),
+        value1: it.value1 !== null && it.value1 !== undefined ? String(it.value1).trim() : null,
+        value2: it.value2 !== null && it.value2 !== undefined ? String(it.value2).trim() : null,
+        value3: it.value3 !== null && it.value3 !== undefined ? String(it.value3).trim() : null,
+        value4: it.value4 !== null && it.value4 !== undefined ? String(it.value4).trim() : null,
+        order: String(it.order),
+        markup: it.markup !== null && it.markup !== undefined ? String(it.markup).trim() : null,
+        default: it.default !== null && it.default !== undefined ? String(it.default).trim() : null,
+        active: it.active === 0 || it.active === false ? 0 : 1
+      }
+      return api.put(`/values/${it.id}`, payload)
+    }))
+    
+    await refreshMetadata()
+    await getValues()
+    showSnackbar('Gold credit item order updated successfully', 'success')
+  } catch (err) {
+    showSnackbar('Failed to save item order: ' + err.message, 'error')
   }
 }
 
@@ -1019,6 +1137,14 @@ watch(hideInactiveCustomSheets, (newVal) => {
 watch(hideInactiveCategories, (newVal) => {
   if (newVal) {
     customSheetCategories.value.forEach(v => {
+      v.justDeactivated = false
+    })
+  }
+})
+
+watch(hideInactiveGoldCredits, (newVal) => {
+  if (newVal) {
+    goldCredits.value.forEach(v => {
       v.justDeactivated = false
     })
   }
