@@ -213,7 +213,22 @@ export async function fetchGlobalRecentlyViewed() {
   try {
     const data = await api.get('/recently-viewed')
     if (Array.isArray(data)) {
-      recentlyViewedState.globalRecords = data
+      const current = recentlyViewedState.globalRecords
+      // Smart check: avoid replacing the array reference if contents are identical
+      const isIdentical = current.length === data.length &&
+        data.every((newItem, i) => {
+          const oldItem = current[i]
+          return oldItem &&
+            oldItem.id === newItem.id &&
+            oldItem.type === newItem.type &&
+            oldItem.viewedAt === newItem.viewedAt &&
+            oldItem.details === newItem.details &&
+            oldItem.customerName === newItem.customerName
+        })
+
+      if (!isIdentical) {
+        recentlyViewedState.globalRecords = data
+      }
     }
   } catch (err) {
     console.error('[RecentlyViewed] Failed to fetch global recently viewed records:', err)

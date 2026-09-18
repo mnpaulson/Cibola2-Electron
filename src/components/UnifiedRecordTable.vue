@@ -1,6 +1,22 @@
 <template>
-  <div class="unified-record-table-container">
-    <v-table hover fixed-header class="unified-record-table" style="table-layout: fixed; width: 100%;" v-if="!loading && processedRecords.length > 0">
+  <div class="unified-record-table-container position-relative">
+    <!-- Subtle top progress bar during background loading when records already exist -->
+    <v-progress-linear
+      v-if="loading && processedRecords.length > 0"
+      indeterminate
+      color="primary"
+      height="2"
+      class="table-loading-bar"
+    />
+
+    <v-table
+      hover
+      fixed-header
+      class="unified-record-table"
+      :class="{ 'table-refreshing': loading && processedRecords.length > 0 }"
+      style="table-layout: fixed; width: 100%;"
+      v-if="processedRecords.length > 0"
+    >
       <thead>
         <tr>
           <th class="text-left font-weight-bold text-caption py-2" style="width: 50px;">Preview</th>
@@ -112,14 +128,14 @@
       </tbody>
     </v-table>
 
-    <!-- Loading State -->
-    <div v-else-if="loading" class="d-flex flex-column align-center justify-center py-12">
+    <!-- Loading State (only shown when no records are present) -->
+    <div v-else-if="loading" class="d-flex flex-column align-center justify-center py-12 table-placeholder-state">
       <v-progress-circular indeterminate size="36" color="primary"></v-progress-circular>
       <div v-if="loadingText" class="mt-2 text-caption text-medium-emphasis">{{ loadingText }}</div>
     </div>
 
     <!-- Empty State -->
-    <div v-else class="d-flex flex-column align-center justify-center py-12 text-center">
+    <div v-else class="d-flex flex-column align-center justify-center py-12 text-center table-placeholder-state">
       <v-avatar color="grey-lighten-3" size="64" class="mb-3">
         <v-icon size="32" color="grey-darken-1">{{ emptyIcon }}</v-icon>
       </v-avatar>
@@ -285,6 +301,23 @@ function goToRecord(item) {
 </script>
 
 <style scoped>
+.table-loading-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+}
+
+.table-refreshing {
+  opacity: 0.88;
+  transition: opacity 0.2s ease;
+}
+
+.table-placeholder-state {
+  min-height: 280px;
+}
+
 .unified-record-table :deep(th) {
   background-color: rgba(var(--v-theme-surface-variant), 0.04) !important;
 }
@@ -294,7 +327,7 @@ function goToRecord(item) {
 }
 
 .transition-row {
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .transition-row:hover {
