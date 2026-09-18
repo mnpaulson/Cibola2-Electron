@@ -3,7 +3,9 @@ import { sessionState } from './session'
 import { api } from '../utils/api'
 
 export const recentlyViewedState = reactive({
-  records: []
+  records: [],         // Local records (persisted in localStorage)
+  globalRecords: [],   // Global records (fetched from central backend)
+  loadingGlobal: false
 })
 
 // Map to prevent redundant concurrent fetches for the same record
@@ -68,6 +70,9 @@ export function addRecentRecord(record) {
 // Remove a record (used during deletion)
 export function removeRecentRecord(type, id) {
   recentlyViewedState.records = recentlyViewedState.records.filter(
+    r => !(r.id === id && r.type === type)
+  )
+  recentlyViewedState.globalRecords = recentlyViewedState.globalRecords.filter(
     r => !(r.id === id && r.type === type)
   )
   saveRecentlyViewed()
@@ -173,6 +178,50 @@ export async function refreshRecentRecord(type, id) {
   }
 }
 
+// Track last recorded view to debounce / prevent duplicate POST requests
+let lastRecordedView = {
+  type: null,
+  id: null,
+  timestamp: 0
+}
+
+// Record a single view to the central backend database
+export async function recordGlobalView(type, id) {
+  if (!type || !id || sessionState.connectionStatus !== 'connected') return
+
+  const now = Date.now()
+  // Debounce if the same record was recorded within 5 minutes
+  if (lastRecordedView.type === type && lastRecordedView.id === id && (now - lastRecordedView.timestamp < 5 * 60 * 1000)) {
+    return
+  }
+
+  lastRecordedView = { type, id, timestamp: now }
+
+  try {
+    await api.post('/recently-viewed', { type, id })
+  } catch (err) {
+    // Fail quietly without interrupting UX if network request fails
+    console.debug('[RecentlyViewed] Failed to post global view:', err)
+  }
+}
+
+// Fetch hydrated global recent records from central server
+export async function fetchGlobalRecentlyViewed() {
+  if (sessionState.connectionStatus !== 'connected') return
+
+  recentlyViewedState.loadingGlobal = true
+  try {
+    const data = await api.get('/recently-viewed')
+    if (Array.isArray(data)) {
+      recentlyViewedState.globalRecords = data
+    }
+  } catch (err) {
+    console.error('[RecentlyViewed] Failed to fetch global recently viewed records:', err)
+  } finally {
+    recentlyViewedState.loadingGlobal = false
+  }
+}
+
 // Watch global navigation to automatically record views
 watch(
   () => [
@@ -183,14 +232,26 @@ watch(
     sessionState.activeSheetId
   ],
   async ([tab, custId, jobId, creditId, sheetId]) => {
+    let activeType = null
+    let activeId = null
+
     if (tab === 'jobs' && jobId && jobId !== 0) {
-      await refreshRecentRecord('job', jobId)
+      activeType = 'job'
+      activeId = jobId
     } else if (tab === 'credits' && creditId && creditId !== 0) {
-      await refreshRecentRecord('credit', creditId)
+      activeType = 'credit'
+      activeId = creditId
     } else if (tab === 'custom' && sheetId && sheetId !== 0) {
-      await refreshRecentRecord('sheet', sheetId)
+      activeType = 'sheet'
+      activeId = sheetId
     } else if (tab === 'customers' && custId && custId !== 0) {
-      await refreshRecentRecord('customer', custId)
+      activeType = 'customer'
+      activeId = custId
+    }
+
+    if (activeType && activeId) {
+      await refreshRecentRecord(activeType, activeId)
+      recordGlobalView(activeType, activeId)
     }
   },
   { deep: true, immediate: true }

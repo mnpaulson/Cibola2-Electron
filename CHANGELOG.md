@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Global Recently Viewed History Across Clients**:
+  - **Central Database Sync**: Added a backend `recently_viewed` table in `cibola2` schema and REST endpoints (`POST /recently-viewed`, `GET /recently-viewed`) that track unique record views across all terminals and hydrate up to 50 records with details, estimates, and thumbnails.
+  - **Single-Record Debounced View Dispatch**: Client dispatches atomic view notifications (`{ type, id }`) upon user navigation, automatically debounced to prevent duplicate requests when switching tabs or viewing the same record.
+  - **All vs Local History Toggle**: Added a compact segmented button toggle (`[ All | Local ]`) in the card header of [RecentlyViewed.vue](file:///c:/dev/Cibola2-Electron/src/components/RecentlyViewed.vue), defaulting to `All` on application launch while allowing operators to switch to local device history.
+  - **Auto-Polling & Manual Refresh**: Implemented 45-second auto-polling while viewing the Dashboard, auto-fetching on connection recovery, and added a manual refresh button (`mdi-refresh`).
+  - **Removed Clear History Broom**: Removed the legacy clear history broom button to prevent accidental purge of global and local viewing history.
 - **Editable Line-Item Markup on Scrap Payout Form**: Converted the `Markup` column in [CreditForm.vue](file:///c:/dev/Cibola2-Electron/src/components/CreditForm.vue) items table from static text to an editable numeric text field, allowing operators to manually customize the markup multiplier per item on the fly while automatically recalculating line item unit prices and total values.
 - **Gold Credit 'Ignore Payout Markup' Configuration (`value4`)**: Stored an ignore payout markup boolean in the `value4` column for Karat Metal Items (`type_id = 1` in `values` table):
   - Added an "Ignore Payout Markup" switch column in [CustomValuesAdmin.vue](file:///c:/dev/Cibola2-Electron/src/components/admin/CustomValuesAdmin.vue) allowing administrators to configure which metals bypass payout type markup adjustments (such as Cash vs Split vs Credit).

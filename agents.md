@@ -243,7 +243,12 @@ To maintain project history and communicate patches clearly to users, all agents
 ---
 
 ## 24. Dashboard History Capacity & Search Bar Suggestions
-* **Recently Viewed Capacity**: The maximum limit for recently viewed items stored in `recentlyViewedState.records` (localStorage) is 50.
+* **Recently Viewed Architecture (Global vs Local)**:
+  * **Global Storage & Deduplication**: Record views across all client terminals are recorded centrally in the backend `recently_viewed` database table with schema `(id, record_type, record_id, viewed_at, UNIQUE(record_type, record_id))`. Each record appears once in the list, bumping to the top with an updated timestamp whenever any client views it. The backend keeps this table pruned to the latest 100 entries.
+  * **Single-Record Dispatching**: When an operator navigates to view a record, the client dispatches a lightweight atomic `POST /recently-viewed` with strictly `{ type, id }` (never posting bulk arrays). The client debounces dispatches using `lastRecordedView` so repeat navigation within 5 minutes or switching tabs within the same open record does not dispatch redundant network calls.
+  * **Hydrated Global Fetch**: `GET /recently-viewed` returns the latest 50 view records pre-hydrated with customer details, estimates, and thumbnails. Any stale references for deleted entities are automatically pruned by the backend.
+  * **View Mode Toggle**: `RecentlyViewed.vue` displays a compact segmented button toggle in the card header (`[ All | Local ]`). The view mode always defaults to `'all'` on application launch. Switching to `'local'` displays `recentlyViewedState.records` loaded from `localStorage`.
+  * **Polling & Manual Refresh**: When viewing 'All', `RecentlyViewed.vue` automatically polls `GET /recently-viewed` every 45 seconds while the dashboard is mounted, auto-fetches upon reconnecting, and provides a manual refresh button (`mdi-refresh`) in the header. The legacy 'Clear History' broom action is removed.
 * **Customer Suggestions**: The customer search bar in `CustomerForm.vue` shows up to 5 recently viewed customer records when focused/selected and the input query is empty. To support this:
   * When resolving customer views (`refreshRecentRecord('customer', id)`), fetch and store the individual fields (`fname`, `lname`, and `phone`) to make them immediately suggestible.
   * In `CustomerForm.vue`, compute `recentCustomers` and fall back to parsing `details` if fields are missing for backwards compatibility.
