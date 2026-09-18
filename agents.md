@@ -35,6 +35,7 @@ POS thermal printers and ticket printers are highly sensitive to print margins a
 * `deviceName: printerName` (Target the configured system printer).
 * `margins: { marginType: 'none' }` (Prevents text clipping and excessive paper rolling).
 * **Template Margins**: When designing print templates (especially quadrant/split-page A4 layouts like [jobPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/jobPrintTemplate.js)), use a minimum padding/margin of `5mm` on outer edges in CSS to prevent hardware/physical printer margins from clipping elements when using `marginType: 'none'`.
+* **Urgent Due Date Highlight**: On the job printout ([jobPrintTemplate.js](file:///c:/dev/Cibola2-Electron/src/utils/jobPrintTemplate.js)), due dates must stand out prominently on both color and monochrome/thermal printouts. Rather than standard red text alone (which prints faint in grayscale), due dates are rendered as a high-contrast badge (`background-color: #c62828`, white text `#fff`, `font-weight: 900`, red transition arrow, and `.icon-urgent` calendar icon). The date font size is bumped to `13.5px` when no due date is entered, and `11.5px` / `12.5px` for the badge when a due date is entered to maximize readability without impacting card layout or causing line wraps.
 * **Validation**: Validate that a target printer is selected in the local settings before triggering print. Provide user feedback (via SnackBar toasts) if printing fails to enqueue, instead of failing silently.
 
 ---

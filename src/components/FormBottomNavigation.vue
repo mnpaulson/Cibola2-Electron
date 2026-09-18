@@ -67,9 +67,6 @@
       <span>Discard</span>
     </v-btn>
 
-    <!-- Spacer to push Delete to the right -->
-    <v-spacer v-if="showDelete"></v-spacer>
-
     <!-- Delete (Saved records) -->
     <v-btn
       v-if="showDelete"

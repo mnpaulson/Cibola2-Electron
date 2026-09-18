@@ -196,11 +196,12 @@
                 <!-- Hidden State Bar placeholder when note is hidden -->
                 <div
                   v-else
-                  class="flex-grow-1 d-flex align-center px-3 py-2 text-caption text-medium-emphasis bg-grey-lighten-4 rounded-e"
-                  style="border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); border-left: none; cursor: pointer;"
+                  class="hidden-note-bar flex-grow-1 d-flex align-center justify-space-between px-3 py-2 text-caption"
+                  :class="startingNote ? 'rounded-e attached-bar' : 'rounded-lg'"
                   @click="isNoteHidden = false"
+                  title="Click to view customer note"
                 >
-                  <em>(Click to view)</em>
+                  <span class="text-caption font-italic text-primary font-weight-medium ml-2">(Click to view)</span>
                 </div>
               </div>
             </v-col>
@@ -1106,6 +1107,23 @@ onMounted(() => {
 .attached-textarea :deep(.v-field__outline__start) {
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
+}
+
+.hidden-note-bar {
+  background: rgba(var(--v-theme-on-surface), 0.05);
+  border: 1px solid rgba(var(--v-border-color), 0.15);
+  cursor: pointer;
+  color: rgb(var(--v-theme-on-surface));
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  user-select: none;
+  min-height: 56px;
+}
+.hidden-note-bar.attached-bar {
+  border-left: none;
+}
+.hidden-note-bar:hover {
+  background: rgba(var(--v-theme-on-surface), 0.09);
+  border-color: rgba(var(--v-theme-primary), 0.5);
 }
 
 .stat-card {

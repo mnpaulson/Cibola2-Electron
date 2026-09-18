@@ -353,7 +353,7 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
     }
     .meta-block .block-content {
       justify-content: space-around;
-      padding: 1px 4px;
+      padding: 1px 3px;
       height: 100%;
     }
     .estimate-block .block-content {
@@ -373,9 +373,12 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
     }
     .info-icon {
       font-size: 12px !important;
-      margin-right: 4px;
+      margin-right: 3px;
       color: #555;
       flex-shrink: 0;
+    }
+    .info-icon.icon-urgent {
+      color: #c62828 !important;
     }
     .job-id-val {
       font-size: 10.5px;
@@ -385,15 +388,29 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
       margin-left: 2px;
     }
     .date-val {
-      font-size: 11.5px;
+      font-size: 13.5px;
       font-weight: bold;
     }
     .date-val.date-small {
-      font-size: 10px;
+      font-size: 11.5px;
       font-weight: bold;
     }
+    .date-arrow {
+      color: #c62828;
+      font-weight: bold;
+      margin: 0 1px;
+    }
     .date-urgent {
-      color: red;
+      font-size: 12.5px;
+      font-weight: 900;
+      color: #fff !important;
+      background-color: #c62828;
+      border: 1px solid #b71c1c;
+      padding: 1px 4px;
+      border-radius: 3px;
+      letter-spacing: 0.2px;
+      display: inline-block;
+      line-height: 1.15;
     }
 
     .est-amount {
@@ -654,9 +671,9 @@ export function generateJobPrintHTML({ job, customer, activeEmployees = [] }) {
                   <span><strong>${empName}</strong> <span class="job-id-val">#${job.id || ''}</span></span>
                 </div>
                 <div class="info-line">
-                  <span class="material-icons info-icon">event</span>
+                  <span class="material-icons info-icon ${dueDateStr ? 'icon-urgent' : ''}">event</span>
                   <span class="date-val ${dueDateStr ? 'date-small' : ''}">
-                    ${createdDateStr}${dueDateStr ? ` → <span class="date-urgent">${dueDateStr}</span>` : ''}
+                    ${createdDateStr}${dueDateStr ? `<span class="date-arrow">→</span><span class="date-urgent">${dueDateStr}</span>` : ''}
                   </span>
                 </div>
               </div>
